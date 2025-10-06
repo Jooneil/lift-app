@@ -44,17 +44,7 @@ export const planApi = {
   },
 };
 
-export const prefsApi = {
-  async get(): Promise<{ lastPlanServerId?: number; lastWeekId?: string; lastDayId?: string } | null> {
-    const { data } = await supabase.from('user_prefs').select('last_plan_server_id,last_week_id,last_day_id').maybeSingle();
-    if (!data) return null;
-    const d = data as { last_plan_server_id?: number; last_week_id?: string; last_day_id?: string };
-    return { lastPlanServerId: d.last_plan_server_id, lastWeekId: d.last_week_id, lastDayId: d.last_day_id };
-  },
-  async save(lastPlanServerId: number | null, lastWeekId: string | null, lastDayId: string | null): Promise<{ ok: true }> {
-    const { error } = await supabase.from('user_prefs').upsert({ last_plan_server_id: lastPlanServerId, last_week_id: lastWeekId, last_day_id: lastDayId }, { onConflict: 'user_id' }); if (error) throw error; return { ok: true };
-  },
-};
+// prefsApi removed; use src/api/userPrefs.ts instead
 
 export const sessionApi = {
   async save(planServerId: number, planWeekId: string, planDayId: string, session: SessionPayload): Promise<{ ok: true }> {

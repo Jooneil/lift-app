@@ -1,7 +1,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
-import { api, planApi, prefsApi, sessionApi, templateApi } from "./api";
+import { api, planApi, sessionApi, templateApi } from "./api";
+import { getUserPrefs, upsertUserPrefs } from './api/userPrefs';
 import { supabase } from "./supabaseClient";
 import type {
   ServerPlanRow,
@@ -257,11 +258,11 @@ function AuthedApp({
         const loaded: Plan[] = rows.map((row) => mapServerPlan(row));
         setPlans(loaded);
 
-        const raw = (await prefsApi.get()) || {};
+        const up = await getUserPrefs().catch(() => null);
         const prefs = {
-          lastPlanServerId: raw.lastPlanServerId ?? null,
-          lastWeekId: raw.lastWeekId ?? null,
-          lastDayId: raw.lastDayId ?? null,
+          lastPlanServerId: up?.last_plan_server_id ?? null,
+          lastWeekId: up?.last_week_id ?? null,
+          lastDayId: up?.last_day_id ?? null,
         };
 
         let plan = typeof prefs.lastPlanServerId === "number"
@@ -317,7 +318,11 @@ function AuthedApp({
     const serverId = plan?.serverId ?? null;
     const weekId = selectedWeekId ?? null;
     const dayId = selectedDayId ?? null;
-    prefsApi.save(serverId, weekId, dayId).catch(() => {});
+    upsertUserPrefs({
+      last_plan_server_id: serverId ?? null,
+      last_week_id: weekId,
+      last_day_id: dayId,
+    }).catch(() => {});
   }, [plans, selectedPlanId, selectedWeekId, selectedDayId]);
 
   useEffect(() => {
