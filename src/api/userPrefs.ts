@@ -22,26 +22,19 @@ export async function getUserPrefs() {
   return (data as UserPrefs) || null
 }
 
-export async function upsertUserPrefs(partial: Partial<UserPrefs>) {
+export async function upsertUserPrefs(partial: {
+  last_plan_server_id?: number | null
+  last_week_id?: string | null
+  last_day_id?: string | null
+}) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
 
-  // Prefer storing values inside prefs jsonb to avoid type/column mismatches
-  const payload: Partial<UserPrefs> = { user_id: user.id } as UserPrefs
-  if (partial.prefs) {
-    payload.prefs = partial.prefs as Record<string, unknown>
-  } else {
-    const pl = partial as { last_plan_server_id?: number|null; last_week_id?: string|null; last_day_id?: string|null }
-    payload.prefs = {
-      last_plan_server_id: pl.last_plan_server_id ?? null,
-      last_week_id: pl.last_week_id ?? null,
-      last_day_id: pl.last_day_id ?? null,
-    }
-  }
+  const payload = { user_id: user.id, ...partial }
 
   const { data, error } = await supabase
     .from('user_prefs')
-    .upsert(payload)
+    .upsert(payload, { onConflict: 'user_id' })
     .select()
     .single()
 
