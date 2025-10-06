@@ -9,7 +9,16 @@ export type ServerPlanRow = { id: string; name?: string; data?: ServerPlanData; 
 export type SessionSetPayload = { id: string; setIndex: number; weight: number | null; reps: number | null };
 export type SessionEntryPayload = { id: string; exerciseName: string; sets: SessionSetPayload[] };
 export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
-// Narrow helper types removed; rely on supabase-js response inference
+// Helper to generate a UUID for tables that may not have a default
+const genUuid = () => (
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      })
+);
 
 export const api = {
   async me(): Promise<{ id: number; username: string } | null> {
@@ -70,7 +79,7 @@ export const sessionApi = {
 
     const ins = await supabase
       .from('sessions')
-      .insert([{ plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId, data: session }])
+      .insert([{ id: genUuid(), plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId, data: session }])
       .select('plan_id')
       .single();
     if (ins.error) throw ins.error;
@@ -88,7 +97,7 @@ export const sessionApi = {
 
       const ins = await supabase
         .from('completions')
-        .insert([{ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }])
+        .insert([{ id: genUuid(), plan_id: planServerId, week_id: planWeekId, day_id: planDayId, completed_at: new Date().toISOString() }])
         .select('plan_id')
         .single();
       if (ins.error) throw ins.error;
