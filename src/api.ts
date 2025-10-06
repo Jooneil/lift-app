@@ -48,11 +48,37 @@ export const planApi = {
 
 export const sessionApi = {
   async save(planServerId: number, planWeekId: string, planDayId: string, session: SessionPayload): Promise<{ ok: true }> {
-    const { error } = await supabase.from('sessions').upsert({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId, data: session }, { onConflict: 'user_id,plan_id,week_id,day_id' }); if (error) throw error; return { ok: true };
+    // Upsert using the unique composite (plan_id, week_id, day_id)
+    const res: any = await supabase
+      .from('sessions')
+      .upsert({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId, data: session }, { onConflict: 'plan_id,week_id,day_id' })
+      .select('plan_id');
+    if (res.error) throw res.error; return { ok: true };
   },
   async complete(planServerId: number, planWeekId: string, planDayId: string, completed?: boolean): Promise<{ ok: true }> {
-    if (completed) { const { error } = await supabase.from('completions').upsert({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }, { onConflict: 'user_id,plan_id,week_id,day_id' }); if (error) throw error; }
-    else { const { error } = await supabase.from('completions').delete().match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }); if (error) throw error; }
+    if (completed) {
+      // Update-first, then insert if missing (no unique constraint required)
+      const upd: any = await supabase
+        .from('completions')
+        .update({ completed_at: new Date().toISOString() })
+        .match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId })
+        .select('plan_id')
+        .maybeSingle();
+      if (!upd.data) {
+        const ins: any = await supabase
+          .from('completions')
+          .insert([{ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }])
+          .select('plan_id')
+          .single();
+        if (ins.error) throw ins.error;
+      } else if (upd.error) { throw upd.error; }
+    } else {
+      const { error } = await supabase
+        .from('completions')
+        .delete()
+        .match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId });
+      if (error) throw error;
+    }
     return { ok: true };
   },
   async lastCompleted(planServerId: number): Promise<{ week_id: string; day_id: string } | null> {
