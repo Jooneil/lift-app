@@ -15,7 +15,7 @@ import type {
   SessionSetPayload,
 } from "./api";
 
-type Plan = { id: string; serverId?: number; predecessorPlanId?: number; name: string; weeks: PlanWeek[] };
+type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
 type PlanDay = { id: string; name: string; items: PlanExercise[] };
 type PlanExercise = { id: string; exerciseName: string; targetSets: number; targetReps?: string };
@@ -198,7 +198,7 @@ function AuthedApp({
     return {
       id: uuid(),
       serverId: row.id,
-      predecessorPlanId: typeof row.predecessor_plan_id === "number" ? row.predecessor_plan_id : undefined,
+      predecessorPlanId: typeof row.predecessor_plan_id === "string" ? row.predecessor_plan_id : undefined,
       name: row.name ?? "Plan",
       weeks,
     };

@@ -5,7 +5,7 @@ export type ServerPlanItem = { id?: string; exerciseName?: string; targetSets?: 
 export type ServerPlanDay = { id?: string; name?: string; items?: ServerPlanItem[] };
 export type ServerPlanWeek = { id?: string; name?: string; days?: ServerPlanDay[] };
 export type ServerPlanData = { weeks?: ServerPlanWeek[]; days?: ServerPlanDay[] };
-export type ServerPlanRow = { id: number; name?: string; data?: ServerPlanData; archived?: 0 | 1 | boolean; predecessor_plan_id?: number | null };
+export type ServerPlanRow = { id: string; name?: string; data?: ServerPlanData; archived?: 0 | 1 | boolean; predecessor_plan_id?: string | null };
 export type SessionSetPayload = { id: string; setIndex: number; weight: number | null; reps: number | null };
 export type SessionEntryPayload = { id: string; exerciseName: string; sets: SessionSetPayload[] };
 export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
@@ -29,15 +29,15 @@ export const planApi = {
     const { data: row, error } = await supabase.from('plans').insert([{ name, data, archived: 0 }]).select('id,name,data,archived,predecessor_plan_id').single();
     if (error) throw error; return row as unknown as ServerPlanRow;
   },
-  async update(id: number, name: string, data: ServerPlanData): Promise<ServerPlanRow> {
+  async update(id: string, name: string, data: ServerPlanData): Promise<ServerPlanRow> {
     const { data: row, error } = await supabase.from('plans').update({ name, data }).eq('id', id).select('id,name,data,archived,predecessor_plan_id').single();
     if (error) throw error; return row as unknown as ServerPlanRow;
   },
-  async remove(id: number): Promise<{ ok: true }> { const { error } = await supabase.from('plans').delete().eq('id', id); if (error) throw error; return { ok: true }; },
-  async archive(id: number): Promise<{ ok: true; id: number }> { const { error } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
-  async unarchive(id: number): Promise<{ ok: true; id: number }> { const { error } = await supabase.from('plans').update({ archived: 0 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
+  async remove(id: string): Promise<{ ok: true }> { const { error } = await supabase.from('plans').delete().eq('id', id); if (error) throw error; return { ok: true }; },
+  async archive(id: string): Promise<{ ok: true; id: string }> { const { error } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
+  async unarchive(id: string): Promise<{ ok: true; id: string }> { const { error } = await supabase.from('plans').update({ archived: 0 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
   async listArchived(): Promise<ServerPlanRow[]> { const { data, error } = await supabase.from('plans').select('id,name,data,archived,predecessor_plan_id').eq('archived', 1).order('id', { ascending: false }); if (error) throw error; return (data ?? []) as unknown as ServerPlanRow[]; },
-  async rollover(id: number): Promise<ServerPlanRow> {
+  async rollover(id: string): Promise<ServerPlanRow> {
     const { data: plan, error: e1 } = await supabase.from('plans').select('id,name,data').eq('id', id).single(); if (e1) throw e1;
     const currentName = String((plan as { name?: string } | null)?.name || 'Plan'); const match = currentName.match(/\(#(\d+)\)\s*$/); const nextN = match ? Number(match[1]) + 1 : 2; const base = match ? currentName.replace(/\(#\d+\)\s*$/, '').trim() : currentName.trim(); const newName = `${base} (#${nextN})`;
     const { error: e2 } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (e2) throw e2;
@@ -49,43 +49,38 @@ export const planApi = {
 
 export const sessionApi = {
   async save(planServerId: number | string, planWeekId: string, planDayId: string, session: SessionPayload): Promise<{ ok: true }> {
-    const pid = String(planServerId);
-    // 1) Try update existing row first
-    const upd: SupabaseResp<{ plan_id: string }> = await supabase
-      .from('sessions')
-      .update({ data: session })
-      .match({ plan_id: pid, week_id: planWeekId, day_id: planDayId })
-      .select('plan_id')
-      .maybeSingle();
-    if (upd.data) return { ok: true };
-    if (upd.error && upd.error.code && upd.error.code !== 'PGRST116') throw upd.error;
+    // Be defensive about plan_id type: numeric if possible, else string
+    const pidNumeric =
+      typeof planServerId === 'number'
+        ? planServerId
+        : /^\d+$/.test(planServerId)
+          ? Number(planServerId)
+          : undefined;
+    const planIdForRow: number | string = pidNumeric !== undefined ? pidNumeric : String(planServerId);
 
-    // 2) No row updated, insert a new one
-    const ins: SupabaseResp<{ plan_id: string }> = await supabase
+    // Use upsert to handle insert-or-update in a single call (avoids PATCH 406 on first save)
+    const upsertRes: SupabaseResp<{ plan_id: string }> = await supabase
       .from('sessions')
-      .insert([{ plan_id: pid, week_id: planWeekId, day_id: planDayId, data: session }])
+      .upsert(
+        [{ plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId, data: session }],
+        { onConflict: 'plan_id,week_id,day_id' }
+      )
       .select('plan_id')
       .single();
-    if (ins.error) throw ins.error;
+    if (upsertRes.error) throw upsertRes.error;
     return { ok: true };
   },
-  async complete(planServerId: number, planWeekId: string, planDayId: string, completed?: boolean): Promise<{ ok: true }> {
+  async complete(planServerId: number | string, planWeekId: string, planDayId: string, completed?: boolean): Promise<{ ok: true }> {
     if (completed) {
-      // Update-first, then insert if missing (no unique constraint required)
-      const upd: SupabaseResp<{ plan_id: string }> = await supabase
+      const up: SupabaseResp<{ plan_id: string }> = await supabase
         .from('completions')
-        .update({ completed_at: new Date().toISOString() })
-        .match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId })
+        .upsert(
+          [{ plan_id: planServerId, week_id: planWeekId, day_id: planDayId, completed_at: new Date().toISOString() }],
+          { onConflict: 'plan_id,week_id,day_id' }
+        )
         .select('plan_id')
-        .maybeSingle();
-      if (!upd.data) {
-        const ins: SupabaseResp<{ plan_id: string }> = await supabase
-          .from('completions')
-          .insert([{ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }])
-          .select('plan_id')
-          .single();
-        if (ins.error) throw ins.error;
-      } else if (upd.error) { throw upd.error; }
+        .single();
+      if (up.error) throw up.error;
     } else {
       const { error } = await supabase
         .from('completions')
@@ -95,16 +90,16 @@ export const sessionApi = {
     }
     return { ok: true };
   },
-  async lastCompleted(planServerId: number): Promise<{ week_id: string; day_id: string } | null> {
+  async lastCompleted(planServerId: number | string): Promise<{ week_id: string; day_id: string } | null> {
     const { data } = await supabase.from('completions').select('week_id,day_id,completed_at').eq('plan_id', planServerId).order('completed_at', { ascending: false }).limit(1).maybeSingle(); return (data as { week_id: string; day_id: string } | null) ?? null;
   },
-  async last(planServerId: number, planWeekId: string, planDayId: string): Promise<SessionPayload | null> {
+  async last(planServerId: number | string, planWeekId: string, planDayId: string): Promise<SessionPayload | null> {
     const { data } = await supabase.from('sessions').select('data').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); return (data as { data?: SessionPayload } | null)?.data ?? null;
   },
-  async status(planServerId: number, planWeekId: string, planDayId: string): Promise<{ completed: boolean }> {
+  async status(planServerId: number | string, planWeekId: string, planDayId: string): Promise<{ completed: boolean }> {
     const { data } = await supabase.from('completions').select('plan_id').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); return { completed: !!data };
   },
-  async completedList(planServerId: number): Promise<Array<{ week_id: string; day_id: string }>> {
+  async completedList(planServerId: number | string): Promise<Array<{ week_id: string; day_id: string }>> {
     const { data } = await supabase.from('completions').select('week_id,day_id').eq('plan_id', planServerId).order('completed_at', { ascending: true }); return (data ?? []) as Array<{ week_id: string; day_id: string }>;
   },
 };

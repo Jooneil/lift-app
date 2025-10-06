@@ -2,7 +2,7 @@ import { supabase } from '../supabaseClient'
 
 export type UserPrefs = {
   user_id: string
-  last_plan_server_id?: number | null
+  last_plan_server_id?: string | null
   last_week_id?: string | null
   last_day_id?: string | null
   prefs?: Record<string, unknown> | null
