@@ -108,6 +108,6 @@ export type ServerTemplateRow = ServerPlanRow;
 export const templateApi = {
   async list(): Promise<ServerTemplateRow[]> { const { data, error } = await supabase.from('templates').select('id,name,data').order('id', { ascending: false }); if (error) throw error; return (data ?? []) as unknown as ServerTemplateRow[]; },
   async create(name: string, data: ServerPlanData): Promise<ServerTemplateRow> { const { data: row, error } = await supabase.from('templates').insert([{ name, data }]).select('id,name,data').single(); if (error) throw error; return row as unknown as ServerTemplateRow; },
-  async update(id: number, name: string, data: ServerPlanData): Promise<ServerTemplateRow> { const { data: row, error } = await supabase.from('templates').update({ name, data }).eq('id', id).select('id,name,data').single(); if (error) throw error; return row as unknown as ServerTemplateRow; },
-  async remove(id: number): Promise<{ ok: true }> { const { error } = await supabase.from('templates').delete().eq('id', id); if (error) throw error; return { ok: true }; },
+  async update(id: string, name: string, data: ServerPlanData): Promise<ServerTemplateRow> { const { data: row, error } = await supabase.from('templates').update({ name, data }).eq('id', id).select('id,name,data').single(); if (error) throw error; return row as unknown as ServerTemplateRow; },
+  async remove(id: string): Promise<{ ok: true }> { const { error } = await supabase.from('templates').delete().eq('id', id); if (error) throw error; return { ok: true }; },
 };
