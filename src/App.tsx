@@ -13,7 +13,6 @@ import type {
   SessionEntryPayload,
   SessionSetPayload,
 } from "./api";
-import SmokeTest from './SmokeTest'
 
 type Plan = { id: string; serverId?: number; predecessorPlanId?: number; name: string; weeks: PlanWeek[] };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
@@ -110,9 +109,6 @@ export default function App() {
 
   return (
     <div>
-      {/* Supabase smoke test panel on the front page for quick auth + table checks */}
-      <SmokeTest />
-
       {checking ? (
         <div style={{ padding: 20 }}>Loading...</div>
       ) : !user ? (

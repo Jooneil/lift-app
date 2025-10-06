@@ -96,12 +96,6 @@ export const api = {
   supaSession(accessToken: string): Promise<{ id: number; username: string }> {
     return j("/api/supa/session", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
   },
-  login(username: string, password: string): Promise<{ id: number; username: string }> {
-    return j("/api/login", { method: "POST", body: JSON.stringify({ username, password }) });
-  },
-  register(username: string, password: string): Promise<{ id: number; username: string }> {
-    return j("/api/register", { method: "POST", body: JSON.stringify({ username, password }) });
-  },
   logout(): Promise<{ ok: true }> {
     return j("/api/logout", { method: "POST" });
   },

@@ -5,6 +5,7 @@ import session from "express-session";
 import connectSqlite3 from "connect-sqlite3";
 import cors from "cors";
 import path from "node:path";
+import dotenv from "dotenv";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import sqlite3 from "sqlite3";
@@ -12,6 +13,15 @@ import sqlite3 from "sqlite3";
 // --- __dirname shim for ESM ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables for server and also fall back to root-level env files used by Vite
+// Order: server/.env.local -> server/.env -> project/.env.local -> project/.env -> project/env.local (no dot) -> project/env
+dotenv.config({ path: path.join(__dirname, ".env.local") });
+dotenv.config({ path: path.join(__dirname, ".env") });
+dotenv.config({ path: path.join(__dirname, "..", ".env.local") });
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
+dotenv.config({ path: path.join(__dirname, "..", "env.local") });
+dotenv.config({ path: path.join(__dirname, "..", "env") });
 
 // --- DB (SQLite): server/credsdb.txt ---
 const DB_FILE = path.join(__dirname, "credsdb.txt");
@@ -33,6 +43,7 @@ db.serialize(() => {
 
 // --- Express app ---
 const app = express();
+app.set("trust proxy", 1);
 app.use(
   cors({
     origin: (_origin, cb) => cb(null, true), // dev: allow all (lets your phone connect)
@@ -53,7 +64,11 @@ app.use(
     secret: process.env.SESSION_SECRET || "dev-secret",
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 * 30 }, // 30 days
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      sameSite: "lax",
+      secure: !!process.env.COOKIE_SECURE || /^https:/i.test(process.env.PUBLIC_ORIGIN || ""),
+    },
   })
 );
 
@@ -122,32 +137,7 @@ app.get("/api/me", (req, res) => {
   res.json(req.session.user || null);
 });
 
-app.post("/api/register", (req, res) => {
-  const { username, password } = req.body || {};
-  if (!username || !password) return res.status(400).send("Missing username or password");
-  db.run(
-    "INSERT INTO users (username, password) VALUES (?, ?)",
-    [username, password],
-    function (err) {
-      if (err) return res.status(400).send("Username taken");
-      req.session.user = { id: this.lastID, username };
-      res.json(req.session.user);
-    }
-  );
-});
-
-app.post("/api/login", (req, res) => {
-  const { username, password } = req.body || {};
-  db.get(
-    "SELECT id, username FROM users WHERE username=? AND password=?",
-    [username, password],
-    (err, row) => {
-      if (err || !row) return res.status(401).send("Invalid credentials");
-      req.session.user = { id: row.id, username: row.username };
-      res.json(req.session.user);
-    }
-  );
-});
+// legacy username/password endpoints removed in favor of Supabase auth
 
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
@@ -161,9 +151,15 @@ app.post("/api/supa/session", async (req, res) => {
     const token = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : (req.body && req.body.token) || "";
     if (!token) return res.status(400).json({ error: "Missing Supabase token" });
 
-    const SUPA_URL = process.env.SUPABASE_URL;
-    const SUPA_ANON = process.env.SUPABASE_ANON_KEY;
-    if (!SUPA_URL || !SUPA_ANON) return res.status(500).json({ error: "Server missing Supabase env" });
+    // Accept either server envs or (as a convenience) Vite-style envs
+    const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const SUPA_ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    if (!SUPA_URL || !SUPA_ANON) {
+      return res.status(500).json({
+        error: "Server missing Supabase env",
+        hint: "Set SUPABASE_URL and SUPABASE_ANON_KEY (or VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY) on the server",
+      });
+    }
 
     const uRes = await fetch(`${SUPA_URL.replace(/\/$/, "")}/auth/v1/user`, {
       headers: {
