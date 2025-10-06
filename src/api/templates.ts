@@ -1,12 +1,17 @@
 import { supabase } from '../supabaseClient'
 
 export async function listTemplates() {
-  const { data, error } = await supabase
+  const res = await supabase
     .from('templates')
     .select('id,name,data')
     .order('id', { ascending: false })
-  if (error) throw error
-  return data ?? []
+  if (res.error) {
+    // If table doesn't exist yet, return empty list instead of crashing UI
+    const code = (res.error as { code?: string }).code
+    if (code === '42P01' || res.error.message.includes('not found')) return []
+    throw res.error
+  }
+  return res.data ?? []
 }
 
 export async function createTemplate(name: string, data: Record<string, unknown> = {}) {

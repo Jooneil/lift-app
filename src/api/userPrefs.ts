@@ -31,13 +31,14 @@ export async function upsertUserPrefs(partial: {
   if (!user) throw new Error('Not signed in')
 
   const payload = { user_id: user.id, ...partial }
-
+  // Robust approach: delete any existing rows for this user, then insert fresh.
+  // This avoids 409 conflicts when unique constraints are missing or duplicates exist.
+  await supabase.from('user_prefs').delete().eq('user_id', user.id)
   const { data, error } = await supabase
     .from('user_prefs')
-    .upsert(payload, { onConflict: 'user_id' })
+    .insert([payload])
     .select()
     .single()
-
   if (error) throw error
   return data as UserPrefs
 }
