@@ -102,7 +102,14 @@ export default function App() {
   useEffect(() => {
     api
       .me()
-      .then(setUser)
+      .then((u) => {
+        const valid = !!(u && typeof (u as { id?: unknown; username?: unknown }).id === 'number' && typeof (u as { id: number; username?: unknown }).username === 'string' && (u as { id: number; username?: string }).username);
+        if (valid) {
+          setUser(u)
+        } else {
+          setUser(null)
+        }
+      })
       .catch(() => {})
       .finally(() => setChecking(false));
   }, []);
