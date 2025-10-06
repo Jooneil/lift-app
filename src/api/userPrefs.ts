@@ -23,23 +23,23 @@ export async function getUserPrefs() {
 }
 
 export async function upsertUserPrefs(partial: {
-  last_plan_server_id?: number | null
+  last_plan_server_id?: string | null
   last_week_id?: string | null
   last_day_id?: string | null
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
 
-  // Normalize payload (avoid sending user_id in UPDATE body)
-  const normalized: { last_plan_server_id?: number | null; last_week_id?: string | null; last_day_id?: string | null } = {
-    last_plan_server_id: typeof partial.last_plan_server_id === 'number' || partial.last_plan_server_id === null ? partial.last_plan_server_id : null,
+  // Write only to prefs JSON to avoid column type mismatches
+  const prefs: Record<string, unknown> = {
+    last_plan_server_id: typeof partial.last_plan_server_id === 'string' || partial.last_plan_server_id === null ? partial.last_plan_server_id : null,
     last_week_id: typeof partial.last_week_id === 'string' || partial.last_week_id === null ? partial.last_week_id : null,
     last_day_id: typeof partial.last_day_id === 'string' || partial.last_day_id === null ? partial.last_day_id : null,
   }
   // Try update-first: if a row exists for this user, update it; otherwise insert.
   const upd = await supabase
     .from('user_prefs')
-    .update(normalized)
+    .update({ prefs })
     .eq('user_id', user.id)
     .select()
     .maybeSingle()
@@ -52,7 +52,7 @@ export async function upsertUserPrefs(partial: {
   // No row updated; insert one
   const ins = await supabase
     .from('user_prefs')
-    .insert([{ user_id: user.id, ...normalized }])
+    .insert([{ user_id: user.id, prefs }])
     .select()
     .single()
   if (ins.error) {
@@ -61,7 +61,7 @@ export async function upsertUserPrefs(partial: {
     if (code === '23505' || code === '409' || ins.error.message.toLowerCase().includes('conflict')) {
       const retry = await supabase
         .from('user_prefs')
-        .update(normalized)
+        .update({ prefs })
         .eq('user_id', user.id)
         .select()
         .maybeSingle()

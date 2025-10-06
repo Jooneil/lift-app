@@ -259,14 +259,15 @@ function AuthedApp({
         setPlans(loaded);
 
         const up = await getUserPrefs().catch(() => null);
+        const p = (up?.prefs as { last_plan_server_id?: string|null; last_week_id?: string|null; last_day_id?: string|null } | null) || null;
         const prefs = {
-          lastPlanServerId: up?.last_plan_server_id ?? null,
-          lastWeekId: up?.last_week_id ?? null,
-          lastDayId: up?.last_day_id ?? null,
+          lastPlanServerId: p?.last_plan_server_id ?? null,
+          lastWeekId: p?.last_week_id ?? null,
+          lastDayId: p?.last_day_id ?? null,
         };
 
-        let plan = typeof prefs.lastPlanServerId === "number"
-          ? loaded.find((p) => p.serverId === prefs.lastPlanServerId) || null
+        let plan = prefs.lastPlanServerId
+          ? loaded.find((p) => String(p.serverId ?? '') === String(prefs.lastPlanServerId)) || null
           : null;
         if (!plan) plan = loaded[0] ?? null;
         if (!plan) {
@@ -318,7 +319,8 @@ function AuthedApp({
     const serverId = plan?.serverId ?? null;
     const weekId = selectedWeekId ?? null;
     const dayId = selectedDayId ?? null;
-    upsertUserPrefs({ last_plan_server_id: serverId ?? null, last_week_id: weekId, last_day_id: dayId }).catch(() => {});
+    const planIdStr: string | null = serverId == null ? null : String(serverId);
+    upsertUserPrefs({ last_plan_server_id: planIdStr, last_week_id: weekId, last_day_id: dayId }).catch(() => {});
   }, [plans, selectedPlanId, selectedWeekId, selectedDayId]);
 
   useEffect(() => {

@@ -34,7 +34,11 @@ export function useUserPrefs() {
     error,
     refresh,
     upsert: async (partial: Partial<UserPrefs>) => {
-      const next = await upsertUserPrefs(partial)
+      const next = await upsertUserPrefs({
+        last_plan_server_id: (partial as { last_plan_server_id?: string|null }).last_plan_server_id ?? null,
+        last_week_id: (partial as { last_week_id?: string|null }).last_week_id ?? null,
+        last_day_id: (partial as { last_day_id?: string|null }).last_day_id ?? null,
+      })
       setPrefs(next)
       return next
     },
