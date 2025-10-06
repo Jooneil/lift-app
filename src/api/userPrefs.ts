@@ -50,6 +50,20 @@ export async function upsertUserPrefs(partial: {
     .insert([payload])
     .select()
     .single()
-  if (ins.error) throw ins.error
+  if (ins.error) {
+    // If a concurrent insert or existing row caused conflict, try update again
+    const code = (ins.error as { code?: string }).code
+    if (code === '23505' || code === '409' || ins.error.message.toLowerCase().includes('conflict')) {
+      const retry = await supabase
+        .from('user_prefs')
+        .update(payload)
+        .eq('user_id', user.id)
+        .select()
+        .maybeSingle()
+      if (retry.error) throw retry.error
+      if (retry.data) return retry.data as UserPrefs
+    }
+    throw ins.error
+  }
   return ins.data as UserPrefs
 }
