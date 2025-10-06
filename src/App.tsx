@@ -259,10 +259,11 @@ function AuthedApp({
         setPlans(loaded);
 
         const up = await getUserPrefs().catch(() => null);
+        const p = (up?.prefs as { last_plan_server_id?: number|null; last_week_id?: string|null; last_day_id?: string|null } | null) || {};
         const prefs = {
-          lastPlanServerId: up?.last_plan_server_id ?? null,
-          lastWeekId: up?.last_week_id ?? null,
-          lastDayId: up?.last_day_id ?? null,
+          lastPlanServerId: p.last_plan_server_id ?? up?.last_plan_server_id ?? null,
+          lastWeekId: p.last_week_id ?? up?.last_week_id ?? null,
+          lastDayId: p.last_day_id ?? up?.last_day_id ?? null,
         };
 
         let plan = typeof prefs.lastPlanServerId === "number"
@@ -318,11 +319,7 @@ function AuthedApp({
     const serverId = plan?.serverId ?? null;
     const weekId = selectedWeekId ?? null;
     const dayId = selectedDayId ?? null;
-    upsertUserPrefs({
-      last_plan_server_id: serverId ?? null,
-      last_week_id: weekId,
-      last_day_id: dayId,
-    }).catch(() => {});
+    upsertUserPrefs({ prefs: { last_plan_server_id: serverId ?? null, last_week_id: weekId, last_day_id: dayId } }).catch(() => {});
   }, [plans, selectedPlanId, selectedWeekId, selectedDayId]);
 
   useEffect(() => {
