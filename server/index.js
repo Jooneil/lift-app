@@ -127,9 +127,41 @@ db.serialize(() => {
 });
 
 // ---- Auth helpers
-function requireAuth(req, res, next) {
-  if (!req.session.user) return res.status(401).json({ error: "Not logged in" });
-  next();
+async function requireAuth(req, res, next) {
+  if (req.session.user) return next();
+  try {
+    const auth = req.headers["authorization"] || "";
+    const token = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (!token) return res.status(401).json({ error: "Not logged in" });
+
+    const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const SUPA_ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    if (!SUPA_URL || !SUPA_ANON) return res.status(500).json({ error: "Server missing Supabase env" });
+
+    const uRes = await fetch(`${SUPA_URL.replace(/\/$/, "")}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: SUPA_ANON },
+    });
+    if (!uRes.ok) return res.status(401).json({ error: "Invalid Supabase token" });
+    const user = await uRes.json();
+    const email = String(user?.email || "").trim();
+    if (!email) return res.status(401).json({ error: "Invalid user" });
+
+    await new Promise((resolve) => {
+      db.run(
+        "INSERT INTO users (username, password) VALUES (?, ?) ON CONFLICT(username) DO NOTHING",
+        [email, ""],
+        () => resolve()
+      );
+    });
+    const row = await new Promise((resolve, reject) => {
+      db.get("SELECT id, username FROM users WHERE username=?", [email], (err, r) => (err ? reject(err) : resolve(r)));
+    });
+    if (!row) return res.status(500).json({ error: "Failed to load/create local user" });
+    req.session.user = { id: row.id, username: row.username };
+    next();
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
 }
 
 // ---- Auth routes

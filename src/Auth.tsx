@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "./api";
+// no direct API calls needed for auth
 import { supabase } from "./supabaseClient";
 
 export default function Auth({ onAuthed }: { onAuthed: (u:{id:number,username:string})=>void }) {
@@ -20,10 +20,8 @@ export default function Auth({ onAuthed }: { onAuthed: (u:{id:number,username:st
       }
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      const access = data.session?.access_token;
-      if (!access) throw new Error('No access token');
-      const me = await api.supaSession(access);
-      onAuthed(me);
+      const userEmail = data.user?.email || email;
+      onAuthed({ id: 0, username: userEmail });
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Error');
     } finally {

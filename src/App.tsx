@@ -100,18 +100,17 @@ export default function App() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    api
-      .me()
-      .then((u) => {
-        const valid = !!(u && typeof (u as { id?: unknown; username?: unknown }).id === 'number' && typeof (u as { id: number; username?: unknown }).username === 'string' && (u as { id: number; username?: string }).username);
-        if (valid) {
-          setUser(u)
-        } else {
-          setUser(null)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setChecking(false));
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const email = data?.user?.email || null;
+        setUser(email ? { id: 0, username: email } : null);
+      } catch {
+        setUser(null);
+      } finally {
+        setChecking(false);
+      }
+    })();
   }, []);
 
   return (

@@ -59,13 +59,25 @@ export type SessionPayload = {
 };
 
 const BASE = ""; // same origin (Vite proxy or same host)
+import { supabase } from "./supabaseClient";
 
 // ---------- tiny fetch helpers ----------
 async function j<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
+  // Attach Supabase access token if present so the server can authorize without app session
+  let authHeader: Record<string, string> = {};
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (token) authHeader = { Authorization: `Bearer ${token}` };
+  } catch {
+    // ignore
+  }
+
   const res = await fetch(BASE + path, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...authHeader,
       ...(opts.headers || {}),
     },
     ...opts,
@@ -92,9 +104,6 @@ async function j<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> 
 export const api = {
   me(): Promise<{ id: number; username: string } | null> {
     return j("/api/me");
-  },
-  supaSession(accessToken: string): Promise<{ id: number; username: string }> {
-    return j("/api/supa/session", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
   },
   logout(): Promise<{ ok: true }> {
     return j("/api/logout", { method: "POST" });
