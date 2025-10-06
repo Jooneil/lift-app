@@ -9,6 +9,7 @@ export type ServerPlanRow = { id: number; name?: string; data?: ServerPlanData; 
 export type SessionSetPayload = { id: string; setIndex: number; weight: number | null; reps: number | null };
 export type SessionEntryPayload = { id: string; exerciseName: string; sets: SessionSetPayload[] };
 export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
+type SupabaseResp<T> = { data?: T | null; error?: { code?: string; message?: string } | null };
 
 export const api = {
   async me(): Promise<{ id: number; username: string } | null> {
@@ -47,25 +48,38 @@ export const planApi = {
 // prefsApi removed; use src/api/userPrefs.ts instead
 
 export const sessionApi = {
-  async save(planServerId: number, planWeekId: string, planDayId: string, session: SessionPayload): Promise<{ ok: true }> {
-    // Upsert using the unique composite (plan_id, week_id, day_id)
-    const res: any = await supabase
+  async save(planServerId: number | string, planWeekId: string, planDayId: string, session: SessionPayload): Promise<{ ok: true }> {
+    const pid = String(planServerId);
+    // 1) Try update existing row first
+    const upd: SupabaseResp<{ plan_id: string }> = await supabase
       .from('sessions')
-      .upsert({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId, data: session }, { onConflict: 'plan_id,week_id,day_id' })
-      .select('plan_id');
-    if (res.error) throw res.error; return { ok: true };
+      .update({ data: session })
+      .match({ plan_id: pid, week_id: planWeekId, day_id: planDayId })
+      .select('plan_id')
+      .maybeSingle();
+    if (upd.data) return { ok: true };
+    if (upd.error && upd.error.code && upd.error.code !== 'PGRST116') throw upd.error;
+
+    // 2) No row updated, insert a new one
+    const ins: SupabaseResp<{ plan_id: string }> = await supabase
+      .from('sessions')
+      .insert([{ plan_id: pid, week_id: planWeekId, day_id: planDayId, data: session }])
+      .select('plan_id')
+      .single();
+    if (ins.error) throw ins.error;
+    return { ok: true };
   },
   async complete(planServerId: number, planWeekId: string, planDayId: string, completed?: boolean): Promise<{ ok: true }> {
     if (completed) {
       // Update-first, then insert if missing (no unique constraint required)
-      const upd: any = await supabase
+      const upd: SupabaseResp<{ plan_id: string }> = await supabase
         .from('completions')
         .update({ completed_at: new Date().toISOString() })
         .match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId })
         .select('plan_id')
         .maybeSingle();
       if (!upd.data) {
-        const ins: any = await supabase
+        const ins: SupabaseResp<{ plan_id: string }> = await supabase
           .from('completions')
           .insert([{ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }])
           .select('plan_id')
