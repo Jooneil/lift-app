@@ -9,7 +9,7 @@ export type ServerPlanRow = { id: string; name?: string; data?: ServerPlanData; 
 export type SessionSetPayload = { id: string; setIndex: number; weight: number | null; reps: number | null };
 export type SessionEntryPayload = { id: string; exerciseName: string; sets: SessionSetPayload[] };
 export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
-type SupabaseResp<T> = { data?: T | null; error?: { code?: string; message?: string } | null };
+// Narrow helper types removed; rely on supabase-js response inference
 
 export const api = {
   async me(): Promise<{ id: number; username: string } | null> {
@@ -59,28 +59,39 @@ export const sessionApi = {
     const planIdForRow: number | string = pidNumeric !== undefined ? pidNumeric : String(planServerId);
 
     // Use upsert to handle insert-or-update in a single call (avoids PATCH 406 on first save)
-    const upsertRes: SupabaseResp<{ plan_id: string }> = await supabase
+    // Update first; if no row matched, insert. Avoids 406/400 noise.
+    const upd = await supabase
       .from('sessions')
-      .upsert(
-        [{ plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId, data: session }],
-        { onConflict: 'plan_id,week_id,day_id' }
-      )
+      .update({ data: session })
+      .match({ plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId })
+      .select('plan_id');
+    if (upd.error && (!('code' in upd.error) || (upd.error as any).code !== 'PGRST116')) throw upd.error;
+    if (Array.isArray((upd as any).data) && (upd as any).data.length > 0) return { ok: true };
+
+    const ins = await supabase
+      .from('sessions')
+      .insert([{ plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId, data: session }])
       .select('plan_id')
       .single();
-    if (upsertRes.error) throw upsertRes.error;
+    if (ins.error) throw ins.error;
     return { ok: true };
   },
   async complete(planServerId: number | string, planWeekId: string, planDayId: string, completed?: boolean): Promise<{ ok: true }> {
     if (completed) {
-      const up: SupabaseResp<{ plan_id: string }> = await supabase
+      const upd = await supabase
         .from('completions')
-        .upsert(
-          [{ plan_id: planServerId, week_id: planWeekId, day_id: planDayId, completed_at: new Date().toISOString() }],
-          { onConflict: 'plan_id,week_id,day_id' }
-        )
+        .update({ completed_at: new Date().toISOString() })
+        .match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId })
+        .select('plan_id');
+      if (upd.error && (!('code' in upd.error) || (upd.error as any).code !== 'PGRST116')) throw upd.error;
+      if (Array.isArray((upd as any).data) && (upd as any).data.length > 0) return { ok: true };
+
+      const ins = await supabase
+        .from('completions')
+        .insert([{ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }])
         .select('plan_id')
         .single();
-      if (up.error) throw up.error;
+      if (ins.error) throw ins.error;
     } else {
       const { error } = await supabase
         .from('completions')
