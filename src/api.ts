@@ -1,245 +1,88 @@
-// api.ts – client helpers for server API
-// Works with App.tsx imports: { api, planApi, prefsApi, sessionApi }
-// and supports sessionApi.complete(..., completed?)
+// api.ts – Supabase-backed API used by the app
+import { supabase } from './supabaseClient'
 
-export type ServerPlanItem = {
-  id?: string;
-  exerciseName?: string;
-  targetSets?: number;
-  targetReps?: string;
-};
+export type ServerPlanItem = { id?: string; exerciseName?: string; targetSets?: number; targetReps?: string };
+export type ServerPlanDay = { id?: string; name?: string; items?: ServerPlanItem[] };
+export type ServerPlanWeek = { id?: string; name?: string; days?: ServerPlanDay[] };
+export type ServerPlanData = { weeks?: ServerPlanWeek[]; days?: ServerPlanDay[] };
+export type ServerPlanRow = { id: number; name?: string; data?: ServerPlanData; archived?: 0 | 1 | boolean; predecessor_plan_id?: number | null };
+export type SessionSetPayload = { id: string; setIndex: number; weight: number | null; reps: number | null };
+export type SessionEntryPayload = { id: string; exerciseName: string; sets: SessionSetPayload[] };
+export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
 
-export type ServerPlanDay = {
-  id?: string;
-  name?: string;
-  items?: ServerPlanItem[];
-};
-
-export type ServerPlanWeek = {
-  id?: string;
-  name?: string;
-  days?: ServerPlanDay[];
-};
-
-export type ServerPlanData = {
-  weeks?: ServerPlanWeek[];
-  days?: ServerPlanDay[];
-};
-
-export type ServerPlanRow = {
-  id: number;
-  name?: string;
-  data?: ServerPlanData;
-  archived?: 0 | 1 | boolean;
-  predecessor_plan_id?: number | null;
-};
-
-export type SessionSetPayload = {
-  id: string;
-  setIndex: number;
-  weight: number | null;
-  reps: number | null;
-};
-
-export type SessionEntryPayload = {
-  id: string;
-  exerciseName: string;
-  sets: SessionSetPayload[];
-};
-
-export type SessionPayload = {
-  id: string;
-  planId: string;
-  planWeekId: string;
-  planDayId: string;
-  date: string;
-  entries: SessionEntryPayload[];
-  completed?: boolean;
-  ghostSeed?: boolean;
-};
-
-const BASE = ""; // same origin (Vite proxy or same host)
-import { supabase } from "./supabaseClient";
-
-// ---------- tiny fetch helpers ----------
-async function j<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
-  // Attach Supabase access token if present so the server can authorize without app session
-  let authHeader: Record<string, string> = {};
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token;
-    if (token) authHeader = { Authorization: `Bearer ${token}` };
-  } catch {
-    // ignore
-  }
-
-  const res = await fetch(BASE + path, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeader,
-      ...(opts.headers || {}),
-    },
-    ...opts,
-  });
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`;
-    try {
-      const data: unknown = await res.json();
-      if (data && typeof data === "object" && "error" in data) {
-        const errObj = data as { error?: string };
-        if (errObj.error) msg = errObj.error;
-      }
-    } catch { void 0; }
-    throw new Error(msg);
-  }
-  // 204 no content?
-  if (res.status === 204) return undefined as T;
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return (await res.json()) as T;
-  return (await res.text()) as unknown as T;
-}
-
-// ---------- auth ----------
 export const api = {
-  me(): Promise<{ id: number; username: string } | null> {
-    return j("/api/me");
+  async me(): Promise<{ id: number; username: string } | null> {
+    const { data } = await supabase.auth.getUser();
+    const email = data?.user?.email || null;
+    return email ? { id: 0, username: email } : null;
   },
-  logout(): Promise<{ ok: true }> {
-    return j("/api/logout", { method: "POST" });
-  },
+  async logout(): Promise<{ ok: true }> { await supabase.auth.signOut(); return { ok: true }; },
 };
 
-// ---------- plans ----------
 export const planApi = {
-  list(): Promise<ServerPlanRow[]> {
-    return j("/api/plans");
+  async list(): Promise<ServerPlanRow[]> {
+    const { data, error } = await supabase.from('plans').select('id,name,data,archived,predecessor_plan_id').eq('archived', 0).order('id', { ascending: false });
+    if (error) throw error; return (data ?? []) as unknown as ServerPlanRow[];
   },
-  create(name: string, data: ServerPlanData): Promise<ServerPlanRow> {
-    return j("/api/plans", { method: "POST", body: JSON.stringify({ name, data }) });
+  async create(name: string, data: ServerPlanData): Promise<ServerPlanRow> {
+    const { data: row, error } = await supabase.from('plans').insert([{ name, data, archived: 0 }]).select('id,name,data,archived,predecessor_plan_id').single();
+    if (error) throw error; return row as unknown as ServerPlanRow;
   },
-  update(id: number, name: string, data: ServerPlanData): Promise<ServerPlanRow> {
-    return j(`/api/plans/${id}`, { method: "PUT", body: JSON.stringify({ name, data }) });
+  async update(id: number, name: string, data: ServerPlanData): Promise<ServerPlanRow> {
+    const { data: row, error } = await supabase.from('plans').update({ name, data }).eq('id', id).select('id,name,data,archived,predecessor_plan_id').single();
+    if (error) throw error; return row as unknown as ServerPlanRow;
   },
-  remove(id: number): Promise<{ ok: true }> {
-    return j(`/api/plans/${id}`, { method: "DELETE" });
-  },
-
-  // archive helpers (server endpoints you already added)
-  archive(id: number): Promise<{ ok: true; id: number }> {
-    return j(`/api/plans/${id}/archive`, { method: "POST" });
-  },
-  unarchive(id: number): Promise<{ ok: true; id: number }> {
-    return j(`/api/plans/${id}/unarchive`, { method: "POST" });
-  },
-  listArchived(): Promise<ServerPlanRow[]> {
-    return j("/api/plans?archived=1");
-  },
-  rollover(id: number): Promise<ServerPlanRow> {
-    return j(`/api/plans/${id}/rollover`, { method: "POST" });
+  async remove(id: number): Promise<{ ok: true }> { const { error } = await supabase.from('plans').delete().eq('id', id); if (error) throw error; return { ok: true }; },
+  async archive(id: number): Promise<{ ok: true; id: number }> { const { error } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
+  async unarchive(id: number): Promise<{ ok: true; id: number }> { const { error } = await supabase.from('plans').update({ archived: 0 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
+  async listArchived(): Promise<ServerPlanRow[]> { const { data, error } = await supabase.from('plans').select('id,name,data,archived,predecessor_plan_id').eq('archived', 1).order('id', { ascending: false }); if (error) throw error; return (data ?? []) as unknown as ServerPlanRow[]; },
+  async rollover(id: number): Promise<ServerPlanRow> {
+    const { data: plan, error: e1 } = await supabase.from('plans').select('id,name,data').eq('id', id).single(); if (e1) throw e1;
+    const currentName = String((plan as { name?: string } | null)?.name || 'Plan'); const match = currentName.match(/\(#(\d+)\)\s*$/); const nextN = match ? Number(match[1]) + 1 : 2; const base = match ? currentName.replace(/\(#\d+\)\s*$/, '').trim() : currentName.trim(); const newName = `${base} (#${nextN})`;
+    const { error: e2 } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (e2) throw e2;
+    const { data: newRow, error: e3 } = await supabase.from('plans').insert([{ name: newName, data: (plan as { data?: ServerPlanData } | null)?.data ?? {}, archived: 0, predecessor_plan_id: id }]).select('id,name,data,archived,predecessor_plan_id').single(); if (e3) throw e3; return newRow as unknown as ServerPlanRow;
   },
 };
 
-// ---------- templates ----------
-export type ServerTemplateRow = ServerPlanRow;
-
-export const templateApi = {
-  list(): Promise<ServerTemplateRow[]> {
-    return j("/api/templates");
-  },
-  create(name: string, data: ServerPlanData): Promise<ServerTemplateRow> {
-    return j("/api/templates", { method: "POST", body: JSON.stringify({ name, data }) });
-  },
-  update(id: number, name: string, data: ServerPlanData): Promise<ServerTemplateRow> {
-    return j(`/api/templates/${id}`, { method: "PUT", body: JSON.stringify({ name, data }) });
-  },
-  remove(id: number): Promise<{ ok: true }> {
-    return j(`/api/templates/${id}`, { method: "DELETE" });
-  },
-};
-
-// ---------- prefs (last plan/week/day) ----------
 export const prefsApi = {
   async get(): Promise<{ lastPlanServerId?: number; lastWeekId?: string; lastDayId?: string } | null> {
-    try {
-      return await j("/api/prefs");
-    } catch (err) {
-      if (err instanceof Error && /404/.test(err.message)) {
-        return null;
-      }
-      throw err;
-    }
+    const { data } = await supabase.from('user_prefs').select('last_plan_server_id,last_week_id,last_day_id').maybeSingle();
+    if (!data) return null;
+    const d = data as { last_plan_server_id?: number; last_week_id?: string; last_day_id?: string };
+    return { lastPlanServerId: d.last_plan_server_id, lastWeekId: d.last_week_id, lastDayId: d.last_day_id };
   },
-  save(lastPlanServerId: number | null, lastWeekId: string | null, lastDayId: string | null): Promise<{ ok: true }> {
-    return j("/api/prefs", {
-      method: "PUT",
-      body: JSON.stringify({ lastPlanServerId, lastWeekId, lastDayId }),
-    });
+  async save(lastPlanServerId: number | null, lastWeekId: string | null, lastDayId: string | null): Promise<{ ok: true }> {
+    const { error } = await supabase.from('user_prefs').upsert({ last_plan_server_id: lastPlanServerId, last_week_id: lastWeekId, last_day_id: lastDayId }, { onConflict: 'user_id' }); if (error) throw error; return { ok: true };
   },
 };
 
-// ---------- session (workout logs) ----------
 export const sessionApi = {
-  // save arbitrary session blob
-  save(
-    planServerId: number,
-    planWeekId: string,
-    planDayId: string,
-    session: SessionPayload
-  ): Promise<{ ok: true }> {
-    return j("/api/sessions", {
-      method: "POST",
-      body: JSON.stringify({
-        planServerId,
-        weekId: planWeekId,
-        dayId: planDayId,
-        data: session,
-      }),
-    });
+  async save(planServerId: number, planWeekId: string, planDayId: string, session: SessionPayload): Promise<{ ok: true }> {
+    const { error } = await supabase.from('sessions').upsert({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId, data: session }, { onConflict: 'user_id,plan_id,week_id,day_id' }); if (error) throw error; return { ok: true };
   },
+  async complete(planServerId: number, planWeekId: string, planDayId: string, completed?: boolean): Promise<{ ok: true }> {
+    if (completed) { const { error } = await supabase.from('completions').upsert({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }, { onConflict: 'user_id,plan_id,week_id,day_id' }); if (error) throw error; }
+    else { const { error } = await supabase.from('completions').delete().match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }); if (error) throw error; }
+    return { ok: true };
+  },
+  async lastCompleted(planServerId: number): Promise<{ week_id: string; day_id: string } | null> {
+    const { data } = await supabase.from('completions').select('week_id,day_id,completed_at').eq('plan_id', planServerId).order('completed_at', { ascending: false }).limit(1).maybeSingle(); return (data as { week_id: string; day_id: string } | null) ?? null;
+  },
+  async last(planServerId: number, planWeekId: string, planDayId: string): Promise<SessionPayload | null> {
+    const { data } = await supabase.from('sessions').select('data').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); return (data as { data?: SessionPayload } | null)?.data ?? null;
+  },
+  async status(planServerId: number, planWeekId: string, planDayId: string): Promise<{ completed: boolean }> {
+    const { data } = await supabase.from('completions').select('plan_id').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); return { completed: !!data };
+  },
+  async completedList(planServerId: number): Promise<Array<{ week_id: string; day_id: string }>> {
+    const { data } = await supabase.from('completions').select('week_id,day_id').eq('plan_id', planServerId).order('completed_at', { ascending: true }); return (data ?? []) as Array<{ week_id: string; day_id: string }>;
+  },
+};
 
-  // mark complete; optional 4th boolean lets you set/unset completion
-  // Your App.tsx calls: complete(id, weekId, dayId, true) and complete(id, weekId, dayId, val)
-  complete(
-    planServerId: number,
-    planWeekId: string,
-    planDayId: string,
-    completed?: boolean
-  ): Promise<{ ok: true }> {
-    const body: { planServerId: number; weekId: string; dayId: string; completed?: boolean } = {
-      planServerId,
-      weekId: planWeekId,
-      dayId: planDayId,
-    };
-    if (typeof completed === "boolean") body.completed = completed;
-    return j("/api/completed", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-  },
-
-  // last completed day for a plan (server should return { week_id, day_id } or null)
-  lastCompleted(planServerId: number): Promise<{ week_id: string; day_id: string } | null> {
-    return j(`/api/completed/last?planServerId=${encodeURIComponent(String(planServerId))}`);
-  },
-
-  // last saved session blob for a specific week/day (used for ghosting)
-  last(
-    planServerId: number,
-    planWeekId: string,
-    planDayId: string
-  ): Promise<SessionPayload | null> {
-    const u = `/api/sessions/last?planServerId=${encodeURIComponent(
-      String(planServerId)
-    )}&weekId=${encodeURIComponent(planWeekId)}&dayId=${encodeURIComponent(planDayId)}`;
-    return j(u);
-  },
-  status(planServerId: number, planWeekId: string, planDayId: string): Promise<{ completed: boolean }> {
-    const url = `/api/completed/get?planServerId=${encodeURIComponent(String(planServerId))}&weekId=${encodeURIComponent(planWeekId)}&dayId=${encodeURIComponent(planDayId)}`;
-    return j(url);
-  },
-  completedList(planServerId: number): Promise<Array<{ week_id: string; day_id: string }>> {
-    const url = `/api/completed/all?planServerId=${encodeURIComponent(String(planServerId))}`;
-    return j(url);
-  },
+export type ServerTemplateRow = ServerPlanRow;
+export const templateApi = {
+  async list(): Promise<ServerTemplateRow[]> { const { data, error } = await supabase.from('templates').select('id,name,data').order('id', { ascending: false }); if (error) throw error; return (data ?? []) as unknown as ServerTemplateRow[]; },
+  async create(name: string, data: ServerPlanData): Promise<ServerTemplateRow> { const { data: row, error } = await supabase.from('templates').insert([{ name, data }]).select('id,name,data').single(); if (error) throw error; return row as unknown as ServerTemplateRow; },
+  async update(id: number, name: string, data: ServerPlanData): Promise<ServerTemplateRow> { const { data: row, error } = await supabase.from('templates').update({ name, data }).eq('id', id).select('id,name,data').single(); if (error) throw error; return row as unknown as ServerTemplateRow; },
+  async remove(id: number): Promise<{ ok: true }> { const { error } = await supabase.from('templates').delete().eq('id', id); if (error) throw error; return { ok: true }; },
 };

@@ -1,0 +1,84 @@
+local url: "
+
+http://localhost:5173
+
+To start server: 
+cd C:\Users\josho\OneDrive\Desktop\Lift App
+npm run dev:all
+
+cd C:\Users\josho\OneDrive\Desktop\Lift App\server
+cd C:\Users\josho\OneDrive\Desktop\Lift App
+
+
+--------
+
+domain: joshoneil.company
+
+----------
+To push locally made changes: 
+ open gitbash 
+
+go to root: 
+cd /c/Users/josho/OneDrive/Desktop/"Lift App"
+
+git add .
+git commit -m "Describe the change"
+
+git push origin main
+
+got to: 
+https://vercel.com/josh-oneils-projects/lift-app/deployments
+
+to check status of update
+--------
+tools used: 
+Github (stores code) 
+Vercel (hosts domain?) z
+Supabase
+
+
+src/App.tsx → Main screen. Right now it renders one ExerciseCard.
+
+Add more exercises, change layout, headers, buttons, etc.
+
+src/styles/index.css → Tailwind entry + any global CSS.
+
+tailwind.config.js → Tailwind theme tweaks (fonts, spacing, etc.).
+
+index.html → Meta tags + iOS “Add to Home Screen” bits. You can add a Google Font here too.
+
+vite.config.ts → PWA manifest (app name, colors, icons).
+
+(Optional) Create a src/components/ folder and extract UI pieces there (e.g., components/ExerciseCard.tsx).
+
+Right now, the ExerciseCard UI lives inside App.tsx (at the bottom). That’s the component you’ll edit to change the set rows, input sizes, ghost text, etc.
+
+--
+made user: 
+curl -i -c cookies.txt -X POST http://localhost:5174/api/login -H "Content-Type: application/json" -d "{\"username\":\"josh\",\"password\":\"test123\"}"
+
+
+import SmokeTest from './SmokeTest'
+
+function App() {
+  return <SmokeTest />
+}
+export default App
+
+import SmokeTest from './SmokeTest'
+
+function App() {
+  return <SmokeTest />
+}
+
+export default App
+
+import SmokeTest from './SmokeTest'
+
+export default function App() {
+  return <SmokeTest />
+}
+
+
+
+
