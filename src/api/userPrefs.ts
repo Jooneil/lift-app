@@ -31,14 +31,25 @@ export async function upsertUserPrefs(partial: {
   if (!user) throw new Error('Not signed in')
 
   const payload = { user_id: user.id, ...partial }
-  // Robust approach: delete any existing rows for this user, then insert fresh.
-  // This avoids 409 conflicts when unique constraints are missing or duplicates exist.
-  await supabase.from('user_prefs').delete().eq('user_id', user.id)
-  const { data, error } = await supabase
+  // Try update-first: if a row exists for this user, update it; otherwise insert.
+  const upd = await supabase
+    .from('user_prefs')
+    .update(payload)
+    .eq('user_id', user.id)
+    .select()
+    .maybeSingle()
+  if (upd.error && upd.error.code && upd.error.code !== 'PGRST116') {
+    // unexpected error
+    throw upd.error
+  }
+  if (upd.data) return upd.data as UserPrefs
+
+  // No row updated; insert one
+  const ins = await supabase
     .from('user_prefs')
     .insert([payload])
     .select()
     .single()
-  if (error) throw error
-  return data as UserPrefs
+  if (ins.error) throw ins.error
+  return ins.data as UserPrefs
 }
