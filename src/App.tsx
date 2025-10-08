@@ -1578,6 +1578,27 @@ function BuilderPage({
   const dragStartYRef = useRef<number>(0);
   const dragTimerRef = useRef<number | null>(null);
 
+  // While dragging, disable text selection globally to avoid blue highlight
+  useEffect(() => {
+    const shouldDisable = !!draggingExerciseId && dragActive;
+    const body = document?.body as any;
+    const prev = body && (body.style.userSelect || "");
+    const prevWebkit = body && (body.style.webkitUserSelect || "");
+    const prevMs = body && (body.style.msUserSelect || "");
+    if (shouldDisable && body) {
+      body.style.userSelect = "none";
+      body.style.webkitUserSelect = "none";
+      body.style.msUserSelect = "none";
+    }
+    return () => {
+      if (body) {
+        body.style.userSelect = prev;
+        body.style.webkitUserSelect = prevWebkit;
+        body.style.msUserSelect = prevMs;
+      }
+    };
+  }, [draggingExerciseId, dragActive]);
+
   const handleReorderExerciseAtIndex = (
     weekId: string,
     dayId: string,
@@ -1871,17 +1892,6 @@ function BuilderPage({
                               <div
                                 key={item.id}
                                 data-exercise-id={item.id}
-                                onPointerDown={(e) => {
-                                  setDraggingExerciseId(item.id);
-                                  setDragWeekId(week.id);
-                                  setDragDayId(day.id);
-                                  setDragActive(false);
-                                  dragStartYRef.current = e.clientY;
-                                  setDragInsertIndex(idx);
-                                  if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
-                                  dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
-                                  try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-                                }}
                                 style={{
                                   display: 'grid',
                                   gridTemplateColumns: 'auto 2fr 1fr 1fr auto',
@@ -1897,10 +1907,30 @@ function BuilderPage({
                                   borderRadius: 8,
                                   padding: 6,
                                   touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
+                                  userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                 }}
                                 title="Drag to reorder"
                               >
-                                <div style={{ textAlign: 'center', fontSize: 18, lineHeight: '18px', padding: '0 6px' }}>≡</div>
+                                <div
+                                  onPointerDown={(e) => {
+                                    // Start drag only from the handle to avoid selecting inputs
+                                    e.preventDefault();
+                                    setDraggingExerciseId(item.id);
+                                    setDragWeekId(week.id);
+                                    setDragDayId(day.id);
+                                    setDragActive(false);
+                                    dragStartYRef.current = e.clientY;
+                                    setDragInsertIndex(idx);
+                                    if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
+                                    dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
+                                    try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+                                  }}
+                                  style={{ textAlign: 'center', fontSize: 18, lineHeight: '18px', padding: '0 6px', userSelect: 'none', touchAction: 'none', cursor: 'grab' }}
+                                  aria-label="Drag handle"
+                                  title="Drag to reorder"
+                                >
+                                  ≡
+                                </div>
                                 <input
                                   value={item.exerciseName}
                                   onChange={(e) => handleExerciseChange(week.id, day.id, item.id, { exerciseName: e.target.value })}
