@@ -642,7 +642,7 @@ function AuthedApp({
     <div style={{ maxWidth: 680, width: "100%", margin: "0 auto", padding: 16, fontFamily: "system-ui, sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, marginBottom: 12, borderBottom: "1px solid #444" }}>
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setUserMenuOpen((v) => !v)} style={{ ...BTN_STYLE, position: 'relative', color: 'transparent', width: 86, overflow: 'hidden' }} aria-expanded={userMenuOpen} aria-haspopup="menu">
+          <button onClick={() => setUserMenuOpen((v) => !v)} style={{ ...BTN_STYLE, position: 'relative', color: 'transparent', fontSize: 0, lineHeight: 0, width: 'auto', overflow: 'visible', padding: '6px 10px' }} aria-label="Profile" aria-expanded={userMenuOpen} aria-haspopup="menu">
             Logged in as <strong>{user.username}</strong> ▾
           </button>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
