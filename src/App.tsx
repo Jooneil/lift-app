@@ -1569,6 +1569,31 @@ function BuilderPage({
     }));
   };
 
+  const handleMoveExercise = (weekId: string, dayId: string, itemId: string, direction: -1 | 1) => {
+    if (!selectedPlan) return;
+    updatePlan(selectedPlan.id, (plan) => ({
+      ...plan,
+      weeks: plan.weeks.map((week) =>
+        week.id === weekId
+          ? {
+              ...week,
+              days: week.days.map((day) => {
+                if (day.id !== dayId) return day;
+                const idx = day.items.findIndex((it) => it.id === itemId);
+                if (idx < 0) return day;
+                const newIdx = Math.max(0, Math.min(day.items.length - 1, idx + direction));
+                if (newIdx === idx) return day;
+                const items = day.items.slice();
+                const [moved] = items.splice(idx, 1);
+                items.splice(newIdx, 0, moved);
+                return { ...day, items };
+              }),
+            }
+          : week
+      ),
+    }));
+  };
+
   const handleDeletePlan = async (planId: string) => {
     const plan = plans.find((p) => p.id === planId) || null;
     if (!plan) return;
@@ -1689,26 +1714,6 @@ function BuilderPage({
   return (
     <div style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label>Plan:</label>
-          <select
-            value={selectedPlanId ?? ''}
-            onChange={(e) => {
-              const planId = e.target.value || null;
-              const plan = planId ? plans.find((p) => p.id === planId) || null : null;
-              onSelectPlan(planId, plan ?? null);
-            }}
-            style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #444' }}
-          >
-            {plans.length === 0 && <option value="">No plans yet</option>}
-            {plans.map((plan) => (
-              <option key={plan.id} value={plan.id}>
-                {plan.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setShowPlanList(true)} style={BTN_STYLE}>
             Manage Plans & Templates
@@ -1799,7 +1804,25 @@ function BuilderPage({
                             : [...SET_COUNT_OPTIONS, item.targetSets].sort((a, b) => a - b);
 
                           return (
-                            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'auto 2fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <button
+                                  onClick={() => handleMoveExercise(week.id, day.id, item.id, -1)}
+                                  style={{ ...SMALL_BTN_STYLE, padding: '2px 6px' }}
+                                  disabled={day.items[0]?.id === item.id}
+                                  title="Move up"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  onClick={() => handleMoveExercise(week.id, day.id, item.id, 1)}
+                                  style={{ ...SMALL_BTN_STYLE, padding: '2px 6px' }}
+                                  disabled={day.items[day.items.length - 1]?.id === item.id}
+                                  title="Move down"
+                                >
+                                  ↓
+                                </button>
+                              </div>
                               <input
                                 value={item.exerciseName}
                                 onChange={(e) => handleExerciseChange(week.id, day.id, item.id, { exerciseName: e.target.value })}
