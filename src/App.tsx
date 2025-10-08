@@ -186,6 +186,11 @@ function AuthedApp({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const selectionOriginRef = useRef<"auto" | "user">("auto");
 
+  // Ensure default view is Workout on load
+  useEffect(() => {
+    setMode("workout");
+  }, []);
+
   const mapServerPlan = (row: ServerPlanRow): Plan => {
     const d = (row?.data ?? {}) as import("./api").ServerPlanData;
     const weeks: PlanWeek[] = Array.isArray(d.weeks)
@@ -1755,8 +1760,6 @@ function BuilderPage({
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setShowPlanList(true)} style={BTN_STYLE}>
             Manage Plans & Templates
-            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', color: '#fff' }}>Profile</span>
-            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', color: '#fff' }}>Profile</span>
           </button>
           <button onClick={handleCreatePlan} style={BTN_STYLE}>
             + Plan
