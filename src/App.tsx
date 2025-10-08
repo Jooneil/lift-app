@@ -645,6 +645,9 @@ function AuthedApp({
           <button onClick={() => setUserMenuOpen((v) => !v)} style={{ ...BTN_STYLE, position: 'relative', color: 'transparent', width: 86, overflow: 'hidden' }} aria-expanded={userMenuOpen} aria-haspopup="menu">
             Logged in as <strong>{user.username}</strong> ▾
           </button>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            Profile
+          </div>
           {userMenuOpen && (
             <div role="menu" style={{ position: 'absolute', top: '100%', left: 0, background: '#111', border: '1px solid #444', borderRadius: 8, padding: 8, marginTop: 6, minWidth: 200, zIndex: 30 }}>
               <div style={{ padding: '4px 6px', color: '#bbb', fontSize: 12 }}>Logged in as</div>
@@ -1754,6 +1757,7 @@ function BuilderPage({
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setShowPlanList(true)} style={BTN_STYLE}>
             Manage Plans & Templates
+            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', color: '#fff' }}>Profile</span>
             <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', color: '#fff' }}>Profile</span>
           </button>
           <button onClick={handleCreatePlan} style={BTN_STYLE}>
