@@ -1569,8 +1569,16 @@ function BuilderPage({
     }));
   };
 
-  const handleMoveExercise = (weekId: string, dayId: string, itemId: string, direction: -1 | 1) => {
-    if (!selectedPlan) return;
+  // --- Drag-and-drop reorder for exercises ---
+  const [draggingExerciseId, setDraggingExerciseId] = useState<string | null>(null);
+
+  const handleReorderExercise = (
+    weekId: string,
+    dayId: string,
+    sourceId: string,
+    targetId: string
+  ) => {
+    if (!selectedPlan || !sourceId || !targetId || sourceId === targetId) return;
     updatePlan(selectedPlan.id, (plan) => ({
       ...plan,
       weeks: plan.weeks.map((week) =>
@@ -1579,13 +1587,13 @@ function BuilderPage({
               ...week,
               days: week.days.map((day) => {
                 if (day.id !== dayId) return day;
-                const idx = day.items.findIndex((it) => it.id === itemId);
-                if (idx < 0) return day;
-                const newIdx = Math.max(0, Math.min(day.items.length - 1, idx + direction));
-                if (newIdx === idx) return day;
                 const items = day.items.slice();
-                const [moved] = items.splice(idx, 1);
-                items.splice(newIdx, 0, moved);
+                const from = items.findIndex((it) => it.id === sourceId);
+                const to = items.findIndex((it) => it.id === targetId);
+                if (from < 0 || to < 0 || from === to) return day;
+                const [moved] = items.splice(from, 1);
+                const insertAt = items.findIndex((it) => it.id === targetId); // after removal
+                items.splice(insertAt, 0, moved);
                 return { ...day, items };
               }),
             }
@@ -1804,24 +1812,26 @@ function BuilderPage({
                             : [...SET_COUNT_OPTIONS, item.targetSets].sort((a, b) => a - b);
 
                           return (
-                            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'auto 2fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <button
-                                  onClick={() => handleMoveExercise(week.id, day.id, item.id, -1)}
-                                  style={{ ...SMALL_BTN_STYLE, padding: '2px 6px' }}
-                                  disabled={day.items[0]?.id === item.id}
-                                  title="Move up"
-                                >
-                                  ↑
-                                </button>
-                                <button
-                                  onClick={() => handleMoveExercise(week.id, day.id, item.id, 1)}
-                                  style={{ ...SMALL_BTN_STYLE, padding: '2px 6px' }}
-                                  disabled={day.items[day.items.length - 1]?.id === item.id}
-                                  title="Move down"
-                                >
-                                  ↓
-                                </button>
+                            <div
+                              key={item.id}
+                              style={{ display: 'grid', gridTemplateColumns: 'auto 2fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}
+                              onDragOver={(e) => { if (draggingExerciseId) e.preventDefault(); }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const sourceId = e.dataTransfer.getData('text/plain') || draggingExerciseId || '';
+                                handleReorderExercise(week.id, day.id, sourceId, item.id);
+                                setDraggingExerciseId(null);
+                              }}
+                            >
+                              <div
+                                draggable
+                                onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.dataTransfer.effectAllowed = 'move'; setDraggingExerciseId(item.id); }}
+                                onDragEnd={() => setDraggingExerciseId(null)}
+                                style={{ cursor: 'grab', userSelect: 'none', padding: '8px 6px', border: '1px solid #444', borderRadius: 8, textAlign: 'center', width: 34 }}
+                                title="Drag to reorder"
+                                aria-label="Drag handle"
+                              >
+                                ≡
                               </div>
                               <input
                                 value={item.exerciseName}
