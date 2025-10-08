@@ -72,6 +72,31 @@ function startSessionFromDay(plan: Plan, weekId: string, dayId: string): Session
   };
 }
 
+// Merge an existing session with the latest plan day shape.
+// - Keeps weights/reps that already exist for matching exercise names and set indices
+// - Adds new exercises/sets as nulls
+// - Drops exercises removed from the plan
+function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
+  const nextEntries: SessionEntry[] = planDay.items.map((item) => {
+    const existing = (prev.entries || []).find((e) => e.exerciseName === item.exerciseName) || null;
+    const sets: SessionSet[] = Array.from({ length: item.targetSets }, (_, i) => {
+      const old = existing?.sets?.[i] || null;
+      return {
+        id: old?.id || uuid(),
+        setIndex: i,
+        weight: old?.weight ?? null,
+        reps: old?.reps ?? null,
+      };
+    });
+    return {
+      id: existing?.id || uuid(),
+      exerciseName: item.exerciseName,
+      sets,
+    };
+  });
+  return { ...prev, entries: nextEntries };
+}
+
 
 function firstWeekDayOf(plan: Plan) {
   const wk = plan.weeks[0] ?? null;
@@ -245,6 +270,13 @@ function AuthedApp({
   useEffect(() => {
     if (mode === "workout") {
       setShouldAutoNavigate(true);
+    }
+  }, [mode]);
+
+  // When entering Builder, open plan/template chooser by default
+  useEffect(() => {
+    if (mode === "builder") {
+      setShowPlanList(true);
     }
   }, [mode]);
 
@@ -620,7 +652,7 @@ function AuthedApp({
           )}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setUserMenuOpen(false); setMode("builder"); }} style={BTN_STYLE} aria-pressed={mode === "builder"}>Builder</button>
+          <button onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(true); setSelectedPlanId(null); }} style={BTN_STYLE} aria-pressed={mode === "builder"}>Builder</button>
           <button onClick={() => { setUserMenuOpen(false); setMode("workout"); }} style={BTN_STYLE} aria-pressed={mode === "workout"}>Workout</button>
           <button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} style={BTN_STYLE}>Archive</button>
         </div>
@@ -1045,6 +1077,26 @@ function WorkoutPage({
       }
     })();
   }, [plan.serverId, currentWeekId, plan.weeks, day.id, plan.id]);
+
+  // Merge session with updated plan day (preserve existing weights/reps)
+  useEffect(() => {
+    if (!session || session.planDayId !== day.id) return;
+    const merged = mergeSessionWithDay(day, session);
+    const a = JSON.stringify(session.entries.map((e) => ({ n: e.exerciseName, s: e.sets.length })));
+    const b = JSON.stringify(merged.entries.map((e) => ({ n: e.exerciseName, s: e.sets.length })));
+    if (a !== b) {
+      setSession(merged);
+      try {
+        localStorage.setItem(
+          `session:${plan.serverId ?? plan.id}:${merged.planWeekId}:${merged.planDayId}`,
+          JSON.stringify(merged)
+        );
+      } catch { /* ignore */ }
+      if (plan.serverId) {
+        sessionApi.save(plan.serverId, merged.planWeekId, merged.planDayId, merged).catch(() => void 0);
+      }
+    }
+  }, [plan.id, plan.serverId, day.items, session]);
 
   if (!session || session.planDayId !== day.id) return null;
 
@@ -1566,6 +1618,8 @@ function BuilderPage({
     }
   };
 
+  
+  
   const handleSaveAsTemplate = async () => {
     if (!selectedPlan) return;
     setSaving(true);
