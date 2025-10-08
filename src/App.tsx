@@ -1569,19 +1569,22 @@ function BuilderPage({
     }));
   };
 
-  // --- Drag-and-drop reorder for exercises ---
+  // --- Drag-and-drop reorder for exercises (pointer-based for mobile) ---
   const [draggingExerciseId, setDraggingExerciseId] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState<{ targetId: string | null; pos: 'before' | 'after' | 'end' | null }>({ targetId: null, pos: null });
+  const [dragWeekId, setDragWeekId] = useState<string | null>(null);
+  const [dragDayId, setDragDayId] = useState<string | null>(null);
+  const [dragInsertIndex, setDragInsertIndex] = useState<number | null>(null);
+  const [dragActive, setDragActive] = useState<boolean>(false);
+  const dragStartYRef = useRef<number>(0);
+  const dragTimerRef = useRef<number | null>(null);
 
-  const handleReorderExercise = (
+  const handleReorderExerciseAtIndex = (
     weekId: string,
     dayId: string,
     sourceId: string,
-    targetId: string | null,
-    position: 'before' | 'after' | 'end' = 'before'
+    insertIndex: number
   ) => {
-    if (!selectedPlan || !sourceId) return;
-    if (targetId && sourceId === targetId && position !== 'end') return;
+    if (!selectedPlan) return;
     updatePlan(selectedPlan.id, (plan) => ({
       ...plan,
       weeks: plan.weeks.map((week) =>
@@ -1593,17 +1596,10 @@ function BuilderPage({
                 const items = day.items.slice();
                 const from = items.findIndex((it) => it.id === sourceId);
                 if (from < 0) return day;
+                let at = Math.max(0, Math.min(insertIndex, items.length));
                 const [moved] = items.splice(from, 1);
-                if (position === 'end' || !targetId) {
-                  items.push(moved);
-                } else {
-                  let insertAt = items.findIndex((it) => it.id === targetId);
-                  if (insertAt < 0) insertAt = items.length;
-                  if (position === 'after') insertAt += 1;
-                  if (insertAt < 0) insertAt = 0;
-                  if (insertAt > items.length) insertAt = items.length;
-                  items.splice(insertAt, 0, moved);
-                }
+                if (at > from) at -= 1; // account for removal shift
+                items.splice(at, 0, moved);
                 return { ...day, items };
               }),
             }
@@ -1816,82 +1812,101 @@ function BuilderPage({
                       <div style={{ color: '#777', fontSize: 13 }}>No exercises yet.</div>
                     ) : (
                       <div
-                        style={{ display: 'flex', flexDirection: 'column', gap: 8, touchAction: draggingExerciseId ? 'none' as any : 'auto' }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 8, touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
                         onPointerMove={(e) => {
-                          if (!draggingExerciseId) return;
+                          if (!draggingExerciseId || dragWeekId !== week.id || dragDayId !== day.id) return;
+                          const dy = Math.abs(e.clientY - dragStartYRef.current);
+                          if (!dragActive && dy > 8) setDragActive(true);
+                          if (!dragActive) return;
                           e.preventDefault();
                           const container = e.currentTarget as HTMLElement;
                           const rows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
                           if (rows.length === 0) return;
                           const y = e.clientY;
-                          let target: HTMLElement | null = null;
-                          let pos: 'before' | 'after' | 'end' = 'end';
-                          for (const row of rows) {
-                            const r = row.getBoundingClientRect();
-                            if (y < r.top) { target = row; pos = 'before'; break; }
-                            if (y >= r.top && y <= r.bottom) {
-                              target = row;
-                              pos = y < (r.top + r.height / 2) ? 'before' : 'after';
-                              break;
-                            }
+                          let insert = rows.length;
+                          for (let i = 0; i < rows.length; i++) {
+                            const r = rows[i].getBoundingClientRect();
+                            const mid = r.top + r.height / 2;
+                            if (y < mid) { insert = i; break; }
                           }
-                          if (!target) {
-                            // below last row
-                            pos = 'end';
-                          }
-                          setDragOver({ targetId: target?.dataset.exerciseId || null, pos });
+                          setDragInsertIndex(insert);
                         }}
                         onPointerUp={() => {
-                          if (!draggingExerciseId) return;
-                          const pos = dragOver.pos || 'end';
-                          if (pos === 'end') {
-                            handleReorderExercise(week.id, day.id, draggingExerciseId, null, 'end');
-                          } else {
-                            handleReorderExercise(week.id, day.id, draggingExerciseId, dragOver.targetId, pos === 'after' ? 'after' : 'before');
+                          if (!draggingExerciseId || dragWeekId !== week.id || dragDayId !== day.id) return;
+                          if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
+                          if (!dragActive) {
+                            setDraggingExerciseId(null);
+                            setDragWeekId(null);
+                            setDragDayId(null);
+                            setDragInsertIndex(null);
+                            return;
                           }
+                          const insert = dragInsertIndex == null ? day.items.length : dragInsertIndex;
+                          handleReorderExerciseAtIndex(week.id, day.id, draggingExerciseId, insert);
                           setDraggingExerciseId(null);
-                          setDragOver({ targetId: null, pos: null });
+                          setDragWeekId(null);
+                          setDragDayId(null);
+                          setDragInsertIndex(null);
+                          setDragActive(false);
                         }}
-                        onPointerCancel={() => { setDraggingExerciseId(null); setDragOver({ targetId: null, pos: null }); }}
+                        onPointerCancel={() => {
+                          if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
+                          setDraggingExerciseId(null);
+                          setDragWeekId(null);
+                          setDragDayId(null);
+                          setDragInsertIndex(null);
+                          setDragActive(false);
+                        }}
                       >
-                        {day.items.map((item) => {
+                        {day.items.map((item, idx) => {
                           const options = SET_COUNT_OPTIONS.includes(item.targetSets)
                             ? SET_COUNT_OPTIONS
                             : [...SET_COUNT_OPTIONS, item.targetSets].sort((a, b) => a - b);
 
                           return (
-                            <div
-                              key={item.id}
-                              data-exercise-id={item.id}
-                              onPointerDown={(e) => {
-                                setDraggingExerciseId(item.id);
-                                try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-                              }}
-                              style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'auto 2fr 1fr 1fr auto',
-                                gap: 8,
-                                alignItems: 'center',
-                                cursor: 'grab',
-                                opacity: draggingExerciseId === item.id ? 0.6 : 1,
-                                background: dragOver.targetId === item.id ? 'rgba(255,255,255,0.04)' : 'transparent',
-                                borderTop: dragOver.targetId === item.id && dragOver.pos === 'before' ? '2px dashed #888' : '1px solid #333',
-                                borderBottom: dragOver.targetId === item.id && dragOver.pos === 'after' ? '2px dashed #888' : '1px solid #333',
-                                borderLeft: '1px solid #333',
-                                borderRight: '1px solid #333',
-                                borderRadius: 8,
-                                padding: 6,
-                                touchAction: draggingExerciseId ? 'none' as any : 'auto',
-                              }}
-                              title="Drag to reorder"
-                            >
-                              <div style={{ textAlign: 'center', fontSize: 18, lineHeight: '18px', padding: '0 6px' }}>≡</div>
-                              <input
-                                value={item.exerciseName}
-                                onChange={(e) => handleExerciseChange(week.id, day.id, item.id, { exerciseName: e.target.value })}
-                                style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
-                                placeholder="Exercise name"
-                              />
+                            <>
+                              {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx && (
+                                <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
+                              )}
+                              <div
+                                key={item.id}
+                                data-exercise-id={item.id}
+                                onPointerDown={(e) => {
+                                  setDraggingExerciseId(item.id);
+                                  setDragWeekId(week.id);
+                                  setDragDayId(day.id);
+                                  setDragActive(false);
+                                  dragStartYRef.current = e.clientY;
+                                  setDragInsertIndex(idx);
+                                  if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
+                                  dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
+                                  try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+                                }}
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'auto 2fr 1fr 1fr auto',
+                                  gap: 8,
+                                  alignItems: 'center',
+                                  cursor: 'grab',
+                                  opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
+                                  background: 'transparent',
+                                  borderTop: '1px solid #333',
+                                  borderBottom: '1px solid #333',
+                                  borderLeft: '1px solid #333',
+                                  borderRight: '1px solid #333',
+                                  borderRadius: 8,
+                                  padding: 6,
+                                  touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
+                                }}
+                                title="Drag to reorder"
+                              >
+                                <div style={{ textAlign: 'center', fontSize: 18, lineHeight: '18px', padding: '0 6px' }}>≡</div>
+                                <input
+                                  value={item.exerciseName}
+                                  onChange={(e) => handleExerciseChange(week.id, day.id, item.id, { exerciseName: e.target.value })}
+                                  style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
+                                  placeholder="Exercise name"
+                                />
                               <select
                                 value={String(item.targetSets)}
                                 onChange={(e) =>
@@ -1916,30 +1931,15 @@ function BuilderPage({
                               <button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} style={SMALL_BTN_STYLE}>
                                 Remove
                               </button>
-                            </div>
+                              </div>
+                              {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx + 1 && (
+                                <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
+                              )}
+                            </>
                           );
                         })}
-                        {/* End-drop zone to allow dropping to the bottom */}
-                        {draggingExerciseId && (
-                          <div
-                            onDragOver={(e) => { e.preventDefault(); setDragOver({ targetId: null, pos: 'after' }); }}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              const sourceId = e.dataTransfer.getData('text/plain') || draggingExerciseId || '';
-                              handleReorderExercise(week.id, day.id, sourceId, null, 'end');
-                              setDraggingExerciseId(null);
-                              setDragOver({ targetId: null, pos: null });
-                            }}
-                            style={{
-                              border: '2px dashed #888',
-                              borderRadius: 8,
-                              padding: 10,
-                              textAlign: 'center',
-                              color: '#888',
-                            }}
-                          >
-                            Drop here to place at end
-                          </div>
+                        {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === day.items.length && (
+                          <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
                         )}
                       </div>
                     )}
