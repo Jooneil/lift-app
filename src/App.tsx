@@ -1571,7 +1571,7 @@ function BuilderPage({
 
   // --- Drag-and-drop reorder for exercises ---
   const [draggingExerciseId, setDraggingExerciseId] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState<{ targetId: string | null; pos: 'before' | 'after' | null }>({ targetId: null, pos: null });
+  const [dragOver, setDragOver] = useState<{ targetId: string | null; pos: 'before' | 'after' | 'end' | null }>({ targetId: null, pos: null });
 
   const handleReorderExercise = (
     weekId: string,
@@ -1815,7 +1815,45 @@ function BuilderPage({
                     {day.items.length === 0 ? (
                       <div style={{ color: '#777', fontSize: 13 }}>No exercises yet.</div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div
+                        style={{ display: 'flex', flexDirection: 'column', gap: 8, touchAction: draggingExerciseId ? 'none' as any : 'auto' }}
+                        onPointerMove={(e) => {
+                          if (!draggingExerciseId) return;
+                          e.preventDefault();
+                          const container = e.currentTarget as HTMLElement;
+                          const rows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
+                          if (rows.length === 0) return;
+                          const y = e.clientY;
+                          let target: HTMLElement | null = null;
+                          let pos: 'before' | 'after' | 'end' = 'end';
+                          for (const row of rows) {
+                            const r = row.getBoundingClientRect();
+                            if (y < r.top) { target = row; pos = 'before'; break; }
+                            if (y >= r.top && y <= r.bottom) {
+                              target = row;
+                              pos = y < (r.top + r.height / 2) ? 'before' : 'after';
+                              break;
+                            }
+                          }
+                          if (!target) {
+                            // below last row
+                            pos = 'end';
+                          }
+                          setDragOver({ targetId: target?.dataset.exerciseId || null, pos });
+                        }}
+                        onPointerUp={() => {
+                          if (!draggingExerciseId) return;
+                          const pos = dragOver.pos || 'end';
+                          if (pos === 'end') {
+                            handleReorderExercise(week.id, day.id, draggingExerciseId, null, 'end');
+                          } else {
+                            handleReorderExercise(week.id, day.id, draggingExerciseId, dragOver.targetId, pos === 'after' ? 'after' : 'before');
+                          }
+                          setDraggingExerciseId(null);
+                          setDragOver({ targetId: null, pos: null });
+                        }}
+                        onPointerCancel={() => { setDraggingExerciseId(null); setDragOver({ targetId: null, pos: null }); }}
+                      >
                         {day.items.map((item) => {
                           const options = SET_COUNT_OPTIONS.includes(item.targetSets)
                             ? SET_COUNT_OPTIONS
@@ -1824,24 +1862,10 @@ function BuilderPage({
                           return (
                             <div
                               key={item.id}
-                              draggable
-                              onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.dataTransfer.effectAllowed = 'move'; setDraggingExerciseId(item.id); }}
-                              onDragEnd={() => { setDraggingExerciseId(null); setDragOver({ targetId: null, pos: null }); }}
-                              onDragOver={(e) => {
-                                if (!draggingExerciseId) return;
-                                e.preventDefault();
-                                const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                                const pos = (e.clientY - rect.top) < rect.height / 2 ? 'before' : 'after';
-                                setDragOver({ targetId: item.id, pos });
-                              }}
-                              onDragLeave={() => { if (dragOver.targetId === item.id) setDragOver({ targetId: null, pos: null }); }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                const sourceId = e.dataTransfer.getData('text/plain') || draggingExerciseId || '';
-                                const pos = dragOver.targetId === item.id ? dragOver.pos || 'before' : 'before';
-                                handleReorderExercise(week.id, day.id, sourceId, item.id, pos);
-                                setDraggingExerciseId(null);
-                                setDragOver({ targetId: null, pos: null });
+                              data-exercise-id={item.id}
+                              onPointerDown={(e) => {
+                                setDraggingExerciseId(item.id);
+                                try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
                               }}
                               style={{
                                 display: 'grid',
@@ -1857,6 +1881,7 @@ function BuilderPage({
                                 borderRight: '1px solid #333',
                                 borderRadius: 8,
                                 padding: 6,
+                                touchAction: draggingExerciseId ? 'none' as any : 'auto',
                               }}
                               title="Drag to reorder"
                             >
