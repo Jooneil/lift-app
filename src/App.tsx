@@ -638,15 +638,17 @@ function AuthedApp({
           setSelectedDayId={setSelectedDayId}
           showPlanList={showPlanList}
           setShowPlanList={setShowPlanList}
-          onSaved={() => {
-            // Reset builder to initial state next time it opens
+          onSaved={(savedPlan) => {
+            // Go to workout with the just-saved plan selected
+            const nextWeekId = savedPlan.weeks[0]?.id ?? null;
+            const nextDayId = savedPlan.weeks[0]?.days[0]?.id ?? null;
             selectionOriginRef.current = "auto";
-            setSelectedPlanId(null);
-            setSelectedWeekId(null);
-            setSelectedDayId(null);
-            // and go to workout
             setMode("workout");
-            setShouldAutoNavigate(true);
+            setSelectedPlanId(savedPlan.id);
+            setSelectedWeekId(nextWeekId);
+            setSelectedDayId(nextDayId);
+            // We set explicit selection; disable auto picker to avoid overrides
+            setShouldAutoNavigate(false);
           }}
         />
       )}
@@ -1248,7 +1250,7 @@ function BuilderPage({
   setSelectedDayId: React.Dispatch<React.SetStateAction<string | null>>;
   showPlanList: boolean;
   setShowPlanList: React.Dispatch<React.SetStateAction<boolean>>;
-  onSaved?: () => void;
+  onSaved?: (savedPlan: Plan) => void;
 }) {
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
@@ -1545,16 +1547,18 @@ function BuilderPage({
       const payload = { weeks: selectedPlan.weeks };
       if (selectedPlan.serverId) {
         await planApi.update(selectedPlan.serverId, selectedPlan.name, payload);
+        // After update, pass through the same plan reference
+        if (onSaved) onSaved(selectedPlan);
       } else {
         const created = await planApi.create(selectedPlan.name, payload);
         if (created?.id) {
-          setPlans((prev) =>
-            prev.map((p) => (p.id === selectedPlan.id ? { ...p, serverId: created.id } : p))
-          );
+          const withServerId: Plan = { ...selectedPlan, serverId: created.id };
+          setPlans((prev) => prev.map((p) => (p.id === selectedPlan.id ? { ...p, serverId: created.id } : p)));
+          if (onSaved) onSaved(withServerId);
+        } else {
+          if (onSaved) onSaved(selectedPlan);
         }
       }
-      // After successful save: finalize builder flow and switch to workout
-      if (onSaved) onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
