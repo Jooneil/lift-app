@@ -1192,7 +1192,7 @@ function WorkoutPage({
                       weight: normalized === '' ? null : Number(normalized),
                     });
                   }}
-                  style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: set.weight == null ? 0.9 : 1 }}
+                  style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.weight == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
                 />
                 <input
                   inputMode="numeric"
@@ -1203,7 +1203,7 @@ function WorkoutPage({
                       reps: e.target.value === '' ? null : Number(e.target.value),
                     })
                   }
-                  style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: set.reps == null ? 0.9 : 1 }}
+                  style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.reps == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
                 />
               </div>
             );
