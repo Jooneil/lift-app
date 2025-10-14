@@ -1132,37 +1132,6 @@ function WorkoutPage({
     });
   };
 
-  const addSetToEntry = (entryId: string) => {
-    setSession((s) => {
-      if (!s) return s;
-      const next: Session = {
-        ...s,
-        entries: s.entries.map((entry) =>
-          entry.id === entryId
-            ? { ...entry, sets: [...entry.sets, { id: uuid(), setIndex: entry.sets.length, weight: null, reps: null }] }
-            : entry
-        ),
-      };
-      saveNow(next);
-      return next;
-    });
-  };
-
-  const removeLastSetFromEntry = (entryId: string) => {
-    setSession((s) => {
-      if (!s) return s;
-      const next: Session = {
-        ...s,
-        entries: s.entries.map((entry) =>
-          entry.id === entryId
-            ? { ...entry, sets: entry.sets.slice(0, -1) }
-            : entry
-        ),
-      };
-      saveNow(next);
-      return next;
-    });
-  };
 
   const updateSet = (entryId: string, setId: string, patch: Partial<SessionSet>) => {
     setSession((s) => {
@@ -1197,10 +1166,6 @@ function WorkoutPage({
         <div key={entry.id} style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => addSetToEntry(entry.id)} style={BTN_STYLE}>+ Set</button>
-              <button onClick={() => removeLastSetFromEntry(entry.id)} style={BTN_STYLE}>- Set</button>
-            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8, color: '#777' }}>
