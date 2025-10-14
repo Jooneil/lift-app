@@ -647,7 +647,6 @@ function AuthedApp({
     <div style={{ maxWidth: 680, width: "100%", margin: "0 auto", padding: 16, fontFamily: "system-ui, sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, marginBottom: 12, borderBottom: "1px solid #444" }}>
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setUserMenuOpen((v) => !v)} style={BTN_STYLE} aria-expanded={userMenuOpen} aria-haspopup="menu">
           <button onClick={() => setUserMenuOpen((v) => !v)} style={BTN_STYLE} aria-expanded={userMenuOpen} aria-haspopup="menu">Profile</button>
           {userMenuOpen && (
             <div role="menu" style={{ position: 'absolute', top: '100%', left: 0, background: '#111', border: '1px solid #444', borderRadius: 8, padding: 8, marginTop: 6, minWidth: 200, zIndex: 30 }}>
@@ -1216,14 +1215,18 @@ function WorkoutPage({
               <div key={set.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
                 <div style={{ alignSelf: 'center' }}>{i + 1}</div>
                 <input
+                  type="number"
+                  step="any"
                   inputMode="decimal"
                   placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
                   value={set.weight ?? ''}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const normalized = v.replace(',', '.');
                     updateSet(entry.id, set.id, {
-                      weight: e.target.value === '' ? null : Number(e.target.value),
-                    })
-                  }
+                      weight: normalized === '' ? null : Number(normalized),
+                    });
+                  }}
                   style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: set.weight == null ? 0.9 : 1 }}
                 />
                 <input
@@ -1757,9 +1760,10 @@ function BuilderPage({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setShowPlanList(true)} style={BTN_STYLE}>
-            Manage Plans & Templates
+            Manage Plans & Templates</button>
           <button onClick={handleCreatePlan} style={BTN_STYLE}>
             + Plan
+          </button>
           {selectedPlan && (
             <>
               <button onClick={handleAddWeek} style={BTN_STYLE}>
