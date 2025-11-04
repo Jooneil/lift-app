@@ -1499,6 +1499,35 @@ function BuilderPage({
     }));
   };
 
+  const handleDuplicateDay = (weekId: string, dayId: string) => {
+    if (!selectedPlan) return;
+    updatePlan(selectedPlan.id, (plan) => ({
+      ...plan,
+      weeks: plan.weeks.map((week) => {
+        if (week.id !== weekId) return week;
+        const idx = week.days.findIndex((d) => d.id === dayId);
+        if (idx < 0) return week;
+        const source = week.days[idx];
+        const cloned: PlanDay = {
+          id: uuid(),
+          name: source.name,
+          items: source.items.map((it) => ({
+            id: uuid(),
+            exerciseName: it.exerciseName,
+            targetSets: it.targetSets,
+            targetReps: it.targetReps ?? '',
+          })),
+        };
+        const days = week.days.slice();
+        days.splice(idx + 1, 0, cloned);
+        // Move selection to the new duplicated day
+        setSelectedWeekId(weekId);
+        setSelectedDayId(cloned.id);
+        return { ...week, days };
+      }),
+    }));
+  };
+
   const handleAddExercise = (weekId: string, dayId: string) => {
     if (!selectedPlan) return;
     const exercise = createExercise();
@@ -1564,6 +1593,57 @@ function BuilderPage({
       ),
     }));
   };
+
+  // --- Drag-and-drop reorder for days (pointer-based for mobile) ---
+  const [draggingDayId, setDraggingDayId] = useState<string | null>(null);
+  const [dayDragWeekId, setDayDragWeekId] = useState<string | null>(null);
+  const [dayDragInsertIndex, setDayDragInsertIndex] = useState<number | null>(null);
+  const [dayDragActive, setDayDragActive] = useState<boolean>(false);
+  const dayDragStartYRef = useRef<number>(0);
+  const dayDragTimerRef = useRef<number | null>(null);
+
+  const handleReorderDayAtIndex = (
+    weekId: string,
+    sourceDayId: string,
+    insertIndex: number,
+  ) => {
+    if (!selectedPlan) return;
+    updatePlan(selectedPlan.id, (plan) => ({
+      ...plan,
+      weeks: plan.weeks.map((week) => {
+        if (week.id !== weekId) return week;
+        const days = week.days.slice();
+        const from = days.findIndex((d) => d.id === sourceDayId);
+        if (from < 0) return week;
+        let at = Math.max(0, Math.min(insertIndex, days.length));
+        const [moved] = days.splice(from, 1);
+        if (at > from) at -= 1; // account for removal shift
+        days.splice(at, 0, moved);
+        return { ...week, days };
+      }),
+    }));
+  };
+
+  // While dragging days, disable text selection globally
+  useEffect(() => {
+    const shouldDisable = !!draggingDayId && dayDragActive;
+    const body = document?.body as any;
+    const prev = body && (body.style.userSelect || "");
+    const prevWebkit = body && (body.style.webkitUserSelect || "");
+    const prevMs = body && (body.style.msUserSelect || "");
+    if (shouldDisable && body) {
+      body.style.userSelect = "none";
+      body.style.webkitUserSelect = "none";
+      body.style.msUserSelect = "none";
+    }
+    return () => {
+      if (body) {
+        body.style.userSelect = prev;
+        body.style.webkitUserSelect = prevWebkit;
+        body.style.msUserSelect = prevMs;
+      }
+    };
+  }, [draggingDayId, dayDragActive]);
 
   // --- Drag-and-drop reorder for exercises (pointer-based for mobile) ---
   const [draggingExerciseId, setDraggingExerciseId] = useState<string | null>(null);
@@ -1806,10 +1886,65 @@ function BuilderPage({
                   </button>
                 </div>
 
-                {week.days.map((day) => (
-                  <div key={day.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                <div
+                  style={{ display: 'flex', flexDirection: 'column', gap: 12, touchAction: draggingDayId && dayDragActive ? 'none' as any : 'auto' }}
+                  onPointerMove={(e) => {
+                    if (!draggingDayId || dayDragWeekId !== week.id) return;
+                    const dy = Math.abs(e.clientY - dayDragStartYRef.current);
+                    if (!dayDragActive && dy > 8) setDayDragActive(true);
+                    if (!dayDragActive) return;
+                    e.preventDefault();
+                    const container = e.currentTarget as HTMLElement;
+                    const rows = Array.from(container.querySelectorAll('[data-day-id]')) as HTMLElement[];
+                    if (rows.length === 0) return;
+                    const y = e.clientY;
+                    let insert = rows.length;
+                    for (let i = 0; i < rows.length; i++) {
+                      const r = rows[i].getBoundingClientRect();
+                      const mid = r.top + r.height / 2;
+                      if (y < mid) { insert = i; break; }
+                    }
+                    setDayDragInsertIndex(insert);
+                  }}
+                  onPointerUp={() => {
+                    if (!draggingDayId || dayDragWeekId !== week.id) return;
+                    if (dayDragTimerRef.current) { window.clearTimeout(dayDragTimerRef.current); dayDragTimerRef.current = null; }
+                    if (!dayDragActive) {
+                      setDraggingDayId(null);
+                      setDayDragWeekId(null);
+                      setDayDragInsertIndex(null);
+                      return;
+                    }
+                    const insert = dayDragInsertIndex == null ? week.days.length : dayDragInsertIndex;
+                    handleReorderDayAtIndex(week.id, draggingDayId, insert);
+                    setDraggingDayId(null);
+                    setDayDragWeekId(null);
+                    setDayDragInsertIndex(null);
+                    setDayDragActive(false);
+                  }}
+                >
+                {week.days.map((day, dayIdx) => (
+                  <div key={day.id} data-day-id={day.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            setDraggingDayId(day.id);
+                            setDayDragWeekId(week.id);
+                            setDayDragActive(false);
+                            dayDragStartYRef.current = e.clientY;
+                            setDayDragInsertIndex(dayIdx);
+                            if (dayDragTimerRef.current) window.clearTimeout(dayDragTimerRef.current);
+                            dayDragTimerRef.current = window.setTimeout(() => setDayDragActive(true), 150);
+                            try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+                          }}
+                          style={{ textAlign: 'center', fontSize: 18, lineHeight: '18px', padding: '0 6px', userSelect: 'none', touchAction: 'none', cursor: 'grab', borderRight: '1px solid #333', borderRadius: 8 }}
+                          aria-label="Drag day handle"
+                          title="Drag to reorder day"
+                        >
+                          ≡
+                        </div>
                         <input
                           value={day.name}
                           onChange={(e) => handleDayNameChange(week.id, day.id, e.target.value)}
@@ -1817,6 +1952,9 @@ function BuilderPage({
                         />
                         <button onClick={() => handleAddExercise(week.id, day.id)} style={SMALL_BTN_STYLE}>
                           + Exercise
+                        </button>
+                        <button onClick={() => handleDuplicateDay(week.id, day.id)} style={SMALL_BTN_STYLE}>
+                          Duplicate Day
                         </button>
                       </div>
                       <button onClick={() => handleRemoveDay(week.id, day.id)} style={SMALL_BTN_STYLE} disabled={week.days.length <= 1}>
@@ -1947,12 +2085,7 @@ function BuilderPage({
                                   </option>
                                 ))}
                               </select>
-                              <input
-                                value={item.targetReps ?? ''}
-                                onChange={(e) => handleExerciseChange(week.id, day.id, item.id, { targetReps: e.target.value })}
-                                style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
-                                placeholder="Reps / notes"
-                              />
+                              {/* reps/notes field removed per request */}
                               <button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} style={SMALL_BTN_STYLE}>
                                 Remove
                               </button>
@@ -1968,8 +2101,15 @@ function BuilderPage({
                         )}
                       </div>
                     )}
+                    {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === dayIdx + 1 && (
+                      <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8, margin: '10px 0' }} />
+                    )}
                   </div>
                 ))}
+                {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === week.days.length && (
+                  <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
+                )}
+                </div>
               </div>
             ))}
           </div>
