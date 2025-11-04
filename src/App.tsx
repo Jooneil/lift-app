@@ -1136,17 +1136,39 @@ function WorkoutPage({
   const updateSet = (entryId: string, setId: string, patch: Partial<SessionSet>) => {
     setSession((s) => {
       if (!s) return s;
-      const next: Session = {
-        ...s,
-        entries: s.entries.map((entry) =>
-          entry.id === entryId
-            ? {
-                ...entry,
-                sets: entry.sets.map((set) => (set.id === setId ? { ...set, ...patch } : set)),
+
+      const nextEntries = s.entries.map((entry) => {
+        if (entry.id !== entryId) return entry;
+
+        const idx = entry.sets.findIndex((st) => st.id === setId);
+        if (idx === -1) return entry;
+
+        const prevWeight = entry.sets[idx]?.weight ?? null;
+
+        // First apply the direct patch to the targeted set
+        const updatedSets = entry.sets.map((st, i) => (st.id === setId ? { ...st, ...patch } : st));
+
+        // Propagate weight forward within this exercise, based on rules:
+        // - Only when weight is part of the patch
+        // - Do not change previous sets
+        // - For sets after the changed index, set weight to the new value
+        //   only if their current weight is null or equal to the old value
+        if (Object.prototype.hasOwnProperty.call(patch, 'weight')) {
+          const newWeight = patch.weight ?? null;
+          if (newWeight !== null) {
+            for (let j = idx + 1; j < updatedSets.length; j++) {
+              const w = updatedSets[j].weight;
+              if (w === null || w === prevWeight) {
+                updatedSets[j] = { ...updatedSets[j], weight: newWeight };
               }
-            : entry
-        ),
-      };
+            }
+          }
+        }
+
+        return { ...entry, sets: updatedSets };
+      });
+
+      const next: Session = { ...s, entries: nextEntries };
       saveNow(next);
       return next;
     });
