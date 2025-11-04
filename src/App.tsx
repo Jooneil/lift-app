@@ -1146,7 +1146,7 @@ function WorkoutPage({
         const prevWeight = entry.sets[idx]?.weight ?? null;
 
         // First apply the direct patch to the targeted set
-        const updatedSets = entry.sets.map((st, i) => (st.id === setId ? { ...st, ...patch } : st));
+        const updatedSets = entry.sets.map((st) => (st.id === setId ? { ...st, ...patch } : st));
 
         // Propagate weight forward within this exercise, based on rules:
         // - Only when weight is part of the patch
