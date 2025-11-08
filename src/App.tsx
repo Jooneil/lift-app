@@ -30,7 +30,7 @@ type Session = {
   completed?: boolean;
   ghostSeed?: boolean;
 };
-type SessionEntry = { id: string; exerciseName: string; sets: SessionSet[] };
+type SessionEntry = { id: string; exerciseName: string; sets: SessionSet[]; note?: string | null };
 type SessionSet = { id: string; setIndex: number; weight: number | null; reps: number | null };
 
 type ArchivedSessionMap = Record<string, Record<string, Session | null>>;
@@ -67,6 +67,7 @@ function startSessionFromDay(plan: Plan, weekId: string, dayId: string): Session
         weight: null,
         reps: null,
       })),
+      note: null,
     })),
     completed: false,
   };
@@ -92,6 +93,7 @@ function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
       id: existing?.id || uuid(),
       exerciseName: item.exerciseName,
       sets,
+      note: existing?.note ?? null,
     };
   });
   return { ...prev, entries: nextEntries };
@@ -938,6 +940,9 @@ function WorkoutPage({
   finishingPlan: boolean;
 }) {
   const [ghost, setGhost] = useState<Record<string, { weight: number | null; reps: number | null }[]>>({});
+  const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
+  const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
 
   const currentWeek = useMemo(
     () => plan.weeks.find((w) => w.days.some((d) => d.id === day.id)) || null,
@@ -1070,18 +1075,48 @@ function WorkoutPage({
         }
 
         const map: Record<string, { weight: number | null; reps: number | null }[]> = {};
+        const notesMap: Record<string, string | null> = {};
         for (const entry of ghostData.entries) {
           map[entry.exerciseName] = (entry.sets || []).map((s: Partial<SessionSetPayload>) => ({
             weight: s.weight ?? null,
             reps: s.reps ?? null,
           }));
+          notesMap[entry.exerciseName] = (entry as any).note ?? null;
         }
         setGhost(map);
+        setPrevNotes(notesMap);
       } catch {
         setGhost({});
+        setPrevNotes({});
       }
     })();
   }, [plan.serverId, currentWeekId, plan.weeks, day.id, plan.id]);
+
+  // Seed notes from previous week where notes are missing
+  useEffect(() => {
+    if (!session || session.planDayId !== day.id) return;
+    if (!prevNotes) return;
+    const nextEntries = session.entries.map((e) => {
+      const hasNote = !!(e.note && String(e.note).trim() !== "");
+      const suggested = prevNotes[e.exerciseName];
+      if (hasNote || !suggested || String(suggested).trim() === "") return e;
+      return { ...e, note: suggested };
+    });
+    const changed = nextEntries.some((e, i) => e.note !== session.entries[i].note);
+    if (changed) {
+      const next: Session = { ...session, entries: nextEntries };
+      setSession(next);
+      try {
+        localStorage.setItem(
+          `session:${plan.serverId ?? plan.id}:${next.planWeekId}:${next.planDayId}`,
+          JSON.stringify(next)
+        );
+      } catch { /* ignore */ }
+      if (plan.serverId) {
+        sessionApi.save(plan.serverId, next.planWeekId, next.planDayId, next).catch(() => void 0);
+      }
+    }
+  }, [prevNotes, session, day.id]);
 
   // Merge session with updated plan day (preserve existing weights/reps)
   useEffect(() => {
@@ -1127,6 +1162,20 @@ function WorkoutPage({
     setSession((prev) => {
       if (!prev) return prev;
       const next: Session = { ...prev, completed: flag };
+      saveNow(next);
+      return next;
+    });
+  };
+
+  const updateEntryNote = (entryId: string, noteText: string) => {
+    setSession((s) => {
+      if (!s) return s;
+      const next: Session = {
+        ...s,
+        entries: s.entries.map((entry) =>
+          entry.id === entryId ? { ...entry, note: noteText.trim() === '' ? null : noteText } : entry
+        ),
+      };
       saveNow(next);
       return next;
     });
@@ -1186,52 +1235,89 @@ function WorkoutPage({
     <div>
       {session.entries.map((entry) => (
         <div key={entry.id} style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
             <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
+            <button
+              onClick={() => {
+                setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
+                setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
+              }}
+              style={{
+                ...SMALL_BTN_STYLE,
+                border: `1px solid ${entry.note && String(entry.note).trim() !== '' ? '#0ff' : '#fff'}`,
+              }}
+              title="Notes"
+            >
+              Notes
+            </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8, color: '#777' }}>
-            <div>Set</div>
-            <div>Weight</div>
-            <div>Reps</div>
-          </div>
-
-          {entry.sets.map((set, i) => {
-            const ghostSet = getGhost(entry.exerciseName, i);
-            return (
-              <div key={set.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-                <div style={{ alignSelf: 'center' }}>{i + 1}</div>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
-                  value={set.weight ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    const normalized = v.replace(',', '.');
-                    updateSet(entry.id, set.id, {
-                      weight: normalized === '' ? null : Number(normalized),
-                    });
+          {openNotes[entry.id] ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <textarea
+                value={notesDraft[entry.id] ?? ''}
+                onChange={(e) => setNotesDraft((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                style={{ padding: 8, borderRadius: 8, border: '1px solid #444', minHeight: 120, resize: 'vertical', width: '100%' }}
+                placeholder="Add notes for this exercise"
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    updateEntryNote(entry.id, notesDraft[entry.id] ?? '');
+                    setOpenNotes((prev) => ({ ...prev, [entry.id]: false }));
                   }}
-                  style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.weight == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
-                />
-                <input
-                  inputMode="numeric"
-                  placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
-                  value={set.reps ?? ''}
-                  onChange={(e) =>
-                    updateSet(entry.id, set.id, {
-                      reps: e.target.value === '' ? null : Number(e.target.value),
-                    })
-                  }
-                  style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.reps == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
-                />
+                  style={PRIMARY_BTN_STYLE}
+                >
+                  Save
+                </button>
               </div>
-            );
-          })}
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8, color: '#777' }}>
+                <div>Set</div>
+                <div>Weight</div>
+                <div>Reps</div>
+              </div>
 
-          {entry.sets.length === 0 && <div style={{ color: '#777' }}>No sets yet.</div>}
+              {entry.sets.map((set, i) => {
+                const ghostSet = getGhost(entry.exerciseName, i);
+                return (
+                  <div key={set.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                    <div style={{ alignSelf: 'center' }}>{i + 1}</div>
+                    <input
+                      type="number"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
+                      value={set.weight ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const normalized = v.replace(',', '.');
+                        updateSet(entry.id, set.id, {
+                          weight: normalized === '' ? null : Number(normalized),
+                        });
+                      }}
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.weight == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
+                    />
+                    <input
+                      inputMode="numeric"
+                      placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
+                      value={set.reps ?? ''}
+                      onChange={(e) =>
+                        updateSet(entry.id, set.id, {
+                          reps: e.target.value === '' ? null : Number(e.target.value),
+                        })
+                      }
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.reps == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
+                    />
+                  </div>
+                );
+              })}
+
+              {entry.sets.length === 0 && <div style={{ color: '#777' }}>No sets yet.</div>}
+            </>
+          )}
         </div>
       ))}
 
@@ -1498,6 +1584,8 @@ function BuilderPage({
       }),
     }));
   };
+
+  
 
   const handleDuplicateDay = (weekId: string, dayId: string) => {
     if (!selectedPlan) return;
