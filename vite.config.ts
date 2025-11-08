@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@supabase/auth-js/dist/module/lib/types': path.resolve(__dirname, 'src/shims/supabase-types.js'),
+      '@supabase/auth-js/dist/module/lib/web3/ethereum': path.resolve(__dirname, 'src/shims/empty.js'),
       // Work around optional modules referenced by @supabase/auth-js that we don't use
       './lib/types': path.resolve(__dirname, 'src/shims/supabase-types.js'),
       './lib/web3/ethereum': path.resolve(__dirname, 'src/shims/empty.js'),
