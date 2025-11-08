@@ -1,4 +1,4 @@
-
+﻿
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
 import { api, planApi, sessionApi, templateApi } from "./api";
@@ -2284,7 +2284,7 @@ function BuilderPage({
                           aria-label="Drag day handle"
                           title="Drag to reorder day"
                         >
-                          ≡
+                          Γëí
                         </div>
                         <input
                           value={day.name}
@@ -2403,7 +2403,7 @@ function BuilderPage({
                                   aria-label="Drag handle"
                                   title="Drag to reorder"
                                 >
-                                  ≡
+                                  Γëí
                                 </div>
                                 <input
                                   value={item.exerciseName}
