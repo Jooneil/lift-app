@@ -1953,14 +1953,22 @@ function BuilderPage({
   const csvEscape = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
 
   const planToCSV = (plan: Plan): string => {
-    const header = ['planName','weekName','dayName','exerciseName','targetSets','targetReps'];
+    const header = ['planName','weekName','dayName','exerciseName','targetSets','targetReps','note'];
     const rows: string[] = [header.join(',')];
     for (const wk of plan.weeks) {
       const weekName = wk.name || '';
-      for (const dy of wk.days) {
+      for (let di = 0; di < wk.days.length; di++) {
+        const dy = wk.days[di];
         const dayName = dy.name || '';
         if (!dy.items || dy.items.length === 0) continue;
+        let seed: Record<string, string> = {};
+        try {
+          const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${di}`;
+          const raw = localStorage.getItem(seedKey);
+          if (raw) seed = JSON.parse(raw) || {};
+        } catch { /* ignore */ }
         for (const it of dy.items) {
+          const note = seed[it.exerciseName || ''] || '';
           rows.push([
             csvEscape(plan.name || ''),
             csvEscape(weekName),
@@ -1968,6 +1976,7 @@ function BuilderPage({
             csvEscape(it.exerciseName || ''),
             String(Number(it.targetSets) || 0),
             csvEscape(it.targetReps || ''),
+            csvEscape(note),
           ].join(','));
         }
       }
@@ -2048,6 +2057,7 @@ function BuilderPage({
       exerciseName: header.indexOf('exercisename'),
       targetSets: header.indexOf('targetsets'),
       targetReps: header.indexOf('targetreps'),
+      note: header.indexOf('note'),
     } as const;
     if (idx.weekName < 0 || idx.dayName < 0 || idx.exerciseName < 0 || idx.targetSets < 0) {
       alert('CSV missing required columns: weekName, dayName, exerciseName, targetSets');
@@ -2108,6 +2118,38 @@ function BuilderPage({
         const text = String(reader.result || '');
         const plan = csvToPlan(file.name, text);
         if (!plan) return;
+        // After creating the plan, seed notes from CSV if provided
+        try {
+          const rows = parseCSV(text);
+          if (rows.length > 0) {
+            const header = rows[0].map((h) => h.trim().toLowerCase());
+            const idx = {
+              weekName: header.indexOf('weekname'),
+              dayName: header.indexOf('dayname'),
+              exerciseName: header.indexOf('exercisename'),
+              note: header.indexOf('note'),
+            } as const;
+            if (idx.weekName >= 0 && idx.dayName >= 0 && idx.exerciseName >= 0 && idx.note >= 0) {
+              for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                if (!row || row.length === 0) continue;
+                const wName = row[idx.weekName] || '';
+                const dName = row[idx.dayName] || '';
+                const exName = row[idx.exerciseName] || '';
+                const note = (row[idx.note] || '').trim();
+                if (!exName || !note) continue;
+                const week = plan.weeks.find((w) => (w.name || '') === wName) || null;
+                const dayIdx = week ? week.days.findIndex((d) => (d.name || '') === dName) : -1;
+                if (dayIdx < 0) continue;
+                const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dayIdx}`;
+                let seed: Record<string, string> = {};
+                try { const raw = localStorage.getItem(seedKey); if (raw) seed = JSON.parse(raw) || {}; } catch { /* ignore */ }
+                seed[exName] = note;
+                try { localStorage.setItem(seedKey, JSON.stringify(seed)); } catch { /* ignore */ }
+              }
+            }
+          }
+        } catch { /* ignore */ }
         setPlans((prev) => [...prev, plan]);
         onSelectPlan(plan.id, plan);
         setShowPlanList(false);
