@@ -1084,6 +1084,18 @@ function WorkoutPage({
           notesMap[entry.exerciseName] = (entry as any).note ?? null;
         }
         setGhost(map);
+        try {
+          const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dayIdx}`;
+          const raw = localStorage.getItem(seedKey);
+          if (raw) {
+            const seed = JSON.parse(raw) as Record<string, string>;
+            for (const [ex, note] of Object.entries(seed)) {
+              if (!notesMap[ex] || String(notesMap[ex]).trim() === '') {
+                notesMap[ex] = note;
+              }
+            }
+          }
+        } catch { /* ignore */ }
         setPrevNotes(notesMap);
       } catch {
         setGhost({});
@@ -1167,22 +1179,36 @@ function WorkoutPage({
     });
   };
 
-  const updateEntryNote = (entryId: string, noteText: string) => {
-    setSession((s) => {
-      if (!s) return s;
-      const next: Session = {
-        ...s,
-        entries: s.entries.map((entry) =>
-          entry.id === entryId ? { ...entry, note: noteText.trim() === '' ? null : noteText } : entry
-        ),
-      };
-      saveNow(next);
-      return next;
-    });
-  };
-
-
-  const updateSet = (entryId: string, setId: string, patch: Partial<SessionSet>) => {
+    const updateEntryNote = (entryId: string, noteText: string) => {
+  setSession((s) => {
+    if (!s) return s;
+    const entry = s.entries.find((e) => e.id === entryId) || null;
+    const next: Session = {
+      ...s,
+      entries: s.entries.map((e) =>
+        e.id === entryId ? { ...e, note: noteText.trim() === '' ? null : noteText } : e
+      ),
+    };
+    try {
+      const wIdx = plan.weeks.findIndex((w) => w.days.some((d) => d.id === day.id));
+      const dIdx = wIdx >= 0 ? plan.weeks[wIdx].days.findIndex((d) => d.id === day.id) : -1;
+      if (entry && wIdx >= 0 && dIdx >= 0) {
+        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dIdx}`;
+        let seed: Record<string, string> = {};
+        try {
+          const raw = localStorage.getItem(seedKey);
+          if (raw) seed = JSON.parse(raw) || {};
+        } catch { /* ignore */ }
+        const name = entry.exerciseName || '';
+        const trimmed = noteText.trim();
+        if (trimmed) seed[name] = trimmed; else delete seed[name];
+        try { localStorage.setItem(seedKey, JSON.stringify(seed)); } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+    saveNow(next);
+    return next;
+  });
+};const updateSet = (entryId: string, setId: string, patch: Partial<SessionSet>) => {
     setSession((s) => {
       if (!s) return s;
 
