@@ -1158,7 +1158,9 @@ function WorkoutPage({
     return arr[idx];
   };
 
-  const saveNow = (next: Session) => {
+  const saveDebounceRef = useRef<number | null>(null);
+  const savePendingRef = useRef<Session | null>(null);
+  const saveNow = (next: Session, flush?: boolean) => {
     try {
       localStorage.setItem(
         `session:${plan.serverId ?? plan.id}:${next.planWeekId}:${next.planDayId}`,
@@ -1167,7 +1169,18 @@ function WorkoutPage({
     } catch { void 0; }
     const serverId = plan.serverId;
     if (!serverId) return;
-    sessionApi.save(serverId, next.planWeekId, next.planDayId, next).catch(() => void 0);
+    savePendingRef.current = next;
+    if (flush) {
+      const payload = savePendingRef.current;
+      if (payload) sessionApi.save(serverId, payload.planWeekId, payload.planDayId, payload).catch(() => void 0);
+      return;
+    }
+    if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
+    saveDebounceRef.current = window.setTimeout(() => {
+      const payload = savePendingRef.current;
+      if (payload) sessionApi.save(serverId, payload.planWeekId, payload.planDayId, payload).catch(() => void 0);
+      saveDebounceRef.current = null;
+    }, 300);
   };
 
   const markSessionCompleted = (flag: boolean) => {
