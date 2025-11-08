@@ -1820,6 +1820,178 @@ function BuilderPage({
     }
   };
 
+  // --- Export / Import (CSV) ---
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  const csvEscape = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
+
+  const planToCSV = (plan: Plan): string => {
+    const header = ['planName','weekName','dayName','exerciseName','targetSets','targetReps'];
+    const rows: string[] = [header.join(',')];
+    for (const wk of plan.weeks) {
+      const weekName = wk.name || '';
+      for (const dy of wk.days) {
+        const dayName = dy.name || '';
+        if (!dy.items || dy.items.length === 0) continue;
+        for (const it of dy.items) {
+          rows.push([
+            csvEscape(plan.name || ''),
+            csvEscape(weekName),
+            csvEscape(dayName),
+            csvEscape(it.exerciseName || ''),
+            String(Number(it.targetSets) || 0),
+            csvEscape(it.targetReps || ''),
+          ].join(','));
+        }
+      }
+    }
+    return rows.join('\n');
+  };
+
+  const downloadCSV = (filename: string, csv: string) => {
+    try {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename.toLowerCase().endsWith('.csv') ? filename : `${filename}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleExportPlanCSV = (plan: Plan) => {
+    const csv = planToCSV(plan);
+    downloadCSV(`${plan.name || 'plan'}.csv`, csv);
+  };
+
+  const handleExportTemplateCSV = (tpl: Plan) => {
+    const csv = planToCSV(tpl);
+    downloadCSV(`${tpl.name || 'template'}.csv`, csv);
+  };
+
+  const parseCSV = (text: string): string[][] => {
+    const rows: string[][] = [];
+    let cur: string[] = [];
+    let cell = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cell += '"'; i++; } else { inQuotes = false; }
+        } else {
+          cell += ch;
+        }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ',') {
+          cur.push(cell); cell = '';
+        } else if (ch === '\n') {
+          cur.push(cell); cell = '';
+          if (cur.length && cur[cur.length - 1].endsWith('\r')) {
+            cur[cur.length - 1] = cur[cur.length - 1].replace(/\r$/, '');
+          }
+          rows.push(cur);
+          cur = [];
+        } else {
+          cell += ch;
+        }
+      }
+    }
+    cur.push(cell);
+    if (!(cur.length === 1 && cur[0] === '')) rows.push(cur);
+    while (rows.length && rows[rows.length - 1].every((c) => c.trim() === '')) rows.pop();
+    return rows;
+  };
+
+  const csvToPlan = (nameFromFile: string, text: string): Plan | null => {
+    const rows = parseCSV(text);
+    if (rows.length === 0) return null;
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const idx = {
+      planName: header.indexOf('planname'),
+      weekName: header.indexOf('weekname'),
+      dayName: header.indexOf('dayname'),
+      exerciseName: header.indexOf('exercisename'),
+      targetSets: header.indexOf('targetsets'),
+      targetReps: header.indexOf('targetreps'),
+    } as const;
+    if (idx.weekName < 0 || idx.dayName < 0 || idx.exerciseName < 0 || idx.targetSets < 0) {
+      alert('CSV missing required columns: weekName, dayName, exerciseName, targetSets');
+      return null;
+    }
+    const weeks: PlanWeek[] = [];
+    const getWeek = (name: string): PlanWeek => {
+      const found = weeks.find((w) => w.name === name);
+      if (found) return found;
+      const w: PlanWeek = { id: uuid(), name: name || 'Week', days: [] };
+      weeks.push(w);
+      return w;
+    };
+    const getDay = (week: PlanWeek, name: string): PlanDay => {
+      const found = week.days.find((d) => d.name === name);
+      if (found) return found;
+      const d: PlanDay = { id: uuid(), name: name || 'Day', items: [] };
+      week.days.push(d);
+      return d;
+    };
+    let planName = '';
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (row.length === 0 || row.every((c) => c.trim() === '')) continue;
+      const wName = row[idx.weekName] || '';
+      const dName = row[idx.dayName] || '';
+      const exName = row[idx.exerciseName] || '';
+      const setsRaw = row[idx.targetSets] || '';
+      const reps = idx.targetReps >= 0 ? (row[idx.targetReps] || '') : '';
+      if (idx.planName >= 0 && !planName) planName = row[idx.planName] || '';
+      const sets = Number(setsRaw);
+      const week = getWeek(wName);
+      const day = getDay(week, dName);
+      if (exName) {
+        day.items.push({ id: uuid(), exerciseName: exName, targetSets: Number.isFinite(sets) && sets > 0 ? sets : 0, targetReps: reps });
+      }
+    }
+    const finalName = (planName || nameFromFile || 'Imported Plan').replace(/\.csv$/i, '');
+    return { id: uuid(), name: finalName, weeks };
+  };
+
+  const handleClickImportPlan = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportPlanFile: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith('.csv')) {
+      alert('Please select a .csv file');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result || '');
+        const plan = csvToPlan(file.name, text);
+        if (!plan) return;
+        setPlans((prev) => [...prev, plan]);
+        onSelectPlan(plan.id, plan);
+        setShowPlanList(false);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      }
+    };
+    reader.onerror = () => alert('Failed to read file');
+    reader.readAsText(file);
+  };
+
   
 
   return (
@@ -2131,6 +2303,10 @@ function BuilderPage({
             </div>
             {manageTab === 'plans' ? (
               <>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button onClick={handleClickImportPlan} style={SMALL_BTN_STYLE}>Import Plan (CSV)</button>
+                  <input ref={importInputRef} type="file" accept=".csv" onChange={handleImportPlanFile} style={{ display: 'none' }} />
+                </div>
                 {plans.length === 0 && <div style={{ color: '#777' }}>No plans yet.</div>}
                 {plans.map((plan) => (
                   <div key={plan.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -2149,6 +2325,7 @@ function BuilderPage({
                       >
                         Open
                       </button>
+                      <button onClick={() => handleExportPlanCSV(plan)} style={SMALL_BTN_STYLE}>Export</button>
                       <button onClick={() => handleDeletePlan(plan.id)} style={SMALL_BTN_STYLE}>
                         Delete
                       </button>
@@ -2172,6 +2349,7 @@ function BuilderPage({
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => openTemplate(tpl)} style={SMALL_BTN_STYLE}>Open</button>
                         <button onClick={() => renameTemplate(tpl)} style={SMALL_BTN_STYLE}>Rename</button>
+                        <button onClick={() => handleExportTemplateCSV(tpl)} style={SMALL_BTN_STYLE}>Export</button>
                         <button onClick={() => deleteTemplate(tpl)} style={SMALL_BTN_STYLE}>Delete</button>
                       </div>
                     </div>
