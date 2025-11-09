@@ -17,7 +17,8 @@ import type {
 
 type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
-type PlanDay = { id: string; name: string; items: PlanExercise[] };\r\ntype PlanExercise = { id: string; exerciseName: string; targetSets: number; targetReps?: string };
+type PlanDay = { id: string; name: string; items: PlanExercise[] };
+type PlanExercise = { id: string; exerciseName: string; targetSets: number; targetReps?: string };
 
 type Session = {
   id: string;
@@ -2283,7 +2284,7 @@ function BuilderPage({
                           aria-label="Drag day handle"
                           title="Drag to reorder day"
                         >
-                          ÃŽâ€œÃƒÂ«ÃƒÂ­
+                          ÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â«ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­
                         </div>
                         <input
                           value={day.name}
@@ -2402,7 +2403,7 @@ function BuilderPage({
                                   aria-label="Drag handle"
                                   title="Drag to reorder"
                                 >
-                                  ÃŽâ€œÃƒÂ«ÃƒÂ­
+                                  ÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â«ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­
                                 </div>
                                 <input
                                   value={item.exerciseName}

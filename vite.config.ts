@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
+      './lib/types': path.resolve(__dirname, 'src/shims/supabase-types.js'),
+      './lib/web3/ethereum': path.resolve(__dirname, 'src/shims/empty.js'),
       // Precise aliases for optional modules referenced by @supabase/auth-js only
       '@supabase/auth-js/dist/module/lib/types': path.resolve(
         __dirname,
