@@ -17,9 +17,7 @@ import type {
 
 type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
-type PlanDay = { id: string; name: string; items: PlanExercise[] };
-  if (!session || session.planDayId !== day.id) return null;
-type PlanExercise = { id: string; exerciseName: string; targetSets: number; targetReps?: string };
+type PlanDay = { id: string; name: string; items: PlanExercise[] };\r\ntype PlanExercise = { id: string; exerciseName: string; targetSets: number; targetReps?: string };
 
 type Session = {
   id: string;
@@ -1160,6 +1158,7 @@ function WorkoutPage({
 
   const saveDebounceRef = useRef<number | null>(null);
   const savePendingRef = useRef<Session | null>(null);
+  if (!session || session.planDayId !== day.id) return null;
   const saveNow = (next: Session, flush?: boolean) => {
     try {
       localStorage.setItem(
@@ -2284,7 +2283,7 @@ function BuilderPage({
                           aria-label="Drag day handle"
                           title="Drag to reorder day"
                         >
-                          Γëí
+                          ÃŽâ€œÃƒÂ«ÃƒÂ­
                         </div>
                         <input
                           value={day.name}
@@ -2403,7 +2402,7 @@ function BuilderPage({
                                   aria-label="Drag handle"
                                   title="Drag to reorder"
                                 >
-                                  Γëí
+                                  ÃŽâ€œÃƒÂ«ÃƒÂ­
                                 </div>
                                 <input
                                   value={item.exerciseName}
