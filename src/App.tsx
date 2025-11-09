@@ -1,4 +1,4 @@
-﻿
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
 import { api, planApi, sessionApi, templateApi } from "./api";
@@ -18,6 +18,7 @@ import type {
 type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
 type PlanDay = { id: string; name: string; items: PlanExercise[] };
+  if (!session || session.planDayId !== day.id) return null;
 type PlanExercise = { id: string; exerciseName: string; targetSets: number; targetReps?: string };
 
 type Session = {
@@ -1150,7 +1151,6 @@ function WorkoutPage({
     }
   }, [plan.id, plan.serverId, day.items, session]);
 
-  if (!session || session.planDayId !== day.id) return null;
 
   const getGhost = (exerciseName: string, idx: number) => {
     const arr = ghost[exerciseName];
