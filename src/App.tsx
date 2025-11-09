@@ -2606,21 +2606,25 @@ function BuilderPage({
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 10 }}>
           <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 420, width: '100%', maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Manage Plans & Templates</h3>
-              <button onClick={() => setShowPlanList(false)} style={BTN_STYLE}>
-                Close
-              </button>
+              <h3 style={{ margin: 0 }}>Manage {manageTab === 'plans' ? 'Plans' : 'Templates'}</h3>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {manageTab === 'plans' && (
+                  <>
+                    <button onClick={handleClickImportPlan} style={SMALL_BTN_STYLE}>Import Plan (CSV)</button>
+                    <input ref={importInputRef} type="file" accept=".csv" onChange={handleImportPlanFile} style={{ display: 'none' }} />
+                  </>
+                )}
+                <button onClick={() => setShowPlanList(false)} style={BTN_STYLE}>
+                  Close
+                </button>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setManageTab('plans')} style={BTN_STYLE} aria-pressed={manageTab==='plans'}>Plans</button>
-              <button onClick={() => setManageTab('templates')} style={BTN_STYLE} aria-pressed={manageTab==='templates'}>Templates</button>
+              <button onClick={() => setManageTab('plans')} style={manageTab === 'plans' ? PRIMARY_BTN_STYLE : BTN_STYLE} aria-pressed={manageTab === 'plans'}>Plans</button>
+              <button onClick={() => setManageTab('templates')} style={manageTab === 'templates' ? PRIMARY_BTN_STYLE : BTN_STYLE} aria-pressed={manageTab === 'templates'}>Templates</button>
             </div>
             {manageTab === 'plans' ? (
               <>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button onClick={handleClickImportPlan} style={SMALL_BTN_STYLE}>Import Plan (CSV)</button>
-                  <input ref={importInputRef} type="file" accept=".csv" onChange={handleImportPlanFile} style={{ display: 'none' }} />
-                </div>
                 {plans.length === 0 && <div style={{ color: '#777' }}>No plans yet.</div>}
                 {plans.map((plan) => (
                   <div key={plan.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
