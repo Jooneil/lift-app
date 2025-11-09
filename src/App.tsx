@@ -1339,38 +1339,18 @@ function WorkoutPage({
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {renamingEntryId === entry.id ? (
-                <input
-                  value={renameDraft}
-                  onChange={(e) => setRenameDraft(e.target.value)}
-                  style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
-                />
-              ) : (
-                <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button
-                onClick={() => {
-                  setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
-                  setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
-                }}
-                style={{
-                  ...SMALL_BTN_STYLE,
-                  border: `1px solid ${entry.note && String(entry.note).trim() !== '' ? '#0ff' : '#fff'}`,
-                }}
-                title="Notes"
-              >
-                Notes
-              </button>
-
-              {renamingEntryId === entry.id ? (
                 <>
+                  <input
+                    value={renameDraft}
+                    onChange={(e) => setRenameDraft(e.target.value)}
+                    style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
+                  />
                   <button
                     onClick={() => {
                       // show replace prompt for this entry
                       setShowReplacePromptForId(entry.id);
                     }}
-                    style={PRIMARY_BTN_STYLE}
+                    style={SMALL_BTN_STYLE}
                   >
                     Save
                   </button>
@@ -1386,17 +1366,35 @@ function WorkoutPage({
                   </button>
                 </>
               ) : (
-                <button
-                  onClick={() => {
-                    setRenamingEntryId(entry.id);
-                    setRenameDraft(entry.exerciseName);
-                    setShowReplacePromptForId(null);
-                  }}
-                  style={SMALL_BTN_STYLE}
-                >
-                  Rename
-                </button>
+                <>
+                  <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
+                  <button
+                    onClick={() => {
+                      setRenamingEntryId(entry.id);
+                      setRenameDraft(entry.exerciseName);
+                      setShowReplacePromptForId(null);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >
+                    Rename
+                  </button>
+                </>
               )}
+            </div>
+            <div>
+              <button
+                onClick={() => {
+                  setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
+                  setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
+                }}
+                style={{
+                  ...SMALL_BTN_STYLE,
+                  border: `1px solid ${entry.note && String(entry.note).trim() !== '' ? '#0ff' : '#fff'}`,
+                }}
+                title="Notes"
+              >
+                Notes
+              </button>
             </div>
           </div>
 
@@ -1415,7 +1413,7 @@ function WorkoutPage({
                   setRenameDraft('');
                   setShowReplacePromptForId(null);
                 }}
-                style={PRIMARY_BTN_STYLE}
+                style={SMALL_BTN_STYLE}
               >
                 Yes
               </button>
