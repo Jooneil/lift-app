@@ -5,6 +5,6 @@ import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <div style={{ padding: 16, color: '#0ff', fontFamily: 'system-ui, sans-serif' }}>OK</div>
   </StrictMode>,
 )
