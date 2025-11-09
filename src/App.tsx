@@ -920,7 +920,7 @@ function AuthedApp({
                                         const sets = entry?.sets ?? [];
                                         const rowCount = Math.max(item.targetSets, sets.length);
                                         return (
-                                          <div key={item.id} style={{ border: '1px solid #444', borderRadius: 8, padding: 8 }}>
+                                          <div key={item.id} style={{ border: '2px solid #fff', borderRadius: 8, padding: 8 }}>
                                             <div style={{ fontWeight: 600 }}>{item.exerciseName}</div>
                                             <div style={{ fontSize: 12, color: '#aaa', marginBottom: 6 }}>
                                               Target: {item.targetSets} set{item.targetSets === 1 ? '' : 's'}
@@ -1335,7 +1335,7 @@ function WorkoutPage({
   return (
     <div>
       {session.entries.map((entry) => (
-        <div key={entry.id} style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+        <div key={entry.id} style={{ border: '2px solid #fff', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {renamingEntryId === entry.id ? (
