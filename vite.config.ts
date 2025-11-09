@@ -6,22 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     dedupe: ['react', 'react-dom'],
-    alias: {
-      react: path.resolve(__dirname, 'node_modules/react/index.js'),
-      'react/jsx-runtime': path.resolve(__dirname, 'node_modules/react/jsx-runtime.js'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom/index.js'),
-      'react-dom/client': path.resolve(__dirname, 'node_modules/react-dom/client.js'),
-
-      // Precise aliases for optional modules referenced by @supabase/auth-js
-      '@supabase/auth-js/dist/module/lib/types': path.resolve(
-        __dirname,
-        'src/shims/supabase-types.js',
-      ),
-      '@supabase/auth-js/dist/module/lib/web3/ethereum': path.resolve(
-        __dirname,
-        'src/shims/empty.js',
-      ),
-    },
+    alias: [\r\n      { find: 'react/jsx-runtime', replacement: path.resolve(__dirname, 'node_modules/react/jsx-runtime.js') },\r\n      { find: 'react-dom/client', replacement: path.resolve(__dirname, 'node_modules/react-dom/client.js') },\r\n      { find: 'react-dom', replacement: path.resolve(__dirname, 'node_modules/react-dom/index.js') },\r\n      { find: /^react$/, replacement: path.resolve(__dirname, 'node_modules/react/index.js') },\r\n      { find: '@supabase/auth-js/dist/module/lib/types', replacement: path.resolve(__dirname, 'src/shims/supabase-types.js') },\r\n      { find: '@supabase/auth-js/dist/module/lib/web3/ethereum', replacement: path.resolve(__dirname, 'src/shims/empty.js') }\r\n    ],
   },
   server: {
     host: true, // expose on LAN
