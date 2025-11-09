@@ -583,6 +583,62 @@ function AuthedApp({
     return mapped;
   };
 
+  const handleRenameExercise = (oldName: string, newName: string, replaceRemaining: boolean) => {
+    if (!selectedPlan || !selectedWeekId || !selectedDayId) return;
+    setPlans((prev) =>
+      prev.map((p) => {
+        if (p.id !== selectedPlan.id) return p;
+        const wIdx = p.weeks.findIndex((w) => w.days.some((d) => d.id === selectedDayId));
+        if (wIdx < 0) return p;
+        const dIdx = p.weeks[wIdx].days.findIndex((d) => d.id === selectedDayId);
+        const weeks = p.weeks.map((week, wi) => {
+          // earlier weeks unchanged
+          if (wi < wIdx) return week;
+
+          // same week: only replace in days at/after current day when requested
+          if (wi === wIdx) {
+            const days = week.days.map((day, di) => {
+              if (!replaceRemaining && di !== dIdx) return day; // only current day when not replacing remaining
+              if (replaceRemaining && di < dIdx) return day; // keep days before current when replacing remaining
+              const items = day.items.map((it) => (it.exerciseName === oldName ? { ...it, exerciseName: newName } : it));
+              return { ...day, items };
+            });
+            return { ...week, days };
+          }
+
+          // later weeks: if replacing remaining, replace all occurrences; otherwise keep
+          if (!replaceRemaining) return week;
+          const days = week.days.map((day) => ({
+            ...day,
+            items: day.items.map((it) => (it.exerciseName === oldName ? { ...it, exerciseName: newName } : it)),
+          }));
+          return { ...week, days };
+        });
+        return { ...p, weeks };
+      })
+    );
+
+    // Update current in-memory session for current day (rename entry there too)
+    setSession((s) => {
+      if (!s || s.planDayId !== selectedDayId) return s;
+      const next = {
+        ...s,
+        entries: s.entries.map((e) => (e.exerciseName === oldName ? { ...e, exerciseName: newName } : e)),
+      };
+      try {
+        localStorage.setItem(
+          `session:${selectedPlan.serverId ?? selectedPlan.id}:${next.planWeekId}:${next.planDayId}`,
+          JSON.stringify(next)
+        );
+      } catch { /* ignore */ }
+      // Also attempt to save to server if plan has serverId
+      if (selectedPlan.serverId) {
+        sessionApi.save(selectedPlan.serverId, next.planWeekId, next.planDayId, next).catch(() => void 0);
+      }
+      return next;
+    });
+  };
+
   const handleFinishPlan = async () => {
     if (!selectedPlan || !selectedWeek || !selectedDay || finishingPlan) return;
     setFinishingPlan(true);
@@ -773,6 +829,7 @@ function AuthedApp({
                 day={selectedDay}
                 session={session}
                 setSession={setSession}
+                onRenameExercise={handleRenameExercise}
                 onMarkDone={async () => {
                   if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   setCompleted(true);
@@ -921,6 +978,7 @@ function WorkoutPage({
   day,
   session,
   setSession,
+  onRenameExercise,
   onMarkDone,
   completed,
   setCompleted,
@@ -932,6 +990,7 @@ function WorkoutPage({
   day: PlanDay;
   session: Session | null;
   setSession: React.Dispatch<React.SetStateAction<Session | null>>;
+  onRenameExercise?: (oldName: string, newName: string, replaceRemaining: boolean) => void;
   onMarkDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
@@ -939,6 +998,9 @@ function WorkoutPage({
   onFinishPlan?: () => void;
   finishingPlan: boolean;
 }) {
+  const [renamingEntryId, setRenamingEntryId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState<string>('');
+  const [showReplacePromptForId, setShowReplacePromptForId] = useState<string | null>(null);
   const [ghost, setGhost] = useState<Record<string, { weight: number | null; reps: number | null }[]>>({});
   const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
@@ -1275,21 +1337,106 @@ function WorkoutPage({
       {session.entries.map((entry) => (
         <div key={entry.id} style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
-            <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
-            <button
-              onClick={() => {
-                setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
-                setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
-              }}
-              style={{
-                ...SMALL_BTN_STYLE,
-                border: `1px solid ${entry.note && String(entry.note).trim() !== '' ? '#0ff' : '#fff'}`,
-              }}
-              title="Notes"
-            >
-              Notes
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {renamingEntryId === entry.id ? (
+                <input
+                  value={renameDraft}
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
+                />
+              ) : (
+                <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                onClick={() => {
+                  setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
+                  setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
+                }}
+                style={{
+                  ...SMALL_BTN_STYLE,
+                  border: `1px solid ${entry.note && String(entry.note).trim() !== '' ? '#0ff' : '#fff'}`,
+                }}
+                title="Notes"
+              >
+                Notes
+              </button>
+
+              {renamingEntryId === entry.id ? (
+                <>
+                  <button
+                    onClick={() => {
+                      // show replace prompt for this entry
+                      setShowReplacePromptForId(entry.id);
+                    }}
+                    style={PRIMARY_BTN_STYLE}
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRenamingEntryId(null);
+                      setRenameDraft('');
+                      setShowReplacePromptForId(null);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setRenamingEntryId(entry.id);
+                    setRenameDraft(entry.exerciseName);
+                    setShowReplacePromptForId(null);
+                  }}
+                  style={SMALL_BTN_STYLE}
+                >
+                  Rename
+                </button>
+              )}
+            </div>
           </div>
+
+          {showReplacePromptForId === entry.id && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <div style={{ color: '#ddd', alignSelf: 'center' }}>Replace remaining exercises?</div>
+              <button
+                onClick={() => {
+                  const trimmed = String(renameDraft || '').trim();
+                  if (!trimmed) {
+                    alert('Name cannot be empty');
+                    return;
+                  }
+                  if (typeof onRenameExercise === 'function') onRenameExercise(entry.exerciseName, trimmed, true);
+                  setRenamingEntryId(null);
+                  setRenameDraft('');
+                  setShowReplacePromptForId(null);
+                }}
+                style={PRIMARY_BTN_STYLE}
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => {
+                  const trimmed = String(renameDraft || '').trim();
+                  if (!trimmed) {
+                    alert('Name cannot be empty');
+                    return;
+                  }
+                  if (typeof onRenameExercise === 'function') onRenameExercise(entry.exerciseName, trimmed, false);
+                  setRenamingEntryId(null);
+                  setRenameDraft('');
+                  setShowReplacePromptForId(null);
+                }}
+                style={SMALL_BTN_STYLE}
+              >
+                No
+              </button>
+            </div>
+          )}
 
           {openNotes[entry.id] ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
