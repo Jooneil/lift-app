@@ -49,6 +49,45 @@ const BTN_STYLE = { padding: "8px 10px", borderRadius: 8, border: "1px solid #44
 const PRIMARY_BTN_STYLE = { padding: "10px 12px", borderRadius: 10, border: "1px solid #444", background: "#222", color: "#fff" } as const;
 const SMALL_BTN_STYLE = { padding: "6px 8px", borderRadius: 8, border: "1px solid #444", background: "transparent", fontSize: 12 } as const;
 
+// Some environments can accidentally store garbled unicode (mojibake). Sanitize display names where needed.
+/* function sanitizeName(name: any, fallback: string) {
+  try {
+    if (!name || typeof name !== 'string') return fallback;
+    const s = name;
+    if (s.trim() === '') return fallback;
+    // Common mojibake fragment seen in this repo: starts with 'Ãƒ'
+    if (s.includes('Ãƒ') || s.includes('Ã…') || s.includes('�')) return fallback;
+    return s;
+  } catch {
+    return fallback;
+  }
+}
+
+*/
+// Fix common mojibake (UTF‑8 shown as Windows‑1252/Latin‑1) when reading data.
+function fixMojibake(value: unknown): string {
+  const s = typeof value === 'string' ? value : '';
+  if (!s) return '';
+  const looksMojibake = /[ÃÂâ¢€™œ]/.test(s);
+  if (!looksMojibake) return s;
+  try {
+    const bytes = new Uint8Array(Array.from(s, (ch) => ch.charCodeAt(0)));
+    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    if (/[ÃÂâ¢€™œ]/.test(decoded)) return s;
+    return decoded;
+  } catch {
+    try {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const decoded = decodeURIComponent(escape(s));
+      if (/[ÃÂâ¢€™œ]/.test(decoded)) return s;
+      return decoded;
+    } catch {
+      return s;
+    }
+  }
+}
+
 function startSessionFromDay(plan: Plan, weekId: string, dayId: string): Session {
   const week = plan.weeks.find((w) => w.id === weekId)!;
   const day = week.days.find((d) => d.id === dayId)!;
@@ -198,13 +237,13 @@ function AuthedApp({
     const weeks: PlanWeek[] = Array.isArray(d.weeks)
       ? (d.weeks as ServerPlanWeek[]).map((week) => ({
           id: week.id ?? uuid(),
-          name: week.name ?? "Week",
+          name: fixMojibake(week.name) || "Week",
           days: (week.days ?? []).map((day: ServerPlanDayRow) => ({
             id: day.id ?? uuid(),
-            name: day.name ?? "Day",
+            name: fixMojibake(day.name) || "Day",
             items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
               id: item.id ?? uuid(),
-              exerciseName: item.exerciseName ?? "Exercise",
+              exerciseName: fixMojibake(item.exerciseName) || "Exercise",
               targetSets: Number(item.targetSets) || 0,
               targetReps: item.targetReps ?? "",
             })),
@@ -216,10 +255,10 @@ function AuthedApp({
             name: "Week 1",
             days: (d.days ?? []).map((day: ServerPlanDayRow) => ({
               id: day.id ?? uuid(),
-              name: day.name ?? "Day",
+              name: fixMojibake(day.name) || "Day",
               items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
                 id: item.id ?? uuid(),
-                exerciseName: item.exerciseName ?? "Exercise",
+                exerciseName: fixMojibake(item.exerciseName) || "Exercise",
                 targetSets: Number(item.targetSets) || 0,
                 targetReps: item.targetReps ?? "",
               })),
@@ -231,7 +270,7 @@ function AuthedApp({
       id: uuid(),
       serverId: row.id,
       predecessorPlanId: typeof row.predecessor_plan_id === "string" ? row.predecessor_plan_id : undefined,
-      name: row.name ?? "Plan",
+      name: fixMojibake(row.name) || "Plan",
       weeks,
     };
   };
@@ -1611,20 +1650,20 @@ function BuilderPage({
     const weeks: PlanWeek[] = Array.isArray(d.weeks)
       ? (d.weeks as ServerPlanWeek[]).map((week) => ({
           id: week.id ?? uuid(),
-          name: week.name ?? "Week",
+          name: fixMojibake(week.name) || "Week",
           days: (week.days ?? []).map((day: ServerPlanDayRow) => ({
             id: day.id ?? uuid(),
-            name: day.name ?? "Day",
+            name: fixMojibake(day.name) || "Day",
             items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
               id: item.id ?? uuid(),
-              exerciseName: item.exerciseName ?? "Exercise",
+              exerciseName: fixMojibake(item.exerciseName) || "Exercise",
               targetSets: Number(item.targetSets) || 0,
               targetReps: item.targetReps ?? "",
             })),
           })),
         }))
       : [];
-    return { id: uuid(), serverId: row.id, name: row.name ?? "Template", weeks };
+    return { id: uuid(), serverId: row.id, name: fixMojibake(row.name) || "Template", weeks };
   };
 
   const loadTemplates = useCallback(async () => {
