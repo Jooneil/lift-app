@@ -2429,7 +2429,7 @@ function BuilderPage({
                           aria-label="Drag day handle"
                           title="Drag to reorder day"
                         >
-                          ÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â«ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­
+                          ≡
                         </div>
                         <input
                           value={day.name}
@@ -2548,7 +2548,7 @@ function BuilderPage({
                                   aria-label="Drag handle"
                                   title="Drag to reorder"
                                 >
-                                  ÃƒÆ’Ã…Â½ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â«ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­
+                                  ≡
                                 </div>
                                 <input
                                   value={item.exerciseName}
