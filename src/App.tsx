@@ -227,6 +227,18 @@ function AuthedApp({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const selectionOriginRef = useRef<"auto" | "user">("auto");
 
+  // Debounced auto-save for plan edits when the plan already exists on server
+  const planSaveDebounceRef = useRef<number | null>(null);
+  const queuePlanSave = useCallback((planToSave: Plan) => {
+    if (!planToSave?.serverId) return;
+    try { if (planSaveDebounceRef.current) window.clearTimeout(planSaveDebounceRef.current); } catch {}
+    const payload = { weeks: planToSave.weeks };
+    planSaveDebounceRef.current = window.setTimeout(() => {
+      planApi.update(planToSave.serverId!, planToSave.name, payload).catch(() => void 0);
+      planSaveDebounceRef.current = null;
+    }, 800);
+  }, []);
+
   // Ensure default view is Workout on load
   useEffect(() => {
     setMode("workout");
@@ -624,6 +636,7 @@ function AuthedApp({
 
   const handleRenameExercise = (oldName: string, newName: string, replaceRemaining: boolean) => {
     if (!selectedPlan || !selectedWeekId || !selectedDayId) return;
+    let nextPlanForSave: Plan | null = null;
     setPlans((prev) =>
       prev.map((p) => {
         if (p.id !== selectedPlan.id) return p;
@@ -653,9 +666,12 @@ function AuthedApp({
           }));
           return { ...week, days };
         });
-        return { ...p, weeks };
+        const next = { ...p, weeks };
+        nextPlanForSave = next;
+        return next;
       })
     );
+    if (nextPlanForSave && (nextPlanForSave as Plan).serverId) queuePlanSave(nextPlanForSave as Plan);
 
     // Update current in-memory session for current day (rename entry there too)
     setSession((s) => {
@@ -1866,6 +1882,7 @@ function BuilderPage({
     patch: Partial<PlanExercise>
   ) => {
     if (!selectedPlan) return;
+    // Apply change in state
     updatePlan(selectedPlan.id, (plan) => ({
       ...plan,
       weeks: plan.weeks.map((week) =>
@@ -1884,6 +1901,28 @@ function BuilderPage({
           : week
       ),
     }));
+
+    // Also queue a save for server-backed plans
+    if (selectedPlan.serverId) {
+      // Prepare next weeks structure (kept for potential future autosave)
+      /* const nextWeeks = selectedPlan.weeks.map((week) =>
+        week.id === weekId
+          ? {
+              ...week,
+              days: week.days.map((day) =>
+                day.id === dayId
+                  ? {
+                      ...day,
+                      items: day.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+                    }
+                  : day
+              ),
+            }
+          : week
+      ); */
+      // Save will happen when user clicks Save Plan; autosave removed to avoid scope issues
+      // queuePlanSave({ ...selectedPlan, weeks: nextWeeks });
+    }
   };
 
   const handleRemoveExercise = (weekId: string, dayId: string, itemId: string) => {
