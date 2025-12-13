@@ -40,10 +40,19 @@ type Mode = "builder" | "workout";
 
 const SET_COUNT_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
-// Shared CSV helpers for exporting plans (active or archived)
-const csvEscapeExport = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
+const uuid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 
-function planToCSVExport(plan: Plan): string {
+const BTN_STYLE = { padding: "8px 10px", borderRadius: 8, border: "1px solid #444", background: "transparent" } as const;
+const PRIMARY_BTN_STYLE = { padding: "10px 12px", borderRadius: 10, border: "1px solid #444", background: "#222", color: "#fff" } as const;
+const SMALL_BTN_STYLE = { padding: "6px 8px", borderRadius: 8, border: "1px solid #444", background: "transparent", fontSize: 12 } as const;
+
+// Shared CSV export helpers (used by active and archived plan exports)
+const csvEscape = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
+
+function planToCSV(plan: Plan): string {
   const header = ['planName','weekName','dayName','exerciseName','targetSets','targetReps','note'];
   const rows: string[] = [header.join(',')];
   for (const wk of plan.weeks) {
@@ -51,10 +60,7 @@ function planToCSVExport(plan: Plan): string {
     for (let di = 0; di < wk.days.length; di++) {
       const dy = wk.days[di];
       const dayName = dy.name || '';
-      if (!dy.items || dy.items.length === 0) {
-        rows.push([csvEscapeExport(plan.name || ''), csvEscapeExport(weekName), csvEscapeExport(dayName), '', '', '', ''].join(','));
-        continue;
-      }
+      if (!dy.items || dy.items.length === 0) continue;
       let seed: Record<string, string> = {};
       try {
         const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${di}`;
@@ -64,21 +70,21 @@ function planToCSVExport(plan: Plan): string {
       for (const it of dy.items) {
         const note = seed[it.exerciseName || ''] || '';
         rows.push([
-          csvEscapeExport(plan.name || ''),
-          csvEscapeExport(weekName),
-          csvEscapeExport(dayName),
-          csvEscapeExport(it.exerciseName || ''),
+          csvEscape(plan.name || ''),
+          csvEscape(weekName),
+          csvEscape(dayName),
+          csvEscape(it.exerciseName || ''),
           String(Number(it.targetSets) || 0),
-          csvEscapeExport(it.targetReps || ''),
-          csvEscapeExport(note),
+          csvEscape(it.targetReps || ''),
+          csvEscape(note),
         ].join(','));
       }
     }
   }
-  return rows.join('\\n');
+  return rows.join('\n');
 }
 
-function downloadCSVExport(filename: string, csv: string) {
+function downloadCSV(filename: string, csv: string) {
   try {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -95,18 +101,9 @@ function downloadCSVExport(filename: string, csv: string) {
 }
 
 function exportPlanCSV(plan: Plan) {
-  const csv = planToCSVExport(plan);
-  downloadCSVExport(`${plan.name || 'plan'}.csv`, csv);
+  const csv = planToCSV(plan);
+  downloadCSV(`${plan.name || 'plan'}.csv`, csv);
 }
-
-const uuid = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-
-const BTN_STYLE = { padding: "8px 10px", borderRadius: 8, border: "1px solid #444", background: "transparent" } as const;
-const PRIMARY_BTN_STYLE = { padding: "10px 12px", borderRadius: 10, border: "1px solid #444", background: "#222", color: "#fff" } as const;
-const SMALL_BTN_STYLE = { padding: "6px 8px", borderRadius: 8, border: "1px solid #444", background: "transparent", fontSize: 12 } as const;
 
 // Some environments can accidentally store garbled unicode (mojibake). Sanitize display names where needed.
 /* function sanitizeName(name: any, fallback: string) {
