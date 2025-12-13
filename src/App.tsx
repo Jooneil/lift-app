@@ -40,6 +40,65 @@ type Mode = "builder" | "workout";
 
 const SET_COUNT_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
+// Shared CSV helpers for exporting plans (active or archived)
+const csvEscapeExport = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
+
+function planToCSVExport(plan: Plan): string {
+  const header = ['planName','weekName','dayName','exerciseName','targetSets','targetReps','note'];
+  const rows: string[] = [header.join(',')];
+  for (const wk of plan.weeks) {
+    const weekName = wk.name || '';
+    for (let di = 0; di < wk.days.length; di++) {
+      const dy = wk.days[di];
+      const dayName = dy.name || '';
+      if (!dy.items || dy.items.length === 0) {
+        rows.push([csvEscapeExport(plan.name || ''), csvEscapeExport(weekName), csvEscapeExport(dayName), '', '', '', ''].join(','));
+        continue;
+      }
+      let seed: Record<string, string> = {};
+      try {
+        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${di}`;
+        const raw = localStorage.getItem(seedKey);
+        if (raw) seed = JSON.parse(raw) || {};
+      } catch { /* ignore */ }
+      for (const it of dy.items) {
+        const note = seed[it.exerciseName || ''] || '';
+        rows.push([
+          csvEscapeExport(plan.name || ''),
+          csvEscapeExport(weekName),
+          csvEscapeExport(dayName),
+          csvEscapeExport(it.exerciseName || ''),
+          String(Number(it.targetSets) || 0),
+          csvEscapeExport(it.targetReps || ''),
+          csvEscapeExport(note),
+        ].join(','));
+      }
+    }
+  }
+  return rows.join('\\n');
+}
+
+function downloadCSVExport(filename: string, csv: string) {
+  try {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.toLowerCase().endsWith('.csv') ? filename : `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(err instanceof Error ? err.message : String(err));
+  }
+}
+
+function exportPlanCSV(plan: Plan) {
+  const csv = planToCSVExport(plan);
+  downloadCSVExport(`${plan.name || 'plan'}.csv`, csv);
+}
+
 const uuid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -944,7 +1003,10 @@ function AuthedApp({
                       <button onClick={() => openArchivedPlan(plan)} style={BTN_STYLE}>
                         {plan.name}
                       </button>
-                      <button onClick={() => handleDeleteArchivedPlan(plan)} style={BTN_STYLE}>Delete</button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => handleDeleteArchivedPlan(plan)} style={SMALL_BTN_STYLE}>Delete</button>
+                        <button onClick={() => exportPlanCSV(plan)} style={SMALL_BTN_STYLE}>Export</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1110,10 +1172,7 @@ function WorkoutPage({
     }
 
     const serverId = plan.serverId;
-    if (!serverId) {
-      setCompleted(false);
-      return;
-    }
+    if (!serverId) return;
 
     let cancelled = false;
     (async () => {
@@ -1121,7 +1180,7 @@ function WorkoutPage({
         const res = await sessionApi.status(serverId, currentWeekId, day.id);
         if (!cancelled) setCompleted(!!res?.completed);
       } catch {
-        if (!cancelled) setCompleted(false);
+        // keep prior state on transient errors
       }
     })();
 
@@ -2173,65 +2232,13 @@ function BuilderPage({
   // --- Export / Import (CSV) ---
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  const csvEscape = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
+  function handleExportPlanCSV(plan: Plan) {
+    exportPlanCSV(plan);
+  }
 
-  const planToCSV = (plan: Plan): string => {
-    const header = ['planName','weekName','dayName','exerciseName','targetSets','targetReps','note'];
-    const rows: string[] = [header.join(',')];
-    for (const wk of plan.weeks) {
-      const weekName = wk.name || '';
-      for (let di = 0; di < wk.days.length; di++) {
-        const dy = wk.days[di];
-        const dayName = dy.name || '';
-        if (!dy.items || dy.items.length === 0) continue;
-        let seed: Record<string, string> = {};
-        try {
-          const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${di}`;
-          const raw = localStorage.getItem(seedKey);
-          if (raw) seed = JSON.parse(raw) || {};
-        } catch { /* ignore */ }
-        for (const it of dy.items) {
-          const note = seed[it.exerciseName || ''] || '';
-          rows.push([
-            csvEscape(plan.name || ''),
-            csvEscape(weekName),
-            csvEscape(dayName),
-            csvEscape(it.exerciseName || ''),
-            String(Number(it.targetSets) || 0),
-            csvEscape(it.targetReps || ''),
-            csvEscape(note),
-          ].join(','));
-        }
-      }
-    }
-    return rows.join('\n');
-  };
-
-  const downloadCSV = (filename: string, csv: string) => {
-    try {
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename.toLowerCase().endsWith('.csv') ? filename : `${filename}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const handleExportPlanCSV = (plan: Plan) => {
-    const csv = planToCSV(plan);
-    downloadCSV(`${plan.name || 'plan'}.csv`, csv);
-  };
-
-  const handleExportTemplateCSV = (tpl: Plan) => {
-    const csv = planToCSV(tpl);
-    downloadCSV(`${tpl.name || 'template'}.csv`, csv);
-  };
+  function handleExportTemplateCSV(tpl: Plan) {
+    exportPlanCSV(tpl);
+  }
 
   const parseCSV = (text: string): string[][] => {
     const rows: string[][] = [];
