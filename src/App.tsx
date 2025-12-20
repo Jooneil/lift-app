@@ -804,6 +804,21 @@ function AuthedApp({
 
   // goToPreviousDay removed (unused)
 
+  const handleSetCompleted = useCallback(
+    async (val: boolean) => {
+      setCompleted(val);
+      const serverId = selectedPlan?.serverId;
+      const weekId = selectedWeekId ?? null;
+      const dayId = selectedDayId ?? null;
+      if (serverId && weekId && dayId) {
+        try {
+          await sessionApi.complete(serverId, weekId, dayId, val);
+        } catch { void 0; }
+      }
+    },
+    [selectedPlan?.serverId, selectedWeekId, selectedDayId]
+  );
+
   const isLastDayOfPlan = (() => {
     if (!selectedPlan || !selectedWeek || !selectedDay) return false;
     const lastWeek = selectedPlan.weeks[selectedPlan.weeks.length - 1];
@@ -958,15 +973,7 @@ function AuthedApp({
                   setShouldAutoNavigate(false);
                 }}
                 completed={completed}
-                setCompleted={async (val: boolean) => {
-                  setCompleted(val);
-                  const serverId = selectedPlan?.serverId;
-                  if (serverId && selectedWeek && selectedDay) {
-                    try {
-                      await sessionApi.complete(serverId, selectedWeek.id, selectedDay.id, val);
-                    } catch { void 0; }
-                  }
-                }}
+                setCompleted={handleSetCompleted}
                 isLastDay={isLastDayOfPlan}
                 onFinishPlan={handleFinishPlan}
                 finishingPlan={finishingPlan}
