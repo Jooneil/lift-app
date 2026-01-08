@@ -263,7 +263,7 @@ function AuthedApp({
   user: { id: number; username: string };
   onLogout: () => void;
 }) {
-  const [mode, setMode] = useState<Mode>("workout");
+  const [mode, setMode] = useState<Mode>("builder");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
@@ -295,9 +295,9 @@ function AuthedApp({
     }, 800);
   }, []);
 
-  // Ensure default view is Workout on load
+  // Ensure default view is Builder on load
   useEffect(() => {
-    setMode("workout");
+    setMode("builder");
   }, []);
 
   const mapServerPlan = (row: ServerPlanRow): Plan => {
@@ -387,10 +387,10 @@ function AuthedApp({
     }
   }, [mode]);
 
-  // When entering Builder, open plan/template chooser by default
+  // When entering Builder, keep the plan/template chooser closed by default
   useEffect(() => {
     if (mode === "builder") {
-      setShowPlanList(true);
+      setShowPlanList(false);
     }
   }, [mode]);
 
@@ -841,7 +841,7 @@ function AuthedApp({
           )}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(true); setSelectedPlanId(null); }} style={BTN_STYLE} aria-pressed={mode === "builder"}>Builder</button>
+          <button onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }} style={BTN_STYLE} aria-pressed={mode === "builder"}>Builder</button>
           <button onClick={() => { setUserMenuOpen(false); setMode("workout"); }} style={BTN_STYLE} aria-pressed={mode === "workout"}>Workout</button>
           <button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} style={BTN_STYLE}>Archive</button>
         </div>
