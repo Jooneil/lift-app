@@ -1069,6 +1069,7 @@ function AuthedApp({
                 session={session}
                 setSession={setSession}
                 onReplaceExercise={handleReplaceExercise}
+                exerciseLibrary={exerciseLibrary}
                 onMarkDone={async () => {
                   if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   setCompleted(true);
@@ -1219,6 +1220,7 @@ function WorkoutPage({
   session,
   setSession,
   onReplaceExercise,
+  exerciseLibrary,
   onMarkDone,
   completed,
   setCompleted,
@@ -1231,6 +1233,7 @@ function WorkoutPage({
   session: Session | null;
   setSession: React.Dispatch<React.SetStateAction<Session | null>>;
   onReplaceExercise?: (oldEntry: { exerciseId?: string; exerciseName: string }, newName: string, scope: "today" | "remaining") => void;
+  exerciseLibrary: Exercise[];
   onMarkDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
@@ -1730,6 +1733,11 @@ function WorkoutPage({
 
   return (
     <div>
+      <datalist id="exercise-options-workout">
+        {exerciseLibrary.map((ex) => (
+          <option key={ex.id} value={ex.name} />
+        ))}
+      </datalist>
       {session.entries.map((entry) => (
         <div key={entry.id} style={{ border: '2px solid #fff', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
@@ -1739,6 +1747,7 @@ function WorkoutPage({
                   <input
                     value={replaceDraft}
                     onChange={(e) => setReplaceDraft(e.target.value)}
+                    list="exercise-options-workout"
                     style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
                   />
                   <button
