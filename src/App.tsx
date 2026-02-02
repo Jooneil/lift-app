@@ -35,6 +35,14 @@ type CatalogExercise = {
   secondaryMuscles: string[];
   isCustom?: boolean;
 };
+type ImportedExerciseMeta = {
+  isCustom?: boolean;
+  primaryMuscle?: string;
+  equipment?: "machine" | "free_weight" | "cable" | "body_weight";
+  isCompound?: boolean;
+  secondaryMuscles?: string[];
+};
+type PlanImportResult = { plan: Plan; exerciseMeta: Map<string, ImportedExerciseMeta> };
 
 type Session = {
   id: string;
@@ -85,8 +93,36 @@ const FILTER_TOGGLE_STYLE = {
 // Shared CSV export helpers (used by active and archived plan exports)
 const csvEscape = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
 
-function planToCSV(plan: Plan): string {
-  const header = ['planName','weekName','dayName','exerciseName','targetSets','targetReps','note'];
+const buildCatalogByName = (catalog: CatalogExercise[]) => {
+  const map = new Map<string, CatalogExercise>();
+  for (const ex of catalog) {
+    const key = ex.name.trim().toLowerCase();
+    if (!key) continue;
+    const existing = map.get(key);
+    if (!existing || (ex.isCustom && !existing.isCustom)) {
+      map.set(key, ex);
+    }
+  }
+  return map;
+};
+
+const parseBool = (value: string) => /^(true|1|yes|y)$/i.test(String(value || '').trim());
+
+function planToCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>): string {
+  const header = [
+    'planName',
+    'weekName',
+    'dayName',
+    'exerciseName',
+    'targetSets',
+    'targetReps',
+    'note',
+    'isCustom',
+    'primaryMuscle',
+    'equipment',
+    'isCompound',
+    'secondaryMuscles',
+  ];
   const rows: string[] = [header.join(',')];
   for (const wk of plan.weeks) {
     const weekName = wk.name || '';
@@ -102,14 +138,37 @@ function planToCSV(plan: Plan): string {
       } catch { /* ignore */ }
       for (const it of dy.items) {
         const note = seed[it.exerciseName || ''] || '';
+        const exerciseName = it.exerciseName || '';
+        const key = exerciseName.trim().toLowerCase();
+        const meta = key && catalogByName ? catalogByName.get(key) : undefined;
+        const isCustom = meta ? (meta.isCustom ? 'true' : 'false') : '';
+        const primaryMuscle = meta?.primaryMuscle ?? '';
+        const equipment = meta
+          ? meta.machine
+            ? 'machine'
+            : meta.freeWeight
+              ? 'free_weight'
+              : meta.cable
+                ? 'cable'
+                : meta.bodyWeight
+                  ? 'body_weight'
+                  : ''
+          : '';
+        const isCompound = meta ? (meta.isCompound ? 'true' : 'false') : '';
+        const secondaryMuscles = meta?.secondaryMuscles?.length ? meta.secondaryMuscles.join(';') : '';
         rows.push([
           csvEscape(plan.name || ''),
           csvEscape(weekName),
           csvEscape(dayName),
-          csvEscape(it.exerciseName || ''),
+          csvEscape(exerciseName),
           String(Number(it.targetSets) || 0),
           csvEscape(it.targetReps || ''),
           csvEscape(note),
+          csvEscape(isCustom),
+          csvEscape(primaryMuscle),
+          csvEscape(equipment),
+          csvEscape(isCompound),
+          csvEscape(secondaryMuscles),
         ].join(','));
       }
     }
@@ -133,8 +192,8 @@ function downloadCSV(filename: string, csv: string) {
   }
 }
 
-function exportPlanCSV(plan: Plan) {
-  const csv = planToCSV(plan);
+function exportPlanCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>) {
+  const csv = planToCSV(plan, catalogByName);
   downloadCSV(`${plan.name || 'plan'}.csv`, csv);
 }
 
@@ -1365,7 +1424,7 @@ function AuthedApp({
                       </button>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => handleDeleteArchivedPlan(plan)} style={SMALL_BTN_STYLE}>Delete</button>
-                        <button onClick={() => exportPlanCSV(plan)} style={SMALL_BTN_STYLE}>Export</button>
+                        <button onClick={() => exportPlanCSV(plan, buildCatalogByName(searchCatalogExercises))} style={SMALL_BTN_STYLE}>Export</button>
                       </div>
                     </div>
                   ))}
@@ -3473,11 +3532,11 @@ function BuilderPage({
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   function handleExportPlanCSV(plan: Plan) {
-    exportPlanCSV(plan);
+    exportPlanCSV(plan, buildCatalogByName(catalogExercises));
   }
 
   function handleExportTemplateCSV(tpl: Plan) {
-    exportPlanCSV(tpl);
+    exportPlanCSV(tpl, buildCatalogByName(catalogExercises));
   }
 
   const parseCSV = (text: string): string[][] => {
@@ -3516,7 +3575,7 @@ function BuilderPage({
     return rows;
   };
 
-  const csvToPlan = (nameFromFile: string, text: string): Plan | null => {
+  const csvToPlan = (nameFromFile: string, text: string): PlanImportResult | null => {
     const rows = parseCSV(text);
     if (rows.length === 0) return null;
     const header = rows[0].map((h) => h.trim().toLowerCase());
@@ -3528,12 +3587,18 @@ function BuilderPage({
       targetSets: header.indexOf('targetsets'),
       targetReps: header.indexOf('targetreps'),
       note: header.indexOf('note'),
+      isCustom: header.indexOf('iscustom'),
+      primaryMuscle: header.indexOf('primarymuscle'),
+      equipment: header.indexOf('equipment'),
+      isCompound: header.indexOf('iscompound'),
+      secondaryMuscles: header.indexOf('secondarymuscles'),
     } as const;
     if (idx.weekName < 0 || idx.dayName < 0 || idx.exerciseName < 0 || idx.targetSets < 0) {
       alert('CSV missing required columns: weekName, dayName, exerciseName, targetSets');
       return null;
     }
     const weeks: PlanWeek[] = [];
+    const exerciseMeta = new Map<string, ImportedExerciseMeta>();
     const getWeek = (name: string): PlanWeek => {
       const found = weeks.find((w) => w.name === name);
       if (found) return found;
@@ -3563,10 +3628,38 @@ function BuilderPage({
       const day = getDay(week, dName);
       if (exName) {
         day.items.push({ id: uuid(), exerciseName: exName, targetSets: Number.isFinite(sets) && sets > 0 ? sets : 0, targetReps: reps });
+        const key = exName.trim().toLowerCase();
+        if (key) {
+          const current = exerciseMeta.get(key) || {};
+          if (idx.isCustom >= 0 && row[idx.isCustom]) {
+            current.isCustom = parseBool(row[idx.isCustom]);
+          }
+          if (idx.primaryMuscle >= 0 && row[idx.primaryMuscle]) {
+            current.primaryMuscle = row[idx.primaryMuscle].trim();
+          }
+          if (idx.equipment >= 0 && row[idx.equipment]) {
+            const rawEquip = row[idx.equipment].trim().toLowerCase();
+            if (rawEquip === 'machine' || rawEquip === 'free_weight' || rawEquip === 'cable' || rawEquip === 'body_weight') {
+              current.equipment = rawEquip as ImportedExerciseMeta['equipment'];
+            }
+          }
+          if (idx.isCompound >= 0 && row[idx.isCompound]) {
+            current.isCompound = parseBool(row[idx.isCompound]);
+          }
+          if (idx.secondaryMuscles >= 0 && row[idx.secondaryMuscles]) {
+            const rawSecondary = row[idx.secondaryMuscles];
+            const list = rawSecondary
+              .split(';')
+              .map((val) => val.trim())
+              .filter((val) => val.length > 0);
+            if (list.length) current.secondaryMuscles = list;
+          }
+          exerciseMeta.set(key, current);
+        }
       }
     }
     const finalName = (planName || nameFromFile || 'Imported Plan').replace(/\.csv$/i, '');
-    return { id: uuid(), name: finalName, weeks };
+    return { plan: { id: uuid(), name: finalName, weeks }, exerciseMeta };
   };
 
   const handleClickImportPlan = () => {
@@ -3583,11 +3676,47 @@ function BuilderPage({
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const text = String(reader.result || '');
-        const plan = csvToPlan(file.name, text);
-        if (!plan) return;
+        const result = csvToPlan(file.name, text);
+        if (!result) return;
+        const { plan, exerciseMeta } = result;
+        try {
+          const existingByName = buildCatalogByName(catalogExercises);
+          const createdNames = new Set<string>();
+          for (const week of plan.weeks) {
+            for (const day of week.days) {
+              for (const item of day.items) {
+                const name = item.exerciseName || '';
+                const key = name.trim().toLowerCase();
+                if (!key || existingByName.has(key) || createdNames.has(key)) continue;
+                createdNames.add(key);
+                if (!onCreateCustomExercise) continue;
+                const meta = exerciseMeta.get(key) || {};
+                const primaryMuscle = meta.primaryMuscle && meta.primaryMuscle.trim() !== ''
+                  ? meta.primaryMuscle.trim()
+                  : 'Other';
+                const equipment = meta.equipment ?? 'body_weight';
+                const isCompound = meta.isCompound ?? false;
+                const secondary = meta.secondaryMuscles ?? [];
+                try {
+                  await onCreateCustomExercise({
+                    name,
+                    primaryMuscle,
+                    equipment,
+                    isCompound,
+                    secondaryMuscles: isCompound ? secondary : [],
+                  });
+                } catch {
+                  // ignore duplicate/custom creation failures on import
+                }
+              }
+            }
+          }
+        } catch {
+          /* ignore custom creation issues */
+        }
         // After creating the plan, seed notes from CSV if provided
         try {
           const rows = parseCSV(text);
