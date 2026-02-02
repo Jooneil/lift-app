@@ -3198,8 +3198,8 @@ function BuilderPage({
   return (
     <div style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
       <datalist id="exercise-options">
-        {exerciseOptions.map((name) => (
-          <option key={name} value={name} />
+        {catalogExercises.map((exercise) => (
+          <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
