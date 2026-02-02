@@ -1495,6 +1495,7 @@ function WorkoutPage({
   const [replaceAddMovementPrimary, setReplaceAddMovementPrimary] = useState("");
   const [replaceAddMovementEquipment, setReplaceAddMovementEquipment] = useState<"" | "machine" | "free_weight" | "cable" | "body_weight">("");
   const [replaceAddMovementCompound, setReplaceAddMovementCompound] = useState(false);
+  const [replaceAddMovementSecondary, setReplaceAddMovementSecondary] = useState("");
   const [replaceAddMovementError, setReplaceAddMovementError] = useState<string | null>(null);
   const [ghost, setGhost] = useState<Record<string, { weight: number | null; reps: number | null }[]>>({});
   const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
