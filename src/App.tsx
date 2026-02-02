@@ -2126,18 +2126,61 @@ function BuilderPage({
   const [templates, setTemplates] = useState<Plan[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
-  const catalogByMuscle = useMemo(() => {
-    const map = new Map<string, CatalogExercise[]>();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchWeekId, setSearchWeekId] = useState<string | null>(null);
+  const [searchDayId, setSearchDayId] = useState<string | null>(null);
+  const [searchItemId, setSearchItemId] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [searchPrimary, setSearchPrimary] = useState<string>("All");
+  const [searchSecondary, setSearchSecondary] = useState<string>("All");
+  const [searchMachine, setSearchMachine] = useState<"All" | "Yes" | "No">("All");
+  const [searchFreeWeight, setSearchFreeWeight] = useState<"All" | "Yes" | "No">("All");
+  const [searchCable, setSearchCable] = useState<"All" | "Yes" | "No">("All");
+  const [searchBodyWeight, setSearchBodyWeight] = useState<"All" | "Yes" | "No">("All");
+  const [searchCompound, setSearchCompound] = useState<"All" | "Yes" | "No">("All");
+  const [searchQueue, setSearchQueue] = useState<Array<{ name: string; id?: string }>>([]);
+
+  const primaryMuscles = useMemo(() => {
+    const set = new Set<string>();
     for (const ex of catalogExercises) {
-      const key = ex.primaryMuscle || "Other";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(ex);
+      if (ex.primaryMuscle) set.add(ex.primaryMuscle);
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return map;
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [catalogExercises]);
+
+  const secondaryMuscles = useMemo(() => {
+    const set = new Set<string>();
+    for (const ex of catalogExercises) {
+      for (const m of ex.secondaryMuscles) set.add(m);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [catalogExercises]);
+
+  const filteredCatalog = useMemo(() => {
+    const text = searchText.trim().toLowerCase();
+    const wantSecondary = searchSecondary !== "All" ? searchSecondary.toLowerCase() : "";
+    return catalogExercises.filter((ex) => {
+      if (text && !ex.name.toLowerCase().includes(text)) return false;
+      if (searchPrimary !== "All" && ex.primaryMuscle !== searchPrimary) return false;
+      if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
+      if (searchMachine !== "All" && ex.machine !== (searchMachine === "Yes")) return false;
+      if (searchFreeWeight !== "All" && ex.freeWeight !== (searchFreeWeight === "Yes")) return false;
+      if (searchCable !== "All" && ex.cable !== (searchCable === "Yes")) return false;
+      if (searchBodyWeight !== "All" && ex.bodyWeight !== (searchBodyWeight === "Yes")) return false;
+      if (searchCompound !== "All" && ex.isCompound !== (searchCompound === "Yes")) return false;
+      return true;
+    });
+  }, [
+    catalogExercises,
+    searchText,
+    searchPrimary,
+    searchSecondary,
+    searchMachine,
+    searchFreeWeight,
+    searchCable,
+    searchBodyWeight,
+    searchCompound,
+  ]);
 
   const createDay = (index: number): PlanDay => ({
     id: uuid(),
@@ -2489,6 +2532,84 @@ function BuilderPage({
           : week
       ),
     }));
+  };
+
+  const openSearchForItem = (weekId: string, dayId: string, itemId: string) => {
+    setSearchWeekId(weekId);
+    setSearchDayId(dayId);
+    setSearchItemId(itemId);
+    setSearchOpen(true);
+  };
+
+  const addToQueue = (ex: CatalogExercise) => {
+    setSearchQueue((prev) => {
+      const exists = prev.some((p) => p.name.toLowerCase() === ex.name.toLowerCase());
+      if (exists) return prev;
+      return [...prev, { name: ex.name, id: ex.id }];
+    });
+  };
+
+  const removeFromQueue = (name: string) => {
+    setSearchQueue((prev) => prev.filter((q) => q.name.toLowerCase() !== name.toLowerCase()));
+  };
+
+  const applyQueueToDay = async () => {
+    if (!selectedPlan || !searchWeekId || !searchDayId || searchQueue.length === 0) {
+      setSearchOpen(false);
+      return;
+    }
+
+    const resolved = await Promise.all(
+      searchQueue.map(async (q) => {
+        const ex = await onResolveExerciseName(q.name);
+        return { name: ex?.name ?? q.name, id: ex?.id };
+      })
+    );
+
+    updatePlan(selectedPlan.id, (plan) => ({
+      ...plan,
+      weeks: plan.weeks.map((week) => {
+        if (week.id !== searchWeekId) return week;
+        const days = week.days.map((day) => {
+          if (day.id !== searchDayId) return day;
+          const items = day.items.slice();
+          const insertAt = searchItemId ? items.findIndex((it) => it.id === searchItemId) : -1;
+          if (insertAt >= 0) {
+            const first = resolved[0];
+            items[insertAt] = {
+              ...items[insertAt],
+              exerciseName: first.name,
+              exerciseId: first.id,
+            };
+            for (let i = 1; i < resolved.length; i++) {
+              const ex = resolved[i];
+              items.splice(insertAt + i, 0, {
+                id: uuid(),
+                exerciseName: ex.name,
+                exerciseId: ex.id,
+                targetSets: 3,
+                targetReps: '',
+              });
+            }
+          } else {
+            for (const ex of resolved) {
+              items.push({
+                id: uuid(),
+                exerciseName: ex.name,
+                exerciseId: ex.id,
+                targetSets: 3,
+                targetReps: '',
+              });
+            }
+          }
+          return { ...day, items };
+        });
+        return { ...week, days };
+      }),
+    }));
+
+    setSearchOpen(false);
+    setSearchQueue([]);
   };
 
   const handleRemoveExercise = (weekId: string, dayId: string, itemId: string) => {
@@ -3114,7 +3235,7 @@ function BuilderPage({
                                 data-exercise-id={item.id}
                                 style={{
                                   display: 'grid',
-                                  gridTemplateColumns: 'auto 2fr 1.3fr 1fr auto',
+                                  gridTemplateColumns: 'auto 2fr auto 1fr auto',
                                   gap: 8,
                                   alignItems: 'center',
                                   cursor: 'grab',
@@ -3151,12 +3272,12 @@ function BuilderPage({
                                 >
                                   ≡
                                 </div>
-                                <input
-                                  value={item.exerciseName}
-                                  onChange={(e) =>
-                                    handleExerciseChange(week.id, day.id, item.id, {
-                                      exerciseName: e.target.value,
-                                      exerciseId: undefined,
+                              <input
+                                value={item.exerciseName}
+                                onChange={(e) =>
+                                  handleExerciseChange(week.id, day.id, item.id, {
+                                    exerciseName: e.target.value,
+                                    exerciseId: undefined,
                                     })
                                   }
                                   onBlur={(e) => {
@@ -3167,32 +3288,16 @@ function BuilderPage({
                                       (e.currentTarget as HTMLInputElement).blur();
                                     }
                                   }}
-                                  list="exercise-options"
-                                  style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
-                                  placeholder="Exercise name"
-                                />
-                              <select
-                                defaultValue=""
-                                onChange={(e) => {
-                                  const chosen = e.target.value;
-                                  if (!chosen) return;
-                                  void handleExerciseNameCommit(week.id, day.id, item.id, chosen);
-                                  e.currentTarget.value = "";
-                                }}
+                                list="exercise-options"
                                 style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
-                                title="Browse exercises by muscle group"
+                                placeholder="Exercise name"
+                              />
+                              <button
+                                onClick={() => openSearchForItem(week.id, day.id, item.id)}
+                                style={SMALL_BTN_STYLE}
                               >
-                                <option value="">Browse...</option>
-                                {Array.from(catalogByMuscle.entries()).map(([muscle, list]) => (
-                                  <optgroup key={muscle} label={muscle}>
-                                    {list.map((ex) => (
-                                      <option key={ex.id} value={ex.name}>
-                                        {ex.name}
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                ))}
-                              </select>
+                                Search
+                              </button>
                               <select
                                 value={String(item.targetSets)}
                                 onChange={(e) =>
@@ -3312,6 +3417,110 @@ function BuilderPage({
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {searchOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 30 }}>
+          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 980, width: '100%', maxHeight: '85vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <h3 style={{ margin: 0 }}>Search Exercises</h3>
+              <button onClick={() => setSearchOpen(false)} style={BTN_STYLE}>Close</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search name..."
+                style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+              />
+              <select value={searchPrimary} onChange={(e) => setSearchPrimary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Primary Muscle (All)</option>
+                {primaryMuscles.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <select value={searchSecondary} onChange={(e) => setSearchSecondary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Secondary Muscle (All)</option>
+                {secondaryMuscles.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <select value={searchMachine} onChange={(e) => setSearchMachine(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Machine (All)</option>
+                <option value="Yes">Machine (Yes)</option>
+                <option value="No">Machine (No)</option>
+              </select>
+              <select value={searchFreeWeight} onChange={(e) => setSearchFreeWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Free Weight (All)</option>
+                <option value="Yes">Free Weight (Yes)</option>
+                <option value="No">Free Weight (No)</option>
+              </select>
+              <select value={searchCable} onChange={(e) => setSearchCable(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Cable (All)</option>
+                <option value="Yes">Cable (Yes)</option>
+                <option value="No">Cable (No)</option>
+              </select>
+              <select value={searchBodyWeight} onChange={(e) => setSearchBodyWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Bodyweight (All)</option>
+                <option value="Yes">Bodyweight (Yes)</option>
+                <option value="No">Bodyweight (No)</option>
+              </select>
+              <select value={searchCompound} onChange={(e) => setSearchCompound(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Compound (All)</option>
+                <option value="Yes">Compound (Yes)</option>
+                <option value="No">Compound (No)</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12, minHeight: 280 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600 }}>Results</div>
+                  <div style={{ color: '#777', fontSize: 12 }}>{filteredCatalog.length} found</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                  {filteredCatalog.length === 0 ? (
+                    <div style={{ color: '#777' }}>No matches.</div>
+                  ) : (
+                    filteredCatalog.map((ex) => (
+                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{ex.name}</div>
+                          <div style={{ color: '#777', fontSize: 12 }}>
+                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` • ${ex.secondaryMuscles.join(', ')}` : ''}
+                          </div>
+                        </div>
+                        <button onClick={() => addToQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
+                {searchQueue.length === 0 ? (
+                  <div style={{ color: '#777' }}>No exercises selected.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {searchQueue.map((q) => (
+                      <div key={q.name} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>{q.name}</div>
+                        <button onClick={() => removeFromQueue(q.name)} style={SMALL_BTN_STYLE}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button onClick={applyQueueToDay} style={PRIMARY_BTN_STYLE} disabled={searchQueue.length === 0}>
+                    Add to Day
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
