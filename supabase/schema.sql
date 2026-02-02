@@ -63,3 +63,13 @@ create table if not exists public.templates (
 alter table public.templates enable row level security;
 create policy if not exists templates_isolation on public.templates for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+-- exercises
+create table if not exists public.exercises (
+  id bigserial primary key,
+  user_id uuid not null default auth.uid(),
+  name text not null,
+  created_at timestamptz default now()
+);
+alter table public.exercises enable row level security;
+create policy if not exists exercises_isolation on public.exercises for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create unique index if not exists idx_exercises_user_lower_name on public.exercises(user_id, lower(name));

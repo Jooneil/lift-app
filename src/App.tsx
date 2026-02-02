@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
-import { api, planApi, sessionApi, templateApi } from "./api";
+import { api, exerciseApi, planApi, sessionApi, templateApi } from "./api";
 import { getUserPrefs, upsertUserPrefs } from './api/userPrefs';
 import { supabase } from "./supabaseClient";
 import type {
@@ -13,12 +13,14 @@ import type {
   SessionPayload,
   SessionEntryPayload,
   SessionSetPayload,
+  SessionRow,
 } from "./api";
 
 type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
 type PlanDay = { id: string; name: string; items: PlanExercise[] };
-type PlanExercise = { id: string; exerciseName: string; targetSets: number; targetReps?: string };
+type PlanExercise = { id: string; exerciseId?: string; exerciseName: string; targetSets: number; targetReps?: string };
+type Exercise = { id: string; name: string };
 
 type Session = {
   id: string;
@@ -30,7 +32,7 @@ type Session = {
   completed?: boolean;
   ghostSeed?: boolean;
 };
-type SessionEntry = { id: string; exerciseName: string; sets: SessionSet[]; note?: string | null };
+type SessionEntry = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSet[]; note?: string | null };
 type SessionSet = { id: string; setIndex: number; weight: number | null; reps: number | null };
 
 type ArchivedSessionMap = Record<string, Record<string, Session | null>>;
@@ -44,6 +46,13 @@ const uuid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+
+const normalizeExerciseName = (name: string) => name.trim();
+const exerciseKey = (entry: { exerciseId?: string; exerciseName?: string | null }) => {
+  if (entry.exerciseId) return `id:${entry.exerciseId}`;
+  const name = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+  return `name:${name}`;
+};
 
 const BTN_STYLE = { padding: "8px 10px", borderRadius: 8, border: "1px solid #444", background: "transparent" } as const;
 const PRIMARY_BTN_STYLE = { padding: "10px 12px", borderRadius: 10, border: "1px solid #444", background: "#222", color: "#fff" } as const;
@@ -155,6 +164,7 @@ function startSessionFromDay(plan: Plan, weekId: string, dayId: string): Session
     date: new Date().toISOString(),
     entries: day.items.map((item) => ({
       id: uuid(),
+      exerciseId: item.exerciseId,
       exerciseName: item.exerciseName,
       sets: Array.from({ length: item.targetSets }, (_, i) => ({
         id: uuid(),
@@ -173,8 +183,15 @@ function startSessionFromDay(plan: Plan, weekId: string, dayId: string): Session
 // - Adds new exercises/sets as nulls
 // - Drops exercises removed from the plan
 function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
+  const itemName = (name: string) => normalizeExerciseName(name).toLowerCase();
   const nextEntries: SessionEntry[] = planDay.items.map((item) => {
-    const existing = (prev.entries || []).find((e) => e.exerciseName === item.exerciseName) || null;
+    const targetName = itemName(item.exerciseName || '');
+    const existing = (prev.entries || []).find((e) => {
+      if (item.exerciseId && e.exerciseId) return item.exerciseId === e.exerciseId;
+      const entryName = itemName(e.exerciseName || '');
+      if (item.exerciseId && !e.exerciseId) return entryName === targetName;
+      return entryName === targetName;
+    }) || null;
     const sets: SessionSet[] = Array.from({ length: item.targetSets }, (_, i) => {
       const old = existing?.sets?.[i] || null;
       return {
@@ -186,6 +203,7 @@ function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
     });
     return {
       id: existing?.id || uuid(),
+      exerciseId: item.exerciseId ?? existing?.exerciseId,
       exerciseName: item.exerciseName,
       sets,
       note: existing?.note ?? null,
@@ -281,7 +299,60 @@ function AuthedApp({
   const [viewArchivedLoading, setViewArchivedLoading] = useState(false);
   const [finishingPlan, setFinishingPlan] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
+  const [exerciseLoading, setExerciseLoading] = useState(false);
   const selectionOriginRef = useRef<"auto" | "user">("auto");
+
+  const exerciseByName = useMemo(() => {
+    const map = new Map<string, Exercise>();
+    for (const ex of exerciseLibrary) {
+      map.set(ex.name.trim().toLowerCase(), ex);
+    }
+    return map;
+  }, [exerciseLibrary]);
+
+  const upsertExerciseInState = useCallback((row: { id: string | number; name?: string | null }) => {
+    if (!row || row.name == null) return null;
+    const ex: Exercise = { id: String(row.id), name: String(row.name) };
+    setExerciseLibrary((prev) => {
+      const exists = prev.some((p) => p.id === ex.id);
+      if (exists) return prev;
+      const next = [...prev, ex];
+      next.sort((a, b) => a.name.localeCompare(b.name));
+      return next;
+    });
+    return ex;
+  }, []);
+
+  const loadExercises = useCallback(async () => {
+    setExerciseLoading(true);
+    try {
+      const rows = await exerciseApi.list();
+      const mapped = rows
+        .filter((r) => r && r.name != null)
+        .map((r) => ({ id: String(r.id), name: String(r.name) }));
+      mapped.sort((a, b) => a.name.localeCompare(b.name));
+      setExerciseLibrary(mapped);
+    } catch {
+      setExerciseLibrary([]);
+    } finally {
+      setExerciseLoading(false);
+    }
+  }, []);
+
+  const ensureExerciseByName = useCallback(async (rawName: string) => {
+    const trimmed = normalizeExerciseName(rawName);
+    if (!trimmed) return null;
+    const existing = exerciseByName.get(trimmed.toLowerCase());
+    if (existing) return existing;
+    try {
+      const row = await exerciseApi.findOrCreate(trimmed);
+      if (!row) return null;
+      return upsertExerciseInState(row);
+    } catch {
+      return null;
+    }
+  }, [exerciseByName, upsertExerciseInState]);
 
   // Debounced auto-save for plan edits when the plan already exists on server
   const planSaveDebounceRef = useRef<number | null>(null);
@@ -300,6 +371,10 @@ function AuthedApp({
     setMode("builder");
   }, []);
 
+  useEffect(() => {
+    loadExercises();
+  }, [loadExercises]);
+
   const mapServerPlan = (row: ServerPlanRow): Plan => {
     const d = (row?.data ?? {}) as import("./api").ServerPlanData;
     const weeks: PlanWeek[] = Array.isArray(d.weeks)
@@ -311,6 +386,7 @@ function AuthedApp({
             name: fixMojibake(day.name) || "Day",
             items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
               id: item.id ?? uuid(),
+              exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
               exerciseName: fixMojibake(item.exerciseName) || "Exercise",
               targetSets: Number(item.targetSets) || 0,
               targetReps: item.targetReps ?? "",
@@ -322,16 +398,17 @@ function AuthedApp({
             id: uuid(),
             name: "Week 1",
             days: (d.days ?? []).map((day: ServerPlanDayRow) => ({
-              id: day.id ?? uuid(),
-              name: fixMojibake(day.name) || "Day",
-              items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
-                id: item.id ?? uuid(),
-                exerciseName: fixMojibake(item.exerciseName) || "Exercise",
-                targetSets: Number(item.targetSets) || 0,
-                targetReps: item.targetReps ?? "",
-              })),
+            id: day.id ?? uuid(),
+            name: fixMojibake(day.name) || "Day",
+            items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
+              id: item.id ?? uuid(),
+              exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
+              exerciseName: fixMojibake(item.exerciseName) || "Exercise",
+              targetSets: Number(item.targetSets) || 0,
+              targetReps: item.targetReps ?? "",
             })),
-          },
+          })),
+        },
         ];
 
     return {
@@ -621,6 +698,7 @@ function AuthedApp({
                 date: raw.date ?? new Date().toISOString(),
                 entries: raw.entries.map((entry: SessionEntryPayload) => ({
                   id: uuid(),
+                  exerciseId: entry.exerciseId,
                   exerciseName: entry.exerciseName ?? "Exercise",
                   sets: (entry.sets ?? []).map((set: Partial<SessionSetPayload>, index: number) => ({
                     id: uuid(),
@@ -666,6 +744,7 @@ function AuthedApp({
           date: new Date().toISOString(),
           entries: raw.entries.map((entry: SessionEntryPayload, entryIndex: number) => ({
             id: uuid(),
+            exerciseId: entry.exerciseId ?? targetDay.items[entryIndex]?.exerciseId,
             exerciseName: entry.exerciseName ?? targetDay.items[entryIndex]?.exerciseName ?? "Exercise",
             sets: (entry.sets ?? []).map((set: Partial<SessionSetPayload>, setIndex: number) => ({
               id: uuid(),
@@ -692,62 +771,76 @@ function AuthedApp({
 
   const handleRenameExercise = (oldName: string, newName: string, replaceRemaining: boolean) => {
     if (!selectedPlan || !selectedWeekId || !selectedDayId) return;
-    let nextPlanForSave: Plan | null = null;
-    setPlans((prev) =>
-      prev.map((p) => {
-        if (p.id !== selectedPlan.id) return p;
-        const wIdx = p.weeks.findIndex((w) => w.days.some((d) => d.id === selectedDayId));
-        if (wIdx < 0) return p;
-        const dIdx = p.weeks[wIdx].days.findIndex((d) => d.id === selectedDayId);
-        const weeks = p.weeks.map((week, wi) => {
-          // earlier weeks unchanged
-          if (wi < wIdx) return week;
+    const trimmed = normalizeExerciseName(newName);
+    if (!trimmed) return;
 
-          // same week: only replace in days at/after current day when requested
-          if (wi === wIdx) {
-            const days = week.days.map((day, di) => {
-              if (!replaceRemaining && di !== dIdx) return day; // only current day when not replacing remaining
-              if (replaceRemaining && di < dIdx) return day; // keep days before current when replacing remaining
-              const items = day.items.map((it) => (it.exerciseName === oldName ? { ...it, exerciseName: newName } : it));
-              return { ...day, items };
-            });
+    void (async () => {
+      const resolved = await ensureExerciseByName(trimmed);
+      const resolvedName = resolved?.name ?? trimmed;
+      const resolvedId = resolved?.id;
+      let nextPlanForSave: Plan | null = null;
+      setPlans((prev) =>
+        prev.map((p) => {
+          if (p.id !== selectedPlan.id) return p;
+          const wIdx = p.weeks.findIndex((w) => w.days.some((d) => d.id === selectedDayId));
+          if (wIdx < 0) return p;
+          const dIdx = p.weeks[wIdx].days.findIndex((d) => d.id === selectedDayId);
+          const weeks = p.weeks.map((week, wi) => {
+            // earlier weeks unchanged
+            if (wi < wIdx) return week;
+
+            // same week: only replace in days at/after current day when requested
+            if (wi === wIdx) {
+              const days = week.days.map((day, di) => {
+                if (!replaceRemaining && di !== dIdx) return day; // only current day when not replacing remaining
+                if (replaceRemaining && di < dIdx) return day; // keep days before current when replacing remaining
+                const items = day.items.map((it) =>
+                  it.exerciseName === oldName ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it
+                );
+                return { ...day, items };
+              });
+              return { ...week, days };
+            }
+
+            // later weeks: if replacing remaining, replace all occurrences; otherwise keep
+            if (!replaceRemaining) return week;
+            const days = week.days.map((day) => ({
+              ...day,
+              items: day.items.map((it) =>
+                it.exerciseName === oldName ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it
+              ),
+            }));
             return { ...week, days };
-          }
+          });
+          const next = { ...p, weeks };
+          nextPlanForSave = next;
+          return next;
+        })
+      );
+      if (nextPlanForSave && (nextPlanForSave as Plan).serverId) queuePlanSave(nextPlanForSave as Plan);
 
-          // later weeks: if replacing remaining, replace all occurrences; otherwise keep
-          if (!replaceRemaining) return week;
-          const days = week.days.map((day) => ({
-            ...day,
-            items: day.items.map((it) => (it.exerciseName === oldName ? { ...it, exerciseName: newName } : it)),
-          }));
-          return { ...week, days };
-        });
-        const next = { ...p, weeks };
-        nextPlanForSave = next;
+      // Update current in-memory session for current day (rename entry there too)
+      setSession((s) => {
+        if (!s || s.planDayId !== selectedDayId) return s;
+        const next = {
+          ...s,
+          entries: s.entries.map((e) =>
+            e.exerciseName === oldName ? { ...e, exerciseName: resolvedName, exerciseId: resolvedId } : e
+          ),
+        };
+        try {
+          localStorage.setItem(
+            `session:${selectedPlan.serverId ?? selectedPlan.id}:${next.planWeekId}:${next.planDayId}`,
+            JSON.stringify(next)
+          );
+        } catch { /* ignore */ }
+        // Also attempt to save to server if plan has serverId
+        if (selectedPlan.serverId) {
+          sessionApi.save(selectedPlan.serverId, next.planWeekId, next.planDayId, next).catch(() => void 0);
+        }
         return next;
-      })
-    );
-    if (nextPlanForSave && (nextPlanForSave as Plan).serverId) queuePlanSave(nextPlanForSave as Plan);
-
-    // Update current in-memory session for current day (rename entry there too)
-    setSession((s) => {
-      if (!s || s.planDayId !== selectedDayId) return s;
-      const next = {
-        ...s,
-        entries: s.entries.map((e) => (e.exerciseName === oldName ? { ...e, exerciseName: newName } : e)),
-      };
-      try {
-        localStorage.setItem(
-          `session:${selectedPlan.serverId ?? selectedPlan.id}:${next.planWeekId}:${next.planDayId}`,
-          JSON.stringify(next)
-        );
-      } catch { /* ignore */ }
-      // Also attempt to save to server if plan has serverId
-      if (selectedPlan.serverId) {
-        sessionApi.save(selectedPlan.serverId, next.planWeekId, next.planDayId, next).catch(() => void 0);
-      }
-      return next;
-    });
+      });
+    })();
   };
 
   const handleFinishPlan = async () => {
@@ -859,6 +952,9 @@ function AuthedApp({
           setSelectedDayId={setSelectedDayId}
           showPlanList={showPlanList}
           setShowPlanList={setShowPlanList}
+          exerciseLibrary={exerciseLibrary}
+          exerciseLoading={exerciseLoading}
+          onResolveExerciseName={ensureExerciseByName}
           onSaved={(savedPlan) => {
             // Go to workout with the just-saved plan selected
             const nextWeekId = savedPlan.weeks[0]?.id ?? null;
@@ -1037,7 +1133,13 @@ function AuthedApp({
                                   ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                       {day.items.map((item) => {
-                                        const entry = session?.entries?.find((entry) => entry.exerciseName === item.exerciseName) || null;
+                                        const entry = session?.entries?.find((entry) => {
+                                          if (item.exerciseId && entry.exerciseId) return item.exerciseId === entry.exerciseId;
+                                          const entryName = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+                                          const itemName = normalizeExerciseName(item.exerciseName || '').toLowerCase();
+                                          if (item.exerciseId && !entry.exerciseId) return entryName === itemName;
+                                          return entryName === itemName;
+                                        }) || null;
                                         const sets = entry?.sets ?? [];
                                         const rowCount = Math.max(item.targetSets, sets.length);
                                         return (
@@ -1126,6 +1228,13 @@ function WorkoutPage({
   const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEntry, setHistoryEntry] = useState<{ exerciseId?: string; exerciseName: string } | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<Array<{ date: string; weight: number; reps: number }>>([]);
+  const [historyPr, setHistoryPr] = useState<{ date: string; weight: number; reps: number } | null>(null);
+  const historyCacheRef = useRef<SessionRow[] | null>(null);
 
   const currentWeek = useMemo(
     () => plan.weeks.find((w) => w.days.some((d) => d.id === day.id)) || null,
@@ -1145,10 +1254,13 @@ function WorkoutPage({
             if (latest.ghostSeed) {
               const ghostMap: Record<string, { weight: number | null; reps: number | null }[]> = {};
               for (const entry of latest.entries ?? []) {
-                ghostMap[entry.exerciseName] = (entry.sets ?? []).map((set: Partial<SessionSetPayload>) => ({
+                const key = exerciseKey(entry);
+                ghostMap[key] = (entry.sets ?? []).map((set: Partial<SessionSetPayload>) => ({
                   weight: set.weight ?? null,
                   reps: set.reps ?? null,
                 }));
+                const nameKey = `name:${normalizeExerciseName(entry.exerciseName || '').toLowerCase()}`;
+                if (nameKey && !ghostMap[nameKey]) ghostMap[nameKey] = ghostMap[key];
               }
               setGhost(ghostMap);
               setSession(startSessionFromDay(plan, currentWeek.id, day.id));
@@ -1257,11 +1369,17 @@ function WorkoutPage({
         const map: Record<string, { weight: number | null; reps: number | null }[]> = {};
         const notesMap: Record<string, string | null> = {};
         for (const entry of ghostData.entries) {
-          map[entry.exerciseName] = (entry.sets || []).map((s: Partial<SessionSetPayload>) => ({
+          const key = exerciseKey(entry);
+          const sets = (entry.sets || []).map((s: Partial<SessionSetPayload>) => ({
             weight: s.weight ?? null,
             reps: s.reps ?? null,
           }));
-          notesMap[entry.exerciseName] = (entry as any).note ?? null;
+          map[key] = sets;
+          const nameKey = `name:${normalizeExerciseName(entry.exerciseName || '').toLowerCase()}`;
+          if (nameKey && !map[nameKey]) map[nameKey] = sets;
+          const noteVal = (entry as any).note ?? null;
+          notesMap[key] = noteVal;
+          if (nameKey && !notesMap[nameKey]) notesMap[nameKey] = noteVal;
         }
         setGhost(map);
         try {
@@ -1270,8 +1388,9 @@ function WorkoutPage({
           if (raw) {
             const seed = JSON.parse(raw) as Record<string, string>;
             for (const [ex, note] of Object.entries(seed)) {
-              if (!notesMap[ex] || String(notesMap[ex]).trim() === '') {
-                notesMap[ex] = note;
+              const nameKey = `name:${normalizeExerciseName(ex).toLowerCase()}`;
+              if (!notesMap[nameKey] || String(notesMap[nameKey]).trim() === '') {
+                notesMap[nameKey] = note;
               }
             }
           }
@@ -1290,7 +1409,8 @@ function WorkoutPage({
     if (!prevNotes) return;
     const nextEntries = session.entries.map((e) => {
       const hasNote = !!(e.note && String(e.note).trim() !== "");
-      const suggested = prevNotes[e.exerciseName];
+      const key = exerciseKey(e);
+      const suggested = prevNotes[key] ?? prevNotes[`name:${normalizeExerciseName(e.exerciseName).toLowerCase()}`];
       if (hasNote || !suggested || String(suggested).trim() === "") return e;
       return { ...e, note: suggested };
     });
@@ -1331,10 +1451,107 @@ function WorkoutPage({
   }, [plan.id, plan.serverId, day.items, session]);
 
 
-  const getGhost = (exerciseName: string, idx: number) => {
-    const arr = ghost[exerciseName];
-    if (!arr || !arr[idx]) return { weight: null, reps: null };
-    return arr[idx];
+  const getGhost = (exerciseId: string | undefined, exerciseName: string, idx: number) => {
+    const keys: string[] = [];
+    if (exerciseId) keys.push(`id:${exerciseId}`);
+    const nameKey = `name:${normalizeExerciseName(exerciseName).toLowerCase()}`;
+    if (nameKey) keys.push(nameKey);
+    for (const key of keys) {
+      const arr = ghost[key];
+      if (arr && arr[idx]) return arr[idx];
+    }
+    return { weight: null, reps: null };
+  };
+
+  const formatHistoryDate = (raw: string) => {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString();
+  };
+
+  const loadHistoryFor = async (entry: { exerciseId?: string; exerciseName: string }) => {
+    if (!plan.serverId) {
+      setHistoryError('Save the plan to load history across sessions.');
+      setHistoryItems([]);
+      setHistoryPr(null);
+      return;
+    }
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      let rows = historyCacheRef.current;
+      if (!rows) {
+        rows = await sessionApi.listAll();
+        historyCacheRef.current = rows;
+      }
+      const targetName = normalizeExerciseName(entry.exerciseName).toLowerCase();
+      const items: Array<{ date: string; weight: number; reps: number }> = [];
+      for (const row of rows) {
+        const data = (row as SessionRow).data;
+        if (!data || !Array.isArray(data.entries)) continue;
+        const sessionDate = data.date || row.updated_at || '';
+        for (const e of data.entries) {
+          const entryName = normalizeExerciseName(e.exerciseName || '').toLowerCase();
+          const match =
+            (entry.exerciseId && e.exerciseId && String(e.exerciseId) === String(entry.exerciseId)) ||
+            (entry.exerciseId && !e.exerciseId && entryName === targetName) ||
+            (!entry.exerciseId && entryName === targetName);
+          if (!match) continue;
+          for (const set of e.sets ?? []) {
+            const weight = typeof set.weight === 'number' ? set.weight : null;
+            const reps = typeof set.reps === 'number' ? set.reps : null;
+            if (weight == null || reps == null) continue;
+            if (Number.isNaN(weight) || Number.isNaN(reps)) continue;
+            items.push({ date: sessionDate, weight, reps });
+          }
+        }
+      }
+      items.sort((a, b) => {
+        const at = Date.parse(a.date || '') || 0;
+        const bt = Date.parse(b.date || '') || 0;
+        return bt - at;
+      });
+
+      let pr: { date: string; weight: number; reps: number } | null = null;
+      for (const item of items) {
+        if (!pr) {
+          pr = item;
+          continue;
+        }
+        if (item.weight > pr.weight) {
+          pr = item;
+          continue;
+        }
+        if (item.weight === pr.weight && item.reps > pr.reps) {
+          pr = item;
+          continue;
+        }
+        if (item.weight === pr.weight && item.reps === pr.reps) {
+          const it = Date.parse(item.date || '') || 0;
+          const pt = Date.parse(pr.date || '') || 0;
+          if (it > pt) pr = item;
+        }
+      }
+
+      const rest = pr
+        ? items.filter((item) => !(item.weight === pr!.weight && item.reps === pr!.reps && item.date === pr!.date))
+        : items;
+      setHistoryPr(pr);
+      setHistoryItems(rest);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : String(err));
+      setHistoryItems([]);
+      setHistoryPr(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openHistory = (entry: { exerciseId?: string; exerciseName: string }) => {
+    setHistoryEntry(entry);
+    setHistoryOpen(true);
+    void loadHistoryFor(entry);
   };
 
   const saveDebounceRef = useRef<number | null>(null);
@@ -1496,6 +1713,12 @@ function WorkoutPage({
                   >
                     Rename
                   </button>
+                  <button
+                    onClick={() => openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName })}
+                    style={SMALL_BTN_STYLE}
+                  >
+                    History
+                  </button>
                 </>
               )}
             </div>
@@ -1583,7 +1806,7 @@ function WorkoutPage({
               </div>
 
               {entry.sets.map((set, i) => {
-                const ghostSet = getGhost(entry.exerciseName, i);
+                const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
                 return (
                   <div key={set.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
                     <div style={{ alignSelf: 'center' }}>{i + 1}</div>
@@ -1660,6 +1883,57 @@ function WorkoutPage({
           )}
         </div>
       </div>
+
+      {historyOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 30 }}>
+          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 520, width: '100%', maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <h3 style={{ margin: 0 }}>History{historyEntry ? ` - ${historyEntry.exerciseName}` : ''}</h3>
+              <button
+                onClick={() => {
+                  setHistoryOpen(false);
+                  setHistoryError(null);
+                }}
+                style={BTN_STYLE}
+              >
+                Close
+              </button>
+            </div>
+
+            {historyLoading ? (
+              <div style={{ color: '#777' }}>Loading history...</div>
+            ) : historyError ? (
+              <div style={{ color: '#f88' }}>{historyError}</div>
+            ) : (
+              <>
+                {historyPr ? (
+                  <div style={{ border: '2px solid #fff', borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>PR</div>
+                    <div style={{ fontSize: 18 }}>
+                      {historyPr.weight} x {historyPr.reps}
+                    </div>
+                    <div style={{ color: '#aaa', fontSize: 12 }}>{formatHistoryDate(historyPr.date)}</div>
+                  </div>
+                ) : (
+                  <div style={{ color: '#777' }}>No recorded sets yet.</div>
+                )}
+
+                {historyItems.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontWeight: 600 }}>History</div>
+                    {historyItems.map((item, idx) => (
+                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} style={{ border: '1px solid #333', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>{item.weight} x {item.reps}</div>
+                        <div style={{ color: '#aaa', fontSize: 12 }}>{formatHistoryDate(item.date)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1675,6 +1949,9 @@ function BuilderPage({
   showPlanList,
   setShowPlanList,
   onSaved,
+  exerciseLibrary,
+  exerciseLoading,
+  onResolveExerciseName,
 }: {
   plans: Plan[];
   setPlans: React.Dispatch<React.SetStateAction<Plan[]>>;
@@ -1687,6 +1964,9 @@ function BuilderPage({
   showPlanList: boolean;
   setShowPlanList: React.Dispatch<React.SetStateAction<boolean>>;
   onSaved?: (savedPlan: Plan) => void;
+  exerciseLibrary: Exercise[];
+  exerciseLoading: boolean;
+  onResolveExerciseName: (name: string) => Promise<Exercise | null>;
 }) {
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
@@ -1735,6 +2015,7 @@ function BuilderPage({
             name: fixMojibake(day.name) || "Day",
             items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
               id: item.id ?? uuid(),
+              exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
               exerciseName: fixMojibake(item.exerciseName) || "Exercise",
               targetSets: Number(item.targetSets) || 0,
               targetReps: item.targetReps ?? "",
@@ -1803,6 +2084,7 @@ function BuilderPage({
             name: day.name,
             items: day.items.map((item) => ({
               id: uuid(),
+              exerciseId: item.exerciseId,
               exerciseName: item.exerciseName,
               targetSets: item.targetSets,
               targetReps: item.targetReps ?? '',
@@ -1903,6 +2185,7 @@ function BuilderPage({
           name: source.name,
           items: source.items.map((it) => ({
             id: uuid(),
+            exerciseId: it.exerciseId,
             exerciseName: it.exerciseName,
             targetSets: it.targetSets,
             targetReps: it.targetReps ?? '',
@@ -1986,6 +2269,66 @@ function BuilderPage({
       // Save will happen when user clicks Save Plan; autosave removed to avoid scope issues
       // queuePlanSave({ ...selectedPlan, weeks: nextWeeks });
     }
+  };
+
+  const handleExerciseNameCommit = async (
+    weekId: string,
+    dayId: string,
+    itemId: string,
+    rawName: string
+  ) => {
+    if (!selectedPlan) return;
+    const trimmed = normalizeExerciseName(rawName);
+    if (!trimmed) {
+      updatePlan(selectedPlan.id, (plan) => ({
+        ...plan,
+        weeks: plan.weeks.map((week) =>
+          week.id === weekId
+            ? {
+                ...week,
+                days: week.days.map((day) =>
+                  day.id === dayId
+                    ? {
+                        ...day,
+                        items: day.items.map((item) =>
+                          item.id === itemId ? { ...item, exerciseName: '', exerciseId: undefined } : item
+                        ),
+                      }
+                    : day
+                ),
+              }
+            : week
+        ),
+      }));
+      return;
+    }
+
+    const resolved = await onResolveExerciseName(trimmed);
+    const resolvedName = resolved?.name ?? trimmed;
+    const resolvedId = resolved?.id;
+
+    updatePlan(selectedPlan.id, (plan) => ({
+      ...plan,
+      weeks: plan.weeks.map((week) =>
+        week.id === weekId
+          ? {
+              ...week,
+              days: week.days.map((day) =>
+                day.id === dayId
+                  ? {
+                      ...day,
+                      items: day.items.map((item) =>
+                        item.id === itemId
+                          ? { ...item, exerciseName: resolvedName, exerciseId: resolvedId }
+                          : item
+                      ),
+                    }
+                  : day
+              ),
+            }
+          : week
+      ),
+    }));
   };
 
   const handleRemoveExercise = (weekId: string, dayId: string, itemId: string) => {
@@ -2193,6 +2536,7 @@ function BuilderPage({
         name: d.name,
         items: d.items.map((it) => ({
           id: uuid(),
+          exerciseId: it.exerciseId,
           exerciseName: it.exerciseName,
           targetSets: it.targetSets,
           targetReps: it.targetReps ?? "",
@@ -2399,6 +2743,11 @@ function BuilderPage({
 
   return (
     <div style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+      <datalist id="exercise-options">
+        {exerciseLibrary.map((ex) => (
+          <option key={ex.id} value={ex.name} />
+        ))}
+      </datalist>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setShowPlanList(true)} style={BTN_STYLE}>
@@ -2406,6 +2755,7 @@ function BuilderPage({
           <button onClick={handleCreatePlan} style={BTN_STYLE}>
             + Plan
           </button>
+          {exerciseLoading && <div style={{ color: '#777', alignSelf: 'center', fontSize: 12 }}>Loading exercises...</div>}
           {selectedPlan && (
             <>
               <button onClick={handleAddWeek} style={BTN_STYLE}>
@@ -2641,7 +2991,21 @@ function BuilderPage({
                                 </div>
                                 <input
                                   value={item.exerciseName}
-                                  onChange={(e) => handleExerciseChange(week.id, day.id, item.id, { exerciseName: e.target.value })}
+                                  onChange={(e) =>
+                                    handleExerciseChange(week.id, day.id, item.id, {
+                                      exerciseName: e.target.value,
+                                      exerciseId: undefined,
+                                    })
+                                  }
+                                  onBlur={(e) => {
+                                    void handleExerciseNameCommit(week.id, day.id, item.id, e.target.value);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      (e.currentTarget as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                  list="exercise-options"
                                   style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
                                   placeholder="Exercise name"
                                 />

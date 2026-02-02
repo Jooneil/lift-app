@@ -1,14 +1,16 @@
 // api.ts – Supabase-backed API used by the app
 import { supabase } from './supabaseClient'
 
-export type ServerPlanItem = { id?: string; exerciseName?: string; targetSets?: number; targetReps?: string };
+export type ServerPlanItem = { id?: string; exerciseId?: string; exerciseName?: string; targetSets?: number; targetReps?: string };
 export type ServerPlanDay = { id?: string; name?: string; items?: ServerPlanItem[] };
 export type ServerPlanWeek = { id?: string; name?: string; days?: ServerPlanDay[] };
 export type ServerPlanData = { weeks?: ServerPlanWeek[]; days?: ServerPlanDay[] };
 export type ServerPlanRow = { id: string; name?: string; data?: ServerPlanData; archived?: 0 | 1 | boolean; predecessor_plan_id?: string | null };
 export type SessionSetPayload = { id: string; setIndex: number; weight: number | null; reps: number | null };
-export type SessionEntryPayload = { id: string; exerciseName: string; sets: SessionSetPayload[] };
+export type SessionEntryPayload = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSetPayload[] };
 export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
+export type ExerciseRow = { id: string | number; name?: string | null };
+export type SessionRow = { plan_id: string | number; week_id: string; day_id: string; updated_at?: string | null; data?: SessionPayload | null };
 // Helper to generate a UUID for tables that may not have a default
 const genUuid = () => (
   typeof crypto !== 'undefined' && 'randomUUID' in crypto && typeof crypto.randomUUID === 'function'
@@ -27,6 +29,60 @@ export const api = {
     return email ? { id: 0, username: email } : null;
   },
   async logout(): Promise<{ ok: true }> { await supabase.auth.signOut(); return { ok: true }; },
+};
+
+const isMissingTableError = (error: { code?: string; message?: string } | null | undefined) => {
+  if (!error) return false;
+  const code = error.code || '';
+  const message = String(error.message || '').toLowerCase();
+  return code === '42P01' || message.includes('does not exist') || message.includes('not found');
+};
+
+export const exerciseApi = {
+  async list(): Promise<ExerciseRow[]> {
+    const { data, error } = await supabase.from('exercises').select('id,name').order('name', { ascending: true });
+    if (error) {
+      if (isMissingTableError(error as { code?: string; message?: string })) return [];
+      throw error;
+    }
+    return (data ?? []) as ExerciseRow[];
+  },
+  async findByName(name: string): Promise<ExerciseRow | null> {
+    const clean = name.trim();
+    if (!clean) return null;
+    const { data, error } = await supabase
+      .from('exercises')
+      .select('id,name')
+      .ilike('name', clean)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      if (isMissingTableError(error as { code?: string; message?: string })) return null;
+      throw error;
+    }
+    return (data as ExerciseRow | null) ?? null;
+  },
+  async findOrCreate(name: string): Promise<ExerciseRow | null> {
+    const clean = name.trim();
+    if (!clean) return null;
+    const existing = await exerciseApi.findByName(clean);
+    if (existing) return existing;
+    const { data, error } = await supabase
+      .from('exercises')
+      .insert([{ name: clean }])
+      .select('id,name')
+      .single();
+    if (error) {
+      if (isMissingTableError(error as { code?: string; message?: string })) return null;
+      const code = (error as { code?: string }).code || '';
+      if (code === '23505' || String(error.message || '').toLowerCase().includes('duplicate')) {
+        const retry = await exerciseApi.findByName(clean);
+        return retry;
+      }
+      throw error;
+    }
+    return (data as ExerciseRow | null) ?? null;
+  },
 };
 
 export const planApi = {
@@ -121,6 +177,14 @@ export const sessionApi = {
   },
   async completedList(planServerId: number | string): Promise<Array<{ week_id: string; day_id: string }>> {
     const { data } = await supabase.from('completions').select('week_id,day_id').eq('plan_id', planServerId).order('completed_at', { ascending: true }); return (data ?? []) as Array<{ week_id: string; day_id: string }>;
+  },
+  async listAll(): Promise<SessionRow[]> {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('plan_id,week_id,day_id,updated_at,data')
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as unknown as SessionRow[];
   },
 };
 
