@@ -108,10 +108,10 @@ export default function Auth({
       </form>
       <div style={{ marginTop: 8 }}>
         {mode === 'login' && (
-          <>
+          <div style={{ display: 'grid', gap: 8 }}>
             <button onClick={()=>setMode('register')}>Need an account? Sign Up</button>
-            <button onClick={()=>setMode('forgot')} style={{ marginLeft: 8 }}>Forgot password?</button>
-          </>
+            <button onClick={()=>setMode('forgot')}>Forgot password?</button>
+          </div>
         )}
         {mode === 'register' && (
           <button onClick={()=>setMode('login')}>Have an account? Sign In</button>
