@@ -72,6 +72,10 @@ const uuid = () =>
 
 const normalizeExerciseName = (name: string) => name.trim();
 const normalizeFilterValue = (value: string) => value.replace(/\s+/g, " ").trim().toLowerCase();
+const isSearchDebugEnabled = () => {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("debugSearch");
+};
 const exerciseKey = (entry: { exerciseId?: string; exerciseName?: string | null }) => {
   if (entry.exerciseId) return `id:${entry.exerciseId}`;
   const name = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
@@ -1653,6 +1657,12 @@ function WorkoutPage({
     replaceSearchBodyWeight,
     replaceSearchCompound,
   ]);
+  const replaceSearchDebugEnabled = useMemo(() => isSearchDebugEnabled(), []);
+  const replaceFilteredCustomCount = useMemo(
+    () => replaceFilteredCatalog.reduce((count, ex) => count + (ex.isCustom ? 1 : 0), 0),
+    [replaceFilteredCatalog]
+  );
+  const replaceFilteredDefaultCount = replaceFilteredCatalog.length - replaceFilteredCustomCount;
 
   const openReplaceSearch = (entry: SessionEntry, entryIndex: number) => {
     setReplaceTargetEntry({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName });
@@ -2452,11 +2462,16 @@ function WorkoutPage({
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
               <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12, minHeight: 280 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ fontWeight: 600 }}>Results</div>
-                    <div style={{ color: '#777', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
-                  </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontWeight: 600 }}>Results</div>
+                  <div style={{ color: '#777', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
+                  {replaceSearchDebugEnabled && (
+                    <div style={{ color: '#999', fontSize: 11 }}>
+                      debug source={replaceSearchSource} total={replaceFilteredCatalog.length} custom={replaceFilteredCustomCount} defaults={replaceFilteredDefaultCount}
+                    </div>
+                  )}
+                </div>
                   <button
                     onClick={() => {
                       setReplaceAddMovementOpen((prev) => !prev);
@@ -2809,6 +2824,12 @@ function BuilderPage({
     searchBodyWeight,
     searchCompound,
   ]);
+  const searchDebugEnabled = useMemo(() => isSearchDebugEnabled(), []);
+  const filteredCustomCount = useMemo(
+    () => filteredCatalog.reduce((count, ex) => count + (ex.isCustom ? 1 : 0), 0),
+    [filteredCatalog]
+  );
+  const filteredDefaultCount = filteredCatalog.length - filteredCustomCount;
 
   const createDay = (index: number): PlanDay => ({
     id: uuid(),
@@ -4254,6 +4275,11 @@ function BuilderPage({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ fontWeight: 600 }}>Results</div>
                     <div style={{ color: '#777', fontSize: 12 }}>{filteredCatalog.length} found</div>
+                    {searchDebugEnabled && (
+                      <div style={{ color: '#999', fontSize: 11 }}>
+                        debug source={searchSource} total={filteredCatalog.length} custom={filteredCustomCount} defaults={filteredDefaultCount}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => {
