@@ -500,6 +500,13 @@ function AuthedApp({
     return mapped;
   }, [catalogExercises, customCatalogExercises, upsertExerciseInState]);
 
+  const deleteCustomExercise = useCallback(async (id: string) => {
+    const deleted = await exerciseApi.deleteCustom(id);
+    if (!deleted) throw new Error("Unable to delete movement.");
+    setCustomCatalogExercises((prev) => prev.filter((ex) => ex.id !== id));
+    setExerciseLibrary((prev) => prev.filter((ex) => ex.id !== id));
+  }, []);
+
   // Debounced auto-save for plan edits when the plan already exists on server
   const planSaveDebounceRef = useRef<number | null>(null);
   const queuePlanSave = useCallback((planToSave: Plan) => {
@@ -1176,6 +1183,7 @@ function AuthedApp({
           catalogLoading={catalogLoading}
           onResolveExerciseName={ensureExerciseByName}
           onCreateCustomExercise={createCustomExercise}
+          onDeleteCustomExercise={deleteCustomExercise}
           onSaved={(savedPlan) => {
             // Go to workout with the just-saved plan selected
             const nextWeekId = savedPlan.weeks[0]?.id ?? null;
@@ -1277,6 +1285,7 @@ function AuthedApp({
                 catalogExercises={searchCatalogExercises}
                 onInsertExercisesAt={handleInsertExercisesAt}
                 onCreateCustomExercise={createCustomExercise}
+                onDeleteCustomExercise={deleteCustomExercise}
                 onMarkDone={async () => {
                   if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   setCompleted(true);
@@ -1431,6 +1440,7 @@ function WorkoutPage({
   catalogExercises,
   onInsertExercisesAt,
   onCreateCustomExercise,
+  onDeleteCustomExercise,
   onMarkDone,
   completed,
   setCompleted,
@@ -1452,6 +1462,7 @@ function WorkoutPage({
     equipment: "machine" | "free_weight" | "cable" | "body_weight";
     isCompound: boolean;
   }) => Promise<CatalogExercise>;
+  onDeleteCustomExercise?: (id: string) => Promise<void>;
   onMarkDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
@@ -1616,6 +1627,21 @@ function WorkoutPage({
       setReplaceAddMovementOpen(false);
     } catch (err) {
       setReplaceAddMovementError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDeleteCustomFromReplace = async (ex: CatalogExercise) => {
+    if (!ex.isCustom) return;
+    if (!onDeleteCustomExercise) {
+      alert("Custom movements are unavailable.");
+      return;
+    }
+    if (!window.confirm(`Delete "${ex.name}"?`)) return;
+    try {
+      await onDeleteCustomExercise(ex.id);
+      setReplaceQueue((prev) => prev.filter((q) => q.name.toLowerCase() !== ex.name.toLowerCase()));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -2302,9 +2328,20 @@ function WorkoutPage({
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
               <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12, minHeight: 280 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600 }}>Results</div>
-                  <div style={{ color: '#777', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontWeight: 600 }}>Results</div>
+                    <div style={{ color: '#777', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setReplaceAddMovementOpen((prev) => !prev);
+                      setReplaceAddMovementError(null);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >
+                    Can't find a movement? Create a new one!
+                  </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
                   {replaceFilteredCatalog.length === 0 ? (
@@ -2318,7 +2355,12 @@ function WorkoutPage({
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
-                        <button onClick={() => addReplaceQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => addReplaceQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                          {ex.isCustom && (
+                            <button onClick={() => handleDeleteCustomFromReplace(ex)} style={SMALL_BTN_STYLE}>Delete</button>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -2326,18 +2368,7 @@ function WorkoutPage({
               </div>
 
               <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600 }}>Queue</div>
-                  <button
-                    onClick={() => {
-                      setReplaceAddMovementOpen((prev) => !prev);
-                      setReplaceAddMovementError(null);
-                    }}
-                    style={SMALL_BTN_STYLE}
-                  >
-                    Add movement
-                  </button>
-                </div>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {replaceAddMovementOpen && (
                   <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input
@@ -2444,6 +2475,9 @@ function WorkoutPage({
                 </div>
               </div>
             </div>
+            <div style={{ color: '#777', fontSize: 12, textAlign: 'right' }}>
+              * = self made movement
+            </div>
           </div>
         </div>
       )}
@@ -2518,6 +2552,7 @@ function BuilderPage({
   catalogLoading,
   onResolveExerciseName,
   onCreateCustomExercise,
+  onDeleteCustomExercise,
 }: {
   plans: Plan[];
   setPlans: React.Dispatch<React.SetStateAction<Plan[]>>;
@@ -2540,6 +2575,7 @@ function BuilderPage({
     equipment: "machine" | "free_weight" | "cable" | "body_weight";
     isCompound: boolean;
   }) => Promise<CatalogExercise>;
+  onDeleteCustomExercise: (id: string) => Promise<void>;
 }) {
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
@@ -3081,6 +3117,17 @@ function BuilderPage({
       setAddMovementOpen(false);
     } catch (err) {
       setAddMovementError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDeleteCustomFromSearch = async (ex: CatalogExercise) => {
+    if (!ex.isCustom) return;
+    if (!window.confirm(`Delete "${ex.name}"?`)) return;
+    try {
+      await onDeleteCustomExercise(ex.id);
+      setSearchQueue((prev) => prev.filter((q) => q.name.toLowerCase() !== ex.name.toLowerCase()));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -3954,9 +4001,20 @@ function BuilderPage({
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
               <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12, minHeight: 280 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600 }}>Results</div>
-                  <div style={{ color: '#777', fontSize: 12 }}>{filteredCatalog.length} found</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontWeight: 600 }}>Results</div>
+                    <div style={{ color: '#777', fontSize: 12 }}>{filteredCatalog.length} found</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setAddMovementOpen((prev) => !prev);
+                      setAddMovementError(null);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >
+                    Can't find a movement? Create a new one!
+                  </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
                   {filteredCatalog.length === 0 ? (
@@ -3967,10 +4025,15 @@ function BuilderPage({
                         <div>
                           <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
                           <div style={{ color: '#777', fontSize: 12 }}>
-                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` • ${ex.secondaryMuscles.join(', ')}` : ''}
+                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
-                        <button onClick={() => addToQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => addToQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                          {ex.isCustom && (
+                            <button onClick={() => handleDeleteCustomFromSearch(ex)} style={SMALL_BTN_STYLE}>Delete</button>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -3978,18 +4041,7 @@ function BuilderPage({
               </div>
 
               <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600 }}>Queue</div>
-                  <button
-                    onClick={() => {
-                      setAddMovementOpen((prev) => !prev);
-                      setAddMovementError(null);
-                    }}
-                    style={SMALL_BTN_STYLE}
-                  >
-                    Add movement
-                  </button>
-                </div>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {addMovementOpen && (
                   <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input
@@ -4091,6 +4143,9 @@ function BuilderPage({
                   </button>
                 </div>
               </div>
+            </div>
+            <div style={{ color: '#777', fontSize: 12, textAlign: 'right' }}>
+              * = self made movement
             </div>
           </div>
         </div>

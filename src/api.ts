@@ -167,6 +167,25 @@ export const exerciseApi = {
     }
     return (data as CustomExerciseRow | null) ?? null;
   },
+  async deleteCustom(id: string | number): Promise<boolean> {
+    const idValue =
+      typeof id === 'number'
+        ? id
+        : /^\d+$/.test(String(id))
+          ? Number(id)
+          : String(id);
+    const { data, error } = await supabase
+      .from('exercises')
+      .delete()
+      .match({ id: idValue, is_custom: true })
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      if (isMissingTableError(error as { code?: string; message?: string })) return false;
+      throw error;
+    }
+    return !!data;
+  },
 };
 
 export const exerciseCatalogApi = {
