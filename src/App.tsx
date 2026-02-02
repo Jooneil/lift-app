@@ -899,9 +899,17 @@ function AuthedApp({
         };
         const next = {
           ...s,
-          entries: s.entries.map((e) =>
-            matchesOldEntry(e) ? { ...e, exerciseName: resolvedName, exerciseId: resolvedId } : e
-          ),
+          entries: s.entries.map((e) => {
+            if (!matchesOldEntry(e)) return e;
+            const resetSets = e.sets.map((set) => ({ ...set, weight: null, reps: null }));
+            return {
+              ...e,
+              exerciseName: resolvedName,
+              exerciseId: resolvedId,
+              sets: resetSets,
+              note: null,
+            };
+          }),
         };
         try {
           localStorage.setItem(
@@ -1455,6 +1463,7 @@ function WorkoutPage({
     if (typeof onReplaceExercise === "function") {
       onReplaceExercise(replaceTargetEntry, first.name, scope);
     }
+    historyCacheRef.current = null;
     const extras = replaceQueue.slice(1).map((q) => q.name);
     if (extras.length > 0 && typeof onInsertExercisesAt === "function" && currentWeekId && replaceTargetIndex != null) {
       await onInsertExercisesAt(currentWeekId, day.id, replaceTargetIndex, extras);
