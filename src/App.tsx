@@ -61,6 +61,7 @@ type ArchivedSessionMap = Record<string, Record<string, Session | null>>;
 
 
 type Mode = "builder" | "workout";
+type SearchSource = "all" | "defaults" | "home_made";
 
 const SET_COUNT_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -71,7 +72,6 @@ const uuid = () =>
 
 const normalizeExerciseName = (name: string) => name.trim();
 const normalizeFilterValue = (value: string) => value.replace(/\s+/g, " ").trim().toLowerCase();
-const normalizeSourceFilter = (value: string) => normalizeFilterValue(value).replace(/\*/g, "");
 const exerciseKey = (entry: { exerciseId?: string; exerciseName?: string | null }) => {
   if (entry.exerciseId) return `id:${entry.exerciseId}`;
   const name = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
@@ -1564,7 +1564,7 @@ function WorkoutPage({
   const [replaceSearchText, setReplaceSearchText] = useState("");
   const [replaceSearchPrimary, setReplaceSearchPrimary] = useState<string>("All");
   const [replaceSearchSecondary, setReplaceSearchSecondary] = useState<string>("All");
-  const [replaceSearchSource, setReplaceSearchSource] = useState<"All" | "Defaults" | "Home Made">("All");
+  const [replaceSearchSource, setReplaceSearchSource] = useState<SearchSource>("all");
   const [replaceSearchMachine, setReplaceSearchMachine] = useState(false);
   const [replaceSearchFreeWeight, setReplaceSearchFreeWeight] = useState(false);
   const [replaceSearchCable, setReplaceSearchCable] = useState(false);
@@ -1614,7 +1614,7 @@ function WorkoutPage({
 
   const replaceFilteredCatalog = useMemo(() => {
     const text = normalizeFilterValue(replaceSearchText);
-    const source = normalizeSourceFilter(replaceSearchSource);
+    const source = replaceSearchSource;
     const wantPrimary = replaceSearchPrimary !== "All" ? normalizeFilterValue(replaceSearchPrimary) : "";
     const wantSecondary = replaceSearchSecondary !== "All" ? normalizeFilterValue(replaceSearchSecondary) : "";
     const filtered = catalogExercises.filter((ex) => {
@@ -1623,7 +1623,7 @@ function WorkoutPage({
       if (wantPrimary && normalizeFilterValue(ex.primaryMuscle) !== wantPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => normalizeFilterValue(m) === wantSecondary)) return false;
       if (source === "defaults" && isCustom) return false;
-      if (source === "home made" && !isCustom) return false;
+      if (source === "home_made" && !isCustom) return false;
       if (replaceSearchMachine && !ex.machine) return false;
       if (replaceSearchFreeWeight && !ex.freeWeight) return false;
       if (replaceSearchCable && !ex.cable) return false;
@@ -2398,10 +2398,10 @@ function WorkoutPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value.trim() as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Source (All)</option>
-                <option value="Defaults">Defaults</option>
-                <option value="Home Made">Home Made *</option>
+              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value as SearchSource)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="all">Source (All)</option>
+                <option value="defaults">Defaults</option>
+                <option value="home_made">Home Made *</option>
               </select>
               <button
                 type="button"
@@ -2737,7 +2737,7 @@ function BuilderPage({
   const [searchText, setSearchText] = useState("");
   const [searchPrimary, setSearchPrimary] = useState<string>("All");
   const [searchSecondary, setSearchSecondary] = useState<string>("All");
-  const [searchSource, setSearchSource] = useState<"All" | "Defaults" | "Home Made">("All");
+  const [searchSource, setSearchSource] = useState<SearchSource>("all");
   const [searchMachine, setSearchMachine] = useState(false);
   const [searchFreeWeight, setSearchFreeWeight] = useState(false);
   const [searchCable, setSearchCable] = useState(false);
@@ -2770,7 +2770,7 @@ function BuilderPage({
 
   const filteredCatalog = useMemo(() => {
     const text = normalizeFilterValue(searchText);
-    const source = normalizeSourceFilter(searchSource);
+    const source = searchSource;
     const wantPrimary = searchPrimary !== "All" ? normalizeFilterValue(searchPrimary) : "";
     const wantSecondary = searchSecondary !== "All" ? normalizeFilterValue(searchSecondary) : "";
     const filtered = catalogExercises.filter((ex) => {
@@ -2779,7 +2779,7 @@ function BuilderPage({
       if (wantPrimary && normalizeFilterValue(ex.primaryMuscle) !== wantPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => normalizeFilterValue(m) === wantSecondary)) return false;
       if (source === "defaults" && isCustom) return false;
-      if (source === "home made" && !isCustom) return false;
+      if (source === "home_made" && !isCustom) return false;
       if (searchMachine && !ex.machine) return false;
       if (searchFreeWeight && !ex.freeWeight) return false;
       if (searchCable && !ex.cable) return false;
@@ -4196,10 +4196,10 @@ function BuilderPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value.trim() as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Source (All)</option>
-                <option value="Defaults">Defaults</option>
-                <option value="Home Made">Home Made *</option>
+              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value as SearchSource)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="all">Source (All)</option>
+                <option value="defaults">Defaults</option>
+                <option value="home_made">Home Made *</option>
               </select>
               <button
                 type="button"
