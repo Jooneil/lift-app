@@ -81,6 +81,13 @@ create table if not exists public.exercises (
   name text not null,
   created_at timestamptz default now()
 );
+alter table public.exercises add column if not exists primary_muscle text;
+alter table public.exercises add column if not exists machine boolean default false;
+alter table public.exercises add column if not exists free_weight boolean default false;
+alter table public.exercises add column if not exists cable boolean default false;
+alter table public.exercises add column if not exists body_weight boolean default false;
+alter table public.exercises add column if not exists is_compound boolean default false;
+alter table public.exercises add column if not exists is_custom boolean default false;
 alter table public.exercises enable row level security;
 drop policy if exists exercises_isolation on public.exercises;
 create policy exercises_isolation on public.exercises for all using (user_id = auth.uid()) with check (user_id = auth.uid());

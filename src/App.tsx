@@ -15,6 +15,7 @@ import type {
   SessionSetPayload,
   SessionRow,
   ExerciseCatalogRow,
+  CustomExerciseRow,
 } from "./api";
 
 type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
@@ -32,6 +33,7 @@ type CatalogExercise = {
   bodyWeight: boolean;
   isCompound: boolean;
   secondaryMuscles: string[];
+  isCustom?: boolean;
 };
 
 type Session = {
@@ -313,6 +315,7 @@ function AuthedApp({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
   const [catalogExercises, setCatalogExercises] = useState<CatalogExercise[]>([]);
+  const [customCatalogExercises, setCustomCatalogExercises] = useState<CatalogExercise[]>([]);
   const [exerciseLoading, setExerciseLoading] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const selectionOriginRef = useRef<"auto" | "user">("auto");
@@ -325,6 +328,21 @@ function AuthedApp({
     return map;
   }, [exerciseLibrary]);
 
+  const searchCatalogExercises = useMemo(() => {
+    const seen = new Set<string>();
+    const out: CatalogExercise[] = [];
+    const add = (ex: CatalogExercise, isCustom: boolean) => {
+      const key = ex.name.trim().toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push({ ...ex, isCustom });
+    };
+    for (const ex of catalogExercises) add(ex, false);
+    for (const ex of customCatalogExercises) add(ex, true);
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }, [catalogExercises, customCatalogExercises]);
+
   const exerciseOptions = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -334,11 +352,11 @@ function AuthedApp({
       seen.add(key);
       out.push(name);
     };
-    for (const ex of catalogExercises) add(ex.name);
+    for (const ex of searchCatalogExercises) add(ex.name);
     for (const ex of exerciseLibrary) add(ex.name);
     out.sort((a, b) => a.localeCompare(b));
     return out;
-  }, [catalogExercises, exerciseLibrary]);
+  }, [exerciseLibrary, searchCatalogExercises]);
 
   const upsertExerciseInState = useCallback((row: { id: string | number; name?: string | null }) => {
     if (!row || row.name == null) return null;
@@ -387,6 +405,7 @@ function AuthedApp({
           secondaryMuscles: Array.isArray(r.secondary_muscles)
             ? r.secondary_muscles.filter((m) => !!m).map((m) => String(m))
             : [],
+          isCustom: false,
         }));
       mapped.sort((a, b) => a.name.localeCompare(b.name));
       setCatalogExercises(mapped);
@@ -394,6 +413,30 @@ function AuthedApp({
       setCatalogExercises([]);
     } finally {
       setCatalogLoading(false);
+    }
+  }, []);
+
+  const loadCustomExercises = useCallback(async () => {
+    try {
+      const rows = await exerciseApi.listCustom();
+      const mapped = rows
+        .filter((r) => r && r.name != null && r.primary_muscle != null)
+        .map((r: CustomExerciseRow) => ({
+          id: String(r.id),
+          name: String(r.name ?? ''),
+          primaryMuscle: String(r.primary_muscle ?? ''),
+          machine: !!r.machine,
+          freeWeight: !!r.free_weight,
+          cable: !!r.cable,
+          bodyWeight: !!r.body_weight,
+          isCompound: !!r.is_compound,
+          secondaryMuscles: [],
+          isCustom: true,
+        }));
+      mapped.sort((a, b) => a.name.localeCompare(b.name));
+      setCustomCatalogExercises(mapped);
+    } catch {
+      setCustomCatalogExercises([]);
     }
   }, []);
 
@@ -410,6 +453,52 @@ function AuthedApp({
       return null;
     }
   }, [exerciseByName, upsertExerciseInState]);
+
+  const createCustomExercise = useCallback(async (input: {
+    name: string;
+    primaryMuscle: string;
+    equipment: "machine" | "free_weight" | "cable" | "body_weight";
+    isCompound: boolean;
+  }) => {
+    const trimmed = normalizeExerciseName(input.name);
+    if (!trimmed) throw new Error("Enter a name.");
+    const nameKey = trimmed.toLowerCase();
+    const exists = [...catalogExercises, ...customCatalogExercises].some(
+      (ex) => ex.name.trim().toLowerCase() === nameKey
+    );
+    if (exists) throw new Error("That movement already exists.");
+
+    const row = await exerciseApi.createCustom({
+      name: trimmed,
+      primary_muscle: input.primaryMuscle,
+      machine: input.equipment === "machine",
+      free_weight: input.equipment === "free_weight",
+      cable: input.equipment === "cable",
+      body_weight: input.equipment === "body_weight",
+      is_compound: input.isCompound,
+    });
+    if (!row || !row.name || !row.primary_muscle) throw new Error("Failed to add movement.");
+
+    const mapped: CatalogExercise = {
+      id: String(row.id),
+      name: String(row.name),
+      primaryMuscle: String(row.primary_muscle),
+      machine: !!row.machine,
+      freeWeight: !!row.free_weight,
+      cable: !!row.cable,
+      bodyWeight: !!row.body_weight,
+      isCompound: !!row.is_compound,
+      secondaryMuscles: [],
+      isCustom: true,
+    };
+    setCustomCatalogExercises((prev) => {
+      const next = [...prev, mapped];
+      next.sort((a, b) => a.name.localeCompare(b.name));
+      return next;
+    });
+    upsertExerciseInState(row);
+    return mapped;
+  }, [catalogExercises, customCatalogExercises, upsertExerciseInState]);
 
   // Debounced auto-save for plan edits when the plan already exists on server
   const planSaveDebounceRef = useRef<number | null>(null);
@@ -431,7 +520,8 @@ function AuthedApp({
   useEffect(() => {
     loadExercises();
     loadCatalogExercises();
-  }, [loadExercises, loadCatalogExercises]);
+    loadCustomExercises();
+  }, [loadExercises, loadCatalogExercises, loadCustomExercises]);
 
   const mapServerPlan = (row: ServerPlanRow): Plan => {
     const d = (row?.data ?? {}) as import("./api").ServerPlanData;
@@ -1082,9 +1172,10 @@ function AuthedApp({
           showPlanList={showPlanList}
           setShowPlanList={setShowPlanList}
           exerciseLoading={exerciseLoading || catalogLoading}
-          catalogExercises={catalogExercises}
+          catalogExercises={searchCatalogExercises}
           catalogLoading={catalogLoading}
           onResolveExerciseName={ensureExerciseByName}
+          onCreateCustomExercise={createCustomExercise}
           onSaved={(savedPlan) => {
             // Go to workout with the just-saved plan selected
             const nextWeekId = savedPlan.weeks[0]?.id ?? null;
@@ -1183,8 +1274,9 @@ function AuthedApp({
                 setSession={setSession}
                 onReplaceExercise={handleReplaceExercise}
                 exerciseOptions={exerciseOptions}
-                catalogExercises={catalogExercises}
+                catalogExercises={searchCatalogExercises}
                 onInsertExercisesAt={handleInsertExercisesAt}
+                onCreateCustomExercise={createCustomExercise}
                 onMarkDone={async () => {
                   if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   setCompleted(true);
@@ -1338,6 +1430,7 @@ function WorkoutPage({
   exerciseOptions,
   catalogExercises,
   onInsertExercisesAt,
+  onCreateCustomExercise,
   onMarkDone,
   completed,
   setCompleted,
@@ -1353,6 +1446,12 @@ function WorkoutPage({
   exerciseOptions: string[];
   catalogExercises: CatalogExercise[];
   onInsertExercisesAt?: (weekId: string, dayId: string, insertIndex: number, names: string[]) => Promise<void>;
+  onCreateCustomExercise?: (input: {
+    name: string;
+    primaryMuscle: string;
+    equipment: "machine" | "free_weight" | "cable" | "body_weight";
+    isCompound: boolean;
+  }) => Promise<CatalogExercise>;
   onMarkDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
@@ -1366,12 +1465,19 @@ function WorkoutPage({
   const [replaceSearchText, setReplaceSearchText] = useState("");
   const [replaceSearchPrimary, setReplaceSearchPrimary] = useState<string>("All");
   const [replaceSearchSecondary, setReplaceSearchSecondary] = useState<string>("All");
+  const [replaceSearchSource, setReplaceSearchSource] = useState<"All" | "Defaults" | "Home Made">("All");
   const [replaceSearchMachine, setReplaceSearchMachine] = useState<"All" | "Yes" | "No">("All");
   const [replaceSearchFreeWeight, setReplaceSearchFreeWeight] = useState<"All" | "Yes" | "No">("All");
   const [replaceSearchCable, setReplaceSearchCable] = useState<"All" | "Yes" | "No">("All");
   const [replaceSearchBodyWeight, setReplaceSearchBodyWeight] = useState<"All" | "Yes" | "No">("All");
   const [replaceSearchCompound, setReplaceSearchCompound] = useState<"All" | "Yes" | "No">("All");
   const [replaceQueue, setReplaceQueue] = useState<Array<{ name: string; id?: string }>>([]);
+  const [replaceAddMovementOpen, setReplaceAddMovementOpen] = useState(false);
+  const [replaceAddMovementName, setReplaceAddMovementName] = useState("");
+  const [replaceAddMovementPrimary, setReplaceAddMovementPrimary] = useState("");
+  const [replaceAddMovementEquipment, setReplaceAddMovementEquipment] = useState<"" | "machine" | "free_weight" | "cable" | "body_weight">("");
+  const [replaceAddMovementCompound, setReplaceAddMovementCompound] = useState(false);
+  const [replaceAddMovementError, setReplaceAddMovementError] = useState<string | null>(null);
   const [ghost, setGhost] = useState<Record<string, { weight: number | null; reps: number | null }[]>>({});
   const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
@@ -1413,6 +1519,8 @@ function WorkoutPage({
       if (text && !ex.name.toLowerCase().includes(text)) return false;
       if (replaceSearchPrimary !== "All" && ex.primaryMuscle !== replaceSearchPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
+      if (replaceSearchSource === "Defaults" && ex.isCustom) return false;
+      if (replaceSearchSource === "Home Made" && !ex.isCustom) return false;
       if (replaceSearchMachine !== "All" && ex.machine !== (replaceSearchMachine === "Yes")) return false;
       if (replaceSearchFreeWeight !== "All" && ex.freeWeight !== (replaceSearchFreeWeight === "Yes")) return false;
       if (replaceSearchCable !== "All" && ex.cable !== (replaceSearchCable === "Yes")) return false;
@@ -1425,6 +1533,7 @@ function WorkoutPage({
     replaceSearchText,
     replaceSearchPrimary,
     replaceSearchSecondary,
+    replaceSearchSource,
     replaceSearchMachine,
     replaceSearchFreeWeight,
     replaceSearchCable,
@@ -1442,6 +1551,8 @@ function WorkoutPage({
   const closeReplaceSearch = () => {
     setReplaceSearchOpen(false);
     setReplaceQueue([]);
+    setReplaceAddMovementOpen(false);
+    resetReplaceAddMovement();
   };
 
   const addReplaceQueue = (ex: CatalogExercise) => {
@@ -1468,6 +1579,44 @@ function WorkoutPage({
       await onInsertExercisesAt(currentWeekId, day.id, replaceTargetIndex, extras);
     }
     closeReplaceSearch();
+  };
+
+  const resetReplaceAddMovement = () => {
+    setReplaceAddMovementName("");
+    setReplaceAddMovementPrimary("");
+    setReplaceAddMovementEquipment("");
+    setReplaceAddMovementCompound(false);
+    setReplaceAddMovementError(null);
+  };
+
+  const handleReplaceAddMovement = async () => {
+    const name = normalizeExerciseName(replaceAddMovementName);
+    if (!name) {
+      setReplaceAddMovementError("Enter a name.");
+      return;
+    }
+    if (!replaceAddMovementPrimary) {
+      setReplaceAddMovementError("Select a primary muscle.");
+      return;
+    }
+    if (!replaceAddMovementEquipment) {
+      setReplaceAddMovementError("Select machine, free weight, cable, or bodyweight.");
+      return;
+    }
+    setReplaceAddMovementError(null);
+    try {
+      if (!onCreateCustomExercise) throw new Error("Custom movements are unavailable.");
+      await onCreateCustomExercise({
+        name,
+        primaryMuscle: replaceAddMovementPrimary,
+        equipment: replaceAddMovementEquipment,
+        isCompound: replaceAddMovementCompound,
+      });
+      resetReplaceAddMovement();
+      setReplaceAddMovementOpen(false);
+    } catch (err) {
+      setReplaceAddMovementError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   useEffect(() => {
@@ -2119,6 +2268,11 @@ function WorkoutPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
+              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Source (All)</option>
+                <option value="Defaults">Defaults</option>
+                <option value="Home Made">Home Made *</option>
+              </select>
               <select value={replaceSearchMachine} onChange={(e) => setReplaceSearchMachine(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
                 <option value="All">Machine (All)</option>
                 <option value="Yes">Machine (Yes)</option>
@@ -2159,7 +2313,7 @@ function WorkoutPage({
                     replaceFilteredCatalog.map((ex) => (
                       <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{ex.name}</div>
+                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
                           <div style={{ color: '#777', fontSize: 12 }}>
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
@@ -2172,7 +2326,101 @@ function WorkoutPage({
               </div>
 
               <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600 }}>Queue</div>
+                  <button
+                    onClick={() => {
+                      setReplaceAddMovementOpen((prev) => !prev);
+                      setReplaceAddMovementError(null);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >
+                    Add movement
+                  </button>
+                </div>
+                {replaceAddMovementOpen && (
+                  <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input
+                      value={replaceAddMovementName}
+                      onChange={(e) => setReplaceAddMovementName(e.target.value)}
+                      placeholder="Movement name"
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                    />
+                    <select
+                      value={replaceAddMovementPrimary}
+                      onChange={(e) => setReplaceAddMovementPrimary(e.target.value)}
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                    >
+                      <option value="">Primary muscle</option>
+                      {replacePrimaryMuscles.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="replace-add-movement-equipment"
+                          checked={replaceAddMovementEquipment === 'machine'}
+                          onChange={() => setReplaceAddMovementEquipment('machine')}
+                        />
+                        Machine
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="replace-add-movement-equipment"
+                          checked={replaceAddMovementEquipment === 'free_weight'}
+                          onChange={() => setReplaceAddMovementEquipment('free_weight')}
+                        />
+                        Free weight
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="replace-add-movement-equipment"
+                          checked={replaceAddMovementEquipment === 'cable'}
+                          onChange={() => setReplaceAddMovementEquipment('cable')}
+                        />
+                        Cable
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="replace-add-movement-equipment"
+                          checked={replaceAddMovementEquipment === 'body_weight'}
+                          onChange={() => setReplaceAddMovementEquipment('body_weight')}
+                        />
+                        Bodyweight
+                      </label>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input
+                        type="checkbox"
+                        checked={replaceAddMovementCompound}
+                        onChange={(e) => setReplaceAddMovementCompound(e.target.checked)}
+                      />
+                      Compound
+                    </label>
+                    {replaceAddMovementError && (
+                      <div style={{ color: '#f88', fontSize: 12 }}>{replaceAddMovementError}</div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          resetReplaceAddMovement();
+                          setReplaceAddMovementOpen(false);
+                        }}
+                        style={BTN_STYLE}
+                      >
+                        Cancel
+                      </button>
+                      <button onClick={handleReplaceAddMovement} style={PRIMARY_BTN_STYLE}>
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {replaceQueue.length === 0 ? (
                   <div style={{ color: '#777' }}>No exercises selected.</div>
                 ) : (
@@ -2269,6 +2517,7 @@ function BuilderPage({
   catalogExercises,
   catalogLoading,
   onResolveExerciseName,
+  onCreateCustomExercise,
 }: {
   plans: Plan[];
   setPlans: React.Dispatch<React.SetStateAction<Plan[]>>;
@@ -2285,6 +2534,12 @@ function BuilderPage({
   catalogExercises: CatalogExercise[];
   catalogLoading: boolean;
   onResolveExerciseName: (name: string) => Promise<Exercise | null>;
+  onCreateCustomExercise: (input: {
+    name: string;
+    primaryMuscle: string;
+    equipment: "machine" | "free_weight" | "cable" | "body_weight";
+    isCompound: boolean;
+  }) => Promise<CatalogExercise>;
 }) {
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
@@ -2303,12 +2558,19 @@ function BuilderPage({
   const [searchText, setSearchText] = useState("");
   const [searchPrimary, setSearchPrimary] = useState<string>("All");
   const [searchSecondary, setSearchSecondary] = useState<string>("All");
+  const [searchSource, setSearchSource] = useState<"All" | "Defaults" | "Home Made">("All");
   const [searchMachine, setSearchMachine] = useState<"All" | "Yes" | "No">("All");
   const [searchFreeWeight, setSearchFreeWeight] = useState<"All" | "Yes" | "No">("All");
   const [searchCable, setSearchCable] = useState<"All" | "Yes" | "No">("All");
   const [searchBodyWeight, setSearchBodyWeight] = useState<"All" | "Yes" | "No">("All");
   const [searchCompound, setSearchCompound] = useState<"All" | "Yes" | "No">("All");
   const [searchQueue, setSearchQueue] = useState<Array<{ name: string; id?: string }>>([]);
+  const [addMovementOpen, setAddMovementOpen] = useState(false);
+  const [addMovementName, setAddMovementName] = useState("");
+  const [addMovementPrimary, setAddMovementPrimary] = useState("");
+  const [addMovementEquipment, setAddMovementEquipment] = useState<"" | "machine" | "free_weight" | "cable" | "body_weight">("");
+  const [addMovementCompound, setAddMovementCompound] = useState(false);
+  const [addMovementError, setAddMovementError] = useState<string | null>(null);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -2333,6 +2595,8 @@ function BuilderPage({
       if (text && !ex.name.toLowerCase().includes(text)) return false;
       if (searchPrimary !== "All" && ex.primaryMuscle !== searchPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
+      if (searchSource === "Defaults" && ex.isCustom) return false;
+      if (searchSource === "Home Made" && !ex.isCustom) return false;
       if (searchMachine !== "All" && ex.machine !== (searchMachine === "Yes")) return false;
       if (searchFreeWeight !== "All" && ex.freeWeight !== (searchFreeWeight === "Yes")) return false;
       if (searchCable !== "All" && ex.cable !== (searchCable === "Yes")) return false;
@@ -2345,6 +2609,7 @@ function BuilderPage({
     searchText,
     searchPrimary,
     searchSecondary,
+    searchSource,
     searchMachine,
     searchFreeWeight,
     searchCable,
@@ -2780,6 +3045,43 @@ function BuilderPage({
 
     setSearchOpen(false);
     setSearchQueue([]);
+  };
+
+  const resetAddMovement = () => {
+    setAddMovementName("");
+    setAddMovementPrimary("");
+    setAddMovementEquipment("");
+    setAddMovementCompound(false);
+    setAddMovementError(null);
+  };
+
+  const handleAddMovement = async () => {
+    const name = normalizeExerciseName(addMovementName);
+    if (!name) {
+      setAddMovementError("Enter a name.");
+      return;
+    }
+    if (!addMovementPrimary) {
+      setAddMovementError("Select a primary muscle.");
+      return;
+    }
+    if (!addMovementEquipment) {
+      setAddMovementError("Select machine, free weight, cable, or bodyweight.");
+      return;
+    }
+    setAddMovementError(null);
+    try {
+      await onCreateCustomExercise({
+        name,
+        primaryMuscle: addMovementPrimary,
+        equipment: addMovementEquipment,
+        isCompound: addMovementCompound,
+      });
+      resetAddMovement();
+      setAddMovementOpen(false);
+    } catch (err) {
+      setAddMovementError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const handleRemoveExercise = (weekId: string, dayId: string, itemId: string) => {
@@ -3618,6 +3920,11 @@ function BuilderPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
+              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Source (All)</option>
+                <option value="Defaults">Defaults</option>
+                <option value="Home Made">Home Made *</option>
+              </select>
               <select value={searchMachine} onChange={(e) => setSearchMachine(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
                 <option value="All">Machine (All)</option>
                 <option value="Yes">Machine (Yes)</option>
@@ -3658,7 +3965,7 @@ function BuilderPage({
                     filteredCatalog.map((ex) => (
                       <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{ex.name}</div>
+                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
                           <div style={{ color: '#777', fontSize: 12 }}>
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` • ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
@@ -3671,7 +3978,101 @@ function BuilderPage({
               </div>
 
               <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600 }}>Queue</div>
+                  <button
+                    onClick={() => {
+                      setAddMovementOpen((prev) => !prev);
+                      setAddMovementError(null);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >
+                    Add movement
+                  </button>
+                </div>
+                {addMovementOpen && (
+                  <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input
+                      value={addMovementName}
+                      onChange={(e) => setAddMovementName(e.target.value)}
+                      placeholder="Movement name"
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                    />
+                    <select
+                      value={addMovementPrimary}
+                      onChange={(e) => setAddMovementPrimary(e.target.value)}
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                    >
+                      <option value="">Primary muscle</option>
+                      {primaryMuscles.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="add-movement-equipment"
+                          checked={addMovementEquipment === 'machine'}
+                          onChange={() => setAddMovementEquipment('machine')}
+                        />
+                        Machine
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="add-movement-equipment"
+                          checked={addMovementEquipment === 'free_weight'}
+                          onChange={() => setAddMovementEquipment('free_weight')}
+                        />
+                        Free weight
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="add-movement-equipment"
+                          checked={addMovementEquipment === 'cable'}
+                          onChange={() => setAddMovementEquipment('cable')}
+                        />
+                        Cable
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          type="radio"
+                          name="add-movement-equipment"
+                          checked={addMovementEquipment === 'body_weight'}
+                          onChange={() => setAddMovementEquipment('body_weight')}
+                        />
+                        Bodyweight
+                      </label>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input
+                        type="checkbox"
+                        checked={addMovementCompound}
+                        onChange={(e) => setAddMovementCompound(e.target.checked)}
+                      />
+                      Compound
+                    </label>
+                    {addMovementError && (
+                      <div style={{ color: '#f88', fontSize: 12 }}>{addMovementError}</div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          resetAddMovement();
+                          setAddMovementOpen(false);
+                        }}
+                        style={BTN_STYLE}
+                      >
+                        Cancel
+                      </button>
+                      <button onClick={handleAddMovement} style={PRIMARY_BTN_STYLE}>
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {searchQueue.length === 0 ? (
                   <div style={{ color: '#777' }}>No exercises selected.</div>
                 ) : (

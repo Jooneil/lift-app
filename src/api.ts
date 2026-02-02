@@ -10,6 +10,17 @@ export type SessionSetPayload = { id: string; setIndex: number; weight: number |
 export type SessionEntryPayload = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSetPayload[] };
 export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
 export type ExerciseRow = { id: string | number; name?: string | null };
+export type CustomExerciseRow = {
+  id: string | number;
+  name?: string | null;
+  primary_muscle?: string | null;
+  machine?: boolean | null;
+  free_weight?: boolean | null;
+  cable?: boolean | null;
+  body_weight?: boolean | null;
+  is_compound?: boolean | null;
+  is_custom?: boolean | null;
+};
 export type ExerciseCatalogRow = {
   id: string | number;
   name?: string | null;
@@ -93,6 +104,68 @@ export const exerciseApi = {
       throw error;
     }
     return (data as ExerciseRow | null) ?? null;
+  },
+  async listCustom(): Promise<CustomExerciseRow[]> {
+    const { data, error } = await supabase
+      .from('exercises')
+      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,is_custom')
+      .eq('is_custom', true)
+      .order('name', { ascending: true });
+    if (error) {
+      if (isMissingTableError(error as { code?: string; message?: string })) return [];
+      throw error;
+    }
+    return (data ?? []) as CustomExerciseRow[];
+  },
+  async createCustom(input: {
+    name: string;
+    primary_muscle: string;
+    machine: boolean;
+    free_weight: boolean;
+    cable: boolean;
+    body_weight: boolean;
+    is_compound: boolean;
+  }): Promise<CustomExerciseRow | null> {
+    const clean = input.name.trim();
+    if (!clean) return null;
+    const { data, error } = await supabase
+      .from('exercises')
+      .insert([{
+        name: clean,
+        primary_muscle: input.primary_muscle,
+        machine: input.machine,
+        free_weight: input.free_weight,
+        cable: input.cable,
+        body_weight: input.body_weight,
+        is_compound: input.is_compound,
+        is_custom: true,
+      }])
+      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,is_custom')
+      .single();
+    if (error) {
+      if (isMissingTableError(error as { code?: string; message?: string })) return null;
+      const code = (error as { code?: string }).code || '';
+      if (code === '23505' || String(error.message || '').toLowerCase().includes('duplicate')) {
+        const retry = await supabase
+          .from('exercises')
+          .update({
+            primary_muscle: input.primary_muscle,
+            machine: input.machine,
+            free_weight: input.free_weight,
+            cable: input.cable,
+            body_weight: input.body_weight,
+            is_compound: input.is_compound,
+            is_custom: true,
+          })
+          .ilike('name', clean)
+          .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,is_custom')
+          .maybeSingle();
+        if (retry.error) throw retry.error;
+        return (retry.data as CustomExerciseRow | null) ?? null;
+      }
+      throw error;
+    }
+    return (data as CustomExerciseRow | null) ?? null;
   },
 };
 
