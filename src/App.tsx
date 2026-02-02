@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
-import { api, exerciseApi, planApi, sessionApi, templateApi } from "./api";
+import { api, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
 import { getUserPrefs, upsertUserPrefs } from './api/userPrefs';
 import { supabase } from "./supabaseClient";
 import type {
@@ -14,6 +14,7 @@ import type {
   SessionEntryPayload,
   SessionSetPayload,
   SessionRow,
+  ExerciseCatalogRow,
 } from "./api";
 
 type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
@@ -21,6 +22,17 @@ type PlanWeek = { id: string; name: string; days: PlanDay[] };
 type PlanDay = { id: string; name: string; items: PlanExercise[] };
 type PlanExercise = { id: string; exerciseId?: string; exerciseName: string; targetSets: number; targetReps?: string };
 type Exercise = { id: string; name: string };
+type CatalogExercise = {
+  id: string;
+  name: string;
+  primaryMuscle: string;
+  machine: boolean;
+  freeWeight: boolean;
+  cable: boolean;
+  bodyWeight: boolean;
+  isCompound: boolean;
+  secondaryMuscles: string[];
+};
 
 type Session = {
   id: string;
@@ -300,7 +312,9 @@ function AuthedApp({
   const [finishingPlan, setFinishingPlan] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
+  const [catalogExercises, setCatalogExercises] = useState<CatalogExercise[]>([]);
   const [exerciseLoading, setExerciseLoading] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const selectionOriginRef = useRef<"auto" | "user">("auto");
 
   const exerciseByName = useMemo(() => {
@@ -310,6 +324,21 @@ function AuthedApp({
     }
     return map;
   }, [exerciseLibrary]);
+
+  const exerciseOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const add = (name: string) => {
+      const key = name.trim().toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(name);
+    };
+    for (const ex of catalogExercises) add(ex.name);
+    for (const ex of exerciseLibrary) add(ex.name);
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+  }, [catalogExercises, exerciseLibrary]);
 
   const upsertExerciseInState = useCallback((row: { id: string | number; name?: string | null }) => {
     if (!row || row.name == null) return null;
@@ -337,6 +366,34 @@ function AuthedApp({
       setExerciseLibrary([]);
     } finally {
       setExerciseLoading(false);
+    }
+  }, []);
+
+  const loadCatalogExercises = useCallback(async () => {
+    setCatalogLoading(true);
+    try {
+      const rows = await exerciseCatalogApi.list();
+      const mapped = rows
+        .filter((r) => r && r.name != null && r.primary_muscle != null)
+        .map((r: ExerciseCatalogRow) => ({
+          id: String(r.id),
+          name: String(r.name ?? ''),
+          primaryMuscle: String(r.primary_muscle ?? ''),
+          machine: !!r.machine,
+          freeWeight: !!r.free_weight,
+          cable: !!r.cable,
+          bodyWeight: !!r.body_weight,
+          isCompound: !!r.is_compound,
+          secondaryMuscles: Array.isArray(r.secondary_muscles)
+            ? r.secondary_muscles.filter((m) => !!m).map((m) => String(m))
+            : [],
+        }));
+      mapped.sort((a, b) => a.name.localeCompare(b.name));
+      setCatalogExercises(mapped);
+    } catch {
+      setCatalogExercises([]);
+    } finally {
+      setCatalogLoading(false);
     }
   }, []);
 
@@ -373,7 +430,8 @@ function AuthedApp({
 
   useEffect(() => {
     loadExercises();
-  }, [loadExercises]);
+    loadCatalogExercises();
+  }, [loadExercises, loadCatalogExercises]);
 
   const mapServerPlan = (row: ServerPlanRow): Plan => {
     const d = (row?.data ?? {}) as import("./api").ServerPlanData;
@@ -969,8 +1027,10 @@ function AuthedApp({
           setSelectedDayId={setSelectedDayId}
           showPlanList={showPlanList}
           setShowPlanList={setShowPlanList}
-          exerciseLibrary={exerciseLibrary}
-          exerciseLoading={exerciseLoading}
+          exerciseOptions={exerciseOptions}
+          exerciseLoading={exerciseLoading || catalogLoading}
+          catalogExercises={catalogExercises}
+          catalogLoading={catalogLoading}
           onResolveExerciseName={ensureExerciseByName}
           onSaved={(savedPlan) => {
             // Go to workout with the just-saved plan selected
@@ -1069,7 +1129,7 @@ function AuthedApp({
                 session={session}
                 setSession={setSession}
                 onReplaceExercise={handleReplaceExercise}
-                exerciseLibrary={exerciseLibrary}
+                exerciseOptions={exerciseOptions}
                 onMarkDone={async () => {
                   if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   setCompleted(true);
@@ -1220,7 +1280,7 @@ function WorkoutPage({
   session,
   setSession,
   onReplaceExercise,
-  exerciseLibrary,
+  exerciseOptions,
   onMarkDone,
   completed,
   setCompleted,
@@ -1233,7 +1293,7 @@ function WorkoutPage({
   session: Session | null;
   setSession: React.Dispatch<React.SetStateAction<Session | null>>;
   onReplaceExercise?: (oldEntry: { exerciseId?: string; exerciseName: string }, newName: string, scope: "today" | "remaining") => void;
-  exerciseLibrary: Exercise[];
+  exerciseOptions: string[];
   onMarkDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
@@ -1734,8 +1794,8 @@ function WorkoutPage({
   return (
     <div>
       <datalist id="exercise-options-workout">
-        {exerciseLibrary.map((ex) => (
-          <option key={ex.id} value={ex.name} />
+        {exerciseOptions.map((name) => (
+          <option key={name} value={name} />
         ))}
       </datalist>
       {session.entries.map((entry) => (
@@ -2033,8 +2093,10 @@ function BuilderPage({
   showPlanList,
   setShowPlanList,
   onSaved,
-  exerciseLibrary,
+  exerciseOptions,
   exerciseLoading,
+  catalogExercises,
+  catalogLoading,
   onResolveExerciseName,
 }: {
   plans: Plan[];
@@ -2048,8 +2110,10 @@ function BuilderPage({
   showPlanList: boolean;
   setShowPlanList: React.Dispatch<React.SetStateAction<boolean>>;
   onSaved?: (savedPlan: Plan) => void;
-  exerciseLibrary: Exercise[];
+  exerciseOptions: string[];
   exerciseLoading: boolean;
+  catalogExercises: CatalogExercise[];
+  catalogLoading: boolean;
   onResolveExerciseName: (name: string) => Promise<Exercise | null>;
 }) {
   const selectedPlan = useMemo(
@@ -2062,6 +2126,18 @@ function BuilderPage({
   const [templates, setTemplates] = useState<Plan[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const catalogByMuscle = useMemo(() => {
+    const map = new Map<string, CatalogExercise[]>();
+    for (const ex of catalogExercises) {
+      const key = ex.primaryMuscle || "Other";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(ex);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return map;
+  }, [catalogExercises]);
 
   const createDay = (index: number): PlanDay => ({
     id: uuid(),
@@ -2828,8 +2904,8 @@ function BuilderPage({
   return (
     <div style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
       <datalist id="exercise-options">
-        {exerciseLibrary.map((ex) => (
-          <option key={ex.id} value={ex.name} />
+        {exerciseOptions.map((name) => (
+          <option key={name} value={name} />
         ))}
       </datalist>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -2839,7 +2915,9 @@ function BuilderPage({
           <button onClick={handleCreatePlan} style={BTN_STYLE}>
             + Plan
           </button>
-          {exerciseLoading && <div style={{ color: '#777', alignSelf: 'center', fontSize: 12 }}>Loading exercises...</div>}
+          {(exerciseLoading || catalogLoading) && (
+            <div style={{ color: '#777', alignSelf: 'center', fontSize: 12 }}>Loading exercises...</div>
+          )}
           {selectedPlan && (
             <>
               <button onClick={handleAddWeek} style={BTN_STYLE}>
@@ -3036,7 +3114,7 @@ function BuilderPage({
                                 data-exercise-id={item.id}
                                 style={{
                                   display: 'grid',
-                                  gridTemplateColumns: 'auto 2fr 1fr 1fr auto',
+                                  gridTemplateColumns: 'auto 2fr 1.3fr 1fr auto',
                                   gap: 8,
                                   alignItems: 'center',
                                   cursor: 'grab',
@@ -3093,6 +3171,28 @@ function BuilderPage({
                                   style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
                                   placeholder="Exercise name"
                                 />
+                              <select
+                                defaultValue=""
+                                onChange={(e) => {
+                                  const chosen = e.target.value;
+                                  if (!chosen) return;
+                                  void handleExerciseNameCommit(week.id, day.id, item.id, chosen);
+                                  e.currentTarget.value = "";
+                                }}
+                                style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
+                                title="Browse exercises by muscle group"
+                              >
+                                <option value="">Browse...</option>
+                                {Array.from(catalogByMuscle.entries()).map(([muscle, list]) => (
+                                  <optgroup key={muscle} label={muscle}>
+                                    {list.map((ex) => (
+                                      <option key={ex.id} value={ex.name}>
+                                        {ex.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                              </select>
                               <select
                                 value={String(item.targetSets)}
                                 onChange={(e) =>

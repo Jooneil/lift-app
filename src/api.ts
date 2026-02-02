@@ -10,6 +10,17 @@ export type SessionSetPayload = { id: string; setIndex: number; weight: number |
 export type SessionEntryPayload = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSetPayload[] };
 export type SessionPayload = { id: string; planId: string; planWeekId: string; planDayId: string; date: string; entries: SessionEntryPayload[]; completed?: boolean; ghostSeed?: boolean };
 export type ExerciseRow = { id: string | number; name?: string | null };
+export type ExerciseCatalogRow = {
+  id: string | number;
+  name?: string | null;
+  primary_muscle?: string | null;
+  machine?: boolean | null;
+  free_weight?: boolean | null;
+  cable?: boolean | null;
+  body_weight?: boolean | null;
+  is_compound?: boolean | null;
+  secondary_muscles?: string[] | null;
+};
 export type SessionRow = { plan_id: string | number; week_id: string; day_id: string; updated_at?: string | null; data?: SessionPayload | null };
 // Helper to generate a UUID for tables that may not have a default
 const genUuid = () => (
@@ -82,6 +93,21 @@ export const exerciseApi = {
       throw error;
     }
     return (data as ExerciseRow | null) ?? null;
+  },
+};
+
+export const exerciseCatalogApi = {
+  async list(): Promise<ExerciseCatalogRow[]> {
+    const { data, error } = await supabase
+      .from('exercise_catalog')
+      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles')
+      .order('primary_muscle', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) {
+      if (isMissingTableError(error as { code?: string; message?: string })) return [];
+      throw error;
+    }
+    return (data ?? []) as ExerciseCatalogRow[];
   },
 };
 
