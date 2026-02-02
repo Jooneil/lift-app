@@ -339,18 +339,19 @@ function AuthedApp({
   }, [exerciseLibrary]);
 
   const searchCatalogExercises = useMemo(() => {
-    const seen = new Set<string>();
-    const out: CatalogExercise[] = [];
+    const byName = new Map<string, CatalogExercise>();
     const add = (ex: CatalogExercise, isCustom: boolean) => {
       const key = ex.name.trim().toLowerCase();
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      out.push({ ...ex, isCustom });
+      if (!key) return;
+      const next = { ...ex, isCustom };
+      const existing = byName.get(key);
+      if (!existing || (next.isCustom && !existing.isCustom)) {
+        byName.set(key, next);
+      }
     };
-    for (const ex of catalogExercises) add(ex, false);
     for (const ex of customCatalogExercises) add(ex, true);
-    out.sort((a, b) => a.name.localeCompare(b.name));
-    return out;
+    for (const ex of catalogExercises) add(ex, false);
+    return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [catalogExercises, customCatalogExercises]);
 
   const exerciseOptions = useMemo(() => {
@@ -445,8 +446,15 @@ function AuthedApp({
             : [],
           isCustom: true,
         }));
-      mapped.sort((a, b) => a.name.localeCompare(b.name));
-      setCustomCatalogExercises(mapped);
+      const byName = new Map<string, CatalogExercise>();
+      for (const ex of mapped) {
+        const key = ex.name.trim().toLowerCase();
+        if (!key) continue;
+        byName.set(key, ex);
+      }
+      const deduped = Array.from(byName.values());
+      deduped.sort((a, b) => a.name.localeCompare(b.name));
+      setCustomCatalogExercises(deduped);
     } catch {
       setCustomCatalogExercises([]);
     }
@@ -508,7 +516,9 @@ function AuthedApp({
       isCustom: true,
     };
     setCustomCatalogExercises((prev) => {
-      const next = [...prev, mapped];
+      const key = mapped.name.trim().toLowerCase();
+      const next = prev.filter((ex) => ex.name.trim().toLowerCase() !== key);
+      next.push(mapped);
       next.sort((a, b) => a.name.localeCompare(b.name));
       return next;
     });
@@ -1544,7 +1554,7 @@ function WorkoutPage({
   const replaceFilteredCatalog = useMemo(() => {
     const text = replaceSearchText.trim().toLowerCase();
     const wantSecondary = replaceSearchSecondary !== "All" ? replaceSearchSecondary.toLowerCase() : "";
-    return catalogExercises.filter((ex) => {
+    const filtered = catalogExercises.filter((ex) => {
       if (text && !ex.name.toLowerCase().includes(text)) return false;
       if (replaceSearchPrimary !== "All" && ex.primaryMuscle !== replaceSearchPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
@@ -1557,6 +1567,16 @@ function WorkoutPage({
       if (replaceSearchCompound && !ex.isCompound) return false;
       return true;
     });
+    const byName = new Map<string, CatalogExercise>();
+    for (const ex of filtered) {
+      const key = ex.name.trim().toLowerCase();
+      if (!key) continue;
+      const existing = byName.get(key);
+      if (!existing || (ex.isCustom && !existing.isCustom)) {
+        byName.set(key, ex);
+      }
+    }
+    return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [
     catalogExercises,
     replaceSearchText,
@@ -2687,7 +2707,7 @@ function BuilderPage({
   const filteredCatalog = useMemo(() => {
     const text = searchText.trim().toLowerCase();
     const wantSecondary = searchSecondary !== "All" ? searchSecondary.toLowerCase() : "";
-    return catalogExercises.filter((ex) => {
+    const filtered = catalogExercises.filter((ex) => {
       if (text && !ex.name.toLowerCase().includes(text)) return false;
       if (searchPrimary !== "All" && ex.primaryMuscle !== searchPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
@@ -2700,6 +2720,16 @@ function BuilderPage({
       if (searchCompound && !ex.isCompound) return false;
       return true;
     });
+    const byName = new Map<string, CatalogExercise>();
+    for (const ex of filtered) {
+      const key = ex.name.trim().toLowerCase();
+      if (!key) continue;
+      const existing = byName.get(key);
+      if (!existing || (ex.isCustom && !existing.isCustom)) {
+        byName.set(key, ex);
+      }
+    }
+    return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [
     catalogExercises,
     searchText,
