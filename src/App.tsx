@@ -1081,7 +1081,6 @@ function AuthedApp({
           setSelectedDayId={setSelectedDayId}
           showPlanList={showPlanList}
           setShowPlanList={setShowPlanList}
-          exerciseOptions={exerciseOptions}
           exerciseLoading={exerciseLoading || catalogLoading}
           catalogExercises={catalogExercises}
           catalogLoading={catalogLoading}
@@ -2266,7 +2265,6 @@ function BuilderPage({
   showPlanList,
   setShowPlanList,
   onSaved,
-  exerciseOptions,
   exerciseLoading,
   catalogExercises,
   catalogLoading,
@@ -2283,7 +2281,6 @@ function BuilderPage({
   showPlanList: boolean;
   setShowPlanList: React.Dispatch<React.SetStateAction<boolean>>;
   onSaved?: (savedPlan: Plan) => void;
-  exerciseOptions: string[];
   exerciseLoading: boolean;
   catalogExercises: CatalogExercise[];
   catalogLoading: boolean;
