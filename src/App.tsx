@@ -71,6 +71,16 @@ const exerciseKey = (entry: { exerciseId?: string; exerciseName?: string | null 
 const BTN_STYLE = { padding: "8px 10px", borderRadius: 8, border: "1px solid #444", background: "transparent" } as const;
 const PRIMARY_BTN_STYLE = { padding: "10px 12px", borderRadius: 10, border: "1px solid #444", background: "#222", color: "#fff" } as const;
 const SMALL_BTN_STYLE = { padding: "6px 8px", borderRadius: 8, border: "1px solid #444", background: "transparent", fontSize: 12 } as const;
+const FILTER_TOGGLE_STYLE = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "6px 10px",
+  borderRadius: 999,
+  border: "1px solid #444",
+  background: "transparent",
+  fontSize: 12,
+} as const;
 
 // Shared CSV export helpers (used by active and archived plan exports)
 const csvEscape = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
@@ -1484,11 +1494,11 @@ function WorkoutPage({
   const [replaceSearchPrimary, setReplaceSearchPrimary] = useState<string>("All");
   const [replaceSearchSecondary, setReplaceSearchSecondary] = useState<string>("All");
   const [replaceSearchSource, setReplaceSearchSource] = useState<"All" | "Defaults" | "Home Made">("All");
-  const [replaceSearchMachine, setReplaceSearchMachine] = useState<"All" | "Yes" | "No">("All");
-  const [replaceSearchFreeWeight, setReplaceSearchFreeWeight] = useState<"All" | "Yes" | "No">("All");
-  const [replaceSearchCable, setReplaceSearchCable] = useState<"All" | "Yes" | "No">("All");
-  const [replaceSearchBodyWeight, setReplaceSearchBodyWeight] = useState<"All" | "Yes" | "No">("All");
-  const [replaceSearchCompound, setReplaceSearchCompound] = useState<"All" | "Yes" | "No">("All");
+  const [replaceSearchMachine, setReplaceSearchMachine] = useState(false);
+  const [replaceSearchFreeWeight, setReplaceSearchFreeWeight] = useState(false);
+  const [replaceSearchCable, setReplaceSearchCable] = useState(false);
+  const [replaceSearchBodyWeight, setReplaceSearchBodyWeight] = useState(false);
+  const [replaceSearchCompound, setReplaceSearchCompound] = useState(false);
   const [replaceQueue, setReplaceQueue] = useState<Array<{ name: string; id?: string }>>([]);
   const [replaceAddMovementOpen, setReplaceAddMovementOpen] = useState(false);
   const [replaceAddMovementName, setReplaceAddMovementName] = useState("");
@@ -1540,11 +1550,11 @@ function WorkoutPage({
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
       if (replaceSearchSource === "Defaults" && ex.isCustom) return false;
       if (replaceSearchSource === "Home Made" && !ex.isCustom) return false;
-      if (replaceSearchMachine !== "All" && ex.machine !== (replaceSearchMachine === "Yes")) return false;
-      if (replaceSearchFreeWeight !== "All" && ex.freeWeight !== (replaceSearchFreeWeight === "Yes")) return false;
-      if (replaceSearchCable !== "All" && ex.cable !== (replaceSearchCable === "Yes")) return false;
-      if (replaceSearchBodyWeight !== "All" && ex.bodyWeight !== (replaceSearchBodyWeight === "Yes")) return false;
-      if (replaceSearchCompound !== "All" && ex.isCompound !== (replaceSearchCompound === "Yes")) return false;
+      if (replaceSearchMachine && !ex.machine) return false;
+      if (replaceSearchFreeWeight && !ex.freeWeight) return false;
+      if (replaceSearchCable && !ex.cable) return false;
+      if (replaceSearchBodyWeight && !ex.bodyWeight) return false;
+      if (replaceSearchCompound && !ex.isCompound) return false;
       return true;
     });
   }, [
@@ -2309,31 +2319,51 @@ function WorkoutPage({
                 <option value="Defaults">Defaults</option>
                 <option value="Home Made">Home Made *</option>
               </select>
-              <select value={replaceSearchMachine} onChange={(e) => setReplaceSearchMachine(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Machine (All)</option>
-                <option value="Yes">Machine (Yes)</option>
-                <option value="No">Machine (No)</option>
-              </select>
-              <select value={replaceSearchFreeWeight} onChange={(e) => setReplaceSearchFreeWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Free Weight (All)</option>
-                <option value="Yes">Free Weight (Yes)</option>
-                <option value="No">Free Weight (No)</option>
-              </select>
-              <select value={replaceSearchCable} onChange={(e) => setReplaceSearchCable(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Cable (All)</option>
-                <option value="Yes">Cable (Yes)</option>
-                <option value="No">Cable (No)</option>
-              </select>
-              <select value={replaceSearchBodyWeight} onChange={(e) => setReplaceSearchBodyWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Bodyweight (All)</option>
-                <option value="Yes">Bodyweight (Yes)</option>
-                <option value="No">Bodyweight (No)</option>
-              </select>
-              <select value={replaceSearchCompound} onChange={(e) => setReplaceSearchCompound(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Compound (All)</option>
-                <option value="Yes">Compound (Yes)</option>
-                <option value="No">Compound (No)</option>
-              </select>
+              <button
+                type="button"
+                onClick={() => setReplaceSearchMachine((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={replaceSearchMachine}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchMachine ? "#fff" : "transparent" }} />
+                Machine
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaceSearchFreeWeight((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={replaceSearchFreeWeight}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchFreeWeight ? "#fff" : "transparent" }} />
+                Free weight
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaceSearchCable((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={replaceSearchCable}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchCable ? "#fff" : "transparent" }} />
+                Cable
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaceSearchBodyWeight((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={replaceSearchBodyWeight}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchBodyWeight ? "#fff" : "transparent" }} />
+                Bodyweight
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaceSearchCompound((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={replaceSearchCompound}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchCompound ? "#fff" : "transparent" }} />
+                Compound
+              </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
@@ -2503,7 +2533,7 @@ function WorkoutPage({
                 </div>
               </div>
             </div>
-            <div style={{ color: '#777', fontSize: 12, textAlign: 'right' }}>
+            <div style={{ color: '#777', fontSize: 12, textAlign: 'left' }}>
               * = self made movement
             </div>
           </div>
@@ -2624,11 +2654,11 @@ function BuilderPage({
   const [searchPrimary, setSearchPrimary] = useState<string>("All");
   const [searchSecondary, setSearchSecondary] = useState<string>("All");
   const [searchSource, setSearchSource] = useState<"All" | "Defaults" | "Home Made">("All");
-  const [searchMachine, setSearchMachine] = useState<"All" | "Yes" | "No">("All");
-  const [searchFreeWeight, setSearchFreeWeight] = useState<"All" | "Yes" | "No">("All");
-  const [searchCable, setSearchCable] = useState<"All" | "Yes" | "No">("All");
-  const [searchBodyWeight, setSearchBodyWeight] = useState<"All" | "Yes" | "No">("All");
-  const [searchCompound, setSearchCompound] = useState<"All" | "Yes" | "No">("All");
+  const [searchMachine, setSearchMachine] = useState(false);
+  const [searchFreeWeight, setSearchFreeWeight] = useState(false);
+  const [searchCable, setSearchCable] = useState(false);
+  const [searchBodyWeight, setSearchBodyWeight] = useState(false);
+  const [searchCompound, setSearchCompound] = useState(false);
   const [searchQueue, setSearchQueue] = useState<Array<{ name: string; id?: string }>>([]);
   const [addMovementOpen, setAddMovementOpen] = useState(false);
   const [addMovementName, setAddMovementName] = useState("");
@@ -2663,11 +2693,11 @@ function BuilderPage({
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
       if (searchSource === "Defaults" && ex.isCustom) return false;
       if (searchSource === "Home Made" && !ex.isCustom) return false;
-      if (searchMachine !== "All" && ex.machine !== (searchMachine === "Yes")) return false;
-      if (searchFreeWeight !== "All" && ex.freeWeight !== (searchFreeWeight === "Yes")) return false;
-      if (searchCable !== "All" && ex.cable !== (searchCable === "Yes")) return false;
-      if (searchBodyWeight !== "All" && ex.bodyWeight !== (searchBodyWeight === "Yes")) return false;
-      if (searchCompound !== "All" && ex.isCompound !== (searchCompound === "Yes")) return false;
+      if (searchMachine && !ex.machine) return false;
+      if (searchFreeWeight && !ex.freeWeight) return false;
+      if (searchCable && !ex.cable) return false;
+      if (searchBodyWeight && !ex.bodyWeight) return false;
+      if (searchCompound && !ex.isCompound) return false;
       return true;
     });
   }, [
@@ -4004,31 +4034,51 @@ function BuilderPage({
                 <option value="Defaults">Defaults</option>
                 <option value="Home Made">Home Made *</option>
               </select>
-              <select value={searchMachine} onChange={(e) => setSearchMachine(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Machine (All)</option>
-                <option value="Yes">Machine (Yes)</option>
-                <option value="No">Machine (No)</option>
-              </select>
-              <select value={searchFreeWeight} onChange={(e) => setSearchFreeWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Free Weight (All)</option>
-                <option value="Yes">Free Weight (Yes)</option>
-                <option value="No">Free Weight (No)</option>
-              </select>
-              <select value={searchCable} onChange={(e) => setSearchCable(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Cable (All)</option>
-                <option value="Yes">Cable (Yes)</option>
-                <option value="No">Cable (No)</option>
-              </select>
-              <select value={searchBodyWeight} onChange={(e) => setSearchBodyWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Bodyweight (All)</option>
-                <option value="Yes">Bodyweight (Yes)</option>
-                <option value="No">Bodyweight (No)</option>
-              </select>
-              <select value={searchCompound} onChange={(e) => setSearchCompound(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
-                <option value="All">Compound (All)</option>
-                <option value="Yes">Compound (Yes)</option>
-                <option value="No">Compound (No)</option>
-              </select>
+              <button
+                type="button"
+                onClick={() => setSearchMachine((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={searchMachine}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchMachine ? "#fff" : "transparent" }} />
+                Machine
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchFreeWeight((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={searchFreeWeight}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchFreeWeight ? "#fff" : "transparent" }} />
+                Free weight
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchCable((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={searchCable}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchCable ? "#fff" : "transparent" }} />
+                Cable
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchBodyWeight((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={searchBodyWeight}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchBodyWeight ? "#fff" : "transparent" }} />
+                Bodyweight
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchCompound((prev) => !prev)}
+                style={FILTER_TOGGLE_STYLE}
+                aria-pressed={searchCompound}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchCompound ? "#fff" : "transparent" }} />
+                Compound
+              </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
@@ -4194,7 +4244,7 @@ function BuilderPage({
                 </div>
               </div>
             </div>
-            <div style={{ color: '#777', fontSize: 12, textAlign: 'right' }}>
+            <div style={{ color: '#777', fontSize: 12, textAlign: 'left' }}>
               * = self made movement
             </div>
           </div>
