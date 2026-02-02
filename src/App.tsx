@@ -1264,7 +1264,12 @@ function AuthedApp({
           {userMenuOpen && (
             <div role="menu" style={{ position: 'absolute', top: '100%', left: 0, background: '#111', border: '1px solid #444', borderRadius: 8, padding: 8, marginTop: 6, minWidth: 200, zIndex: 30 }}>
               <div style={{ padding: '4px 6px', color: '#bbb', fontSize: 12 }}>Logged in as</div>
-              <div style={{ padding: '0 6px 6px', wordBreak: 'break-all' }}><strong>{user.username}</strong></div>
+              <div
+                style={{ padding: '0 6px 6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}
+                title={user.username}
+              >
+                <strong>{user.username}</strong>
+              </div>
               <button onClick={() => { setUserMenuOpen(false); onLogout(); }} style={SMALL_BTN_STYLE} role="menuitem">Logout</button>
             </div>
           )}
