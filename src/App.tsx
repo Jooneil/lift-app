@@ -769,10 +769,15 @@ function AuthedApp({
     return mapped;
   };
 
-  const handleRenameExercise = (oldName: string, newName: string, replaceRemaining: boolean) => {
+  const handleReplaceExercise = (
+    oldEntry: { exerciseId?: string; exerciseName: string },
+    newName: string,
+    scope: "today" | "remaining"
+  ) => {
     if (!selectedPlan || !selectedWeekId || !selectedDayId) return;
     const trimmed = normalizeExerciseName(newName);
     if (!trimmed) return;
+    const replaceRemaining = scope === "remaining";
 
     void (async () => {
       const resolved = await ensureExerciseByName(trimmed);
@@ -785,6 +790,12 @@ function AuthedApp({
           const wIdx = p.weeks.findIndex((w) => w.days.some((d) => d.id === selectedDayId));
           if (wIdx < 0) return p;
           const dIdx = p.weeks[wIdx].days.findIndex((d) => d.id === selectedDayId);
+          const matchesOld = (it: PlanExercise) => {
+            if (oldEntry.exerciseId && it.exerciseId) return it.exerciseId === oldEntry.exerciseId;
+            const itName = normalizeExerciseName(it.exerciseName || '').toLowerCase();
+            const oldName = normalizeExerciseName(oldEntry.exerciseName || '').toLowerCase();
+            return itName === oldName;
+          };
           const weeks = p.weeks.map((week, wi) => {
             // earlier weeks unchanged
             if (wi < wIdx) return week;
@@ -795,7 +806,7 @@ function AuthedApp({
                 if (!replaceRemaining && di !== dIdx) return day; // only current day when not replacing remaining
                 if (replaceRemaining && di < dIdx) return day; // keep days before current when replacing remaining
                 const items = day.items.map((it) =>
-                  it.exerciseName === oldName ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it
+                  matchesOld(it) ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it
                 );
                 return { ...day, items };
               });
@@ -807,7 +818,7 @@ function AuthedApp({
             const days = week.days.map((day) => ({
               ...day,
               items: day.items.map((it) =>
-                it.exerciseName === oldName ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it
+                matchesOld(it) ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it
               ),
             }));
             return { ...week, days };
@@ -819,13 +830,19 @@ function AuthedApp({
       );
       if (nextPlanForSave && (nextPlanForSave as Plan).serverId) queuePlanSave(nextPlanForSave as Plan);
 
-      // Update current in-memory session for current day (rename entry there too)
+      // Update current in-memory session for current day (replace entry there too)
       setSession((s) => {
         if (!s || s.planDayId !== selectedDayId) return s;
+        const matchesOldEntry = (e: SessionEntry) => {
+          if (oldEntry.exerciseId && e.exerciseId) return oldEntry.exerciseId === e.exerciseId;
+          const eName = normalizeExerciseName(e.exerciseName || '').toLowerCase();
+          const oldName = normalizeExerciseName(oldEntry.exerciseName || '').toLowerCase();
+          return eName === oldName;
+        };
         const next = {
           ...s,
           entries: s.entries.map((e) =>
-            e.exerciseName === oldName ? { ...e, exerciseName: resolvedName, exerciseId: resolvedId } : e
+            matchesOldEntry(e) ? { ...e, exerciseName: resolvedName, exerciseId: resolvedId } : e
           ),
         };
         try {
@@ -1051,7 +1068,7 @@ function AuthedApp({
                 day={selectedDay}
                 session={session}
                 setSession={setSession}
-                onRenameExercise={handleRenameExercise}
+                onReplaceExercise={handleReplaceExercise}
                 onMarkDone={async () => {
                   if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   setCompleted(true);
@@ -1201,7 +1218,7 @@ function WorkoutPage({
   day,
   session,
   setSession,
-  onRenameExercise,
+  onReplaceExercise,
   onMarkDone,
   completed,
   setCompleted,
@@ -1213,7 +1230,7 @@ function WorkoutPage({
   day: PlanDay;
   session: Session | null;
   setSession: React.Dispatch<React.SetStateAction<Session | null>>;
-  onRenameExercise?: (oldName: string, newName: string, replaceRemaining: boolean) => void;
+  onReplaceExercise?: (oldEntry: { exerciseId?: string; exerciseName: string }, newName: string, scope: "today" | "remaining") => void;
   onMarkDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
@@ -1221,8 +1238,8 @@ function WorkoutPage({
   onFinishPlan?: () => void;
   finishingPlan: boolean;
 }) {
-  const [renamingEntryId, setRenamingEntryId] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState<string>('');
+  const [replacingEntryId, setReplacingEntryId] = useState<string | null>(null);
+  const [replaceDraft, setReplaceDraft] = useState<string>('');
   const [showReplacePromptForId, setShowReplacePromptForId] = useState<string | null>(null);
   const [ghost, setGhost] = useState<Record<string, { weight: number | null; reps: number | null }[]>>({});
   const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
@@ -1309,98 +1326,142 @@ function WorkoutPage({
     const serverId = plan.serverId;
     if (!currentWeekId) {
       setGhost({});
+      setPrevNotes({});
       return;
     }
 
+    let cancelled = false;
+
+    const readSessionForDay = async (weekId: string, dayId: string) => {
+      let payload: SessionPayload | null = null;
+      if (serverId) {
+        try {
+          payload = await sessionApi.last(serverId, weekId, dayId);
+        } catch {
+          /* ignore and try local */
+        }
+      }
+      if (!payload) {
+        const keysToTry: string[] = [];
+        if (serverId) keysToTry.push(`session:${serverId}:${weekId}:${dayId}`);
+        keysToTry.push(`session:${plan.id}:${weekId}:${dayId}`);
+        for (const k of keysToTry) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const parsed = JSON.parse(raw) as SessionPayload;
+              if (parsed && parsed.entries) {
+                payload = parsed;
+                break;
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      return payload;
+    };
+
+    const matchesTarget = (
+      entry: { exerciseId?: string; exerciseName?: string | null },
+      target: { exerciseId?: string; exerciseName: string }
+    ) => {
+      if (target.exerciseId && entry.exerciseId) return String(target.exerciseId) === String(entry.exerciseId);
+      const entryName = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+      const targetName = normalizeExerciseName(target.exerciseName || '').toLowerCase();
+      if (target.exerciseId && !entry.exerciseId) return entryName === targetName;
+      return entryName === targetName;
+    };
+
     (async () => {
       try {
-        const wIdx = plan.weeks.findIndex((w) => w.days.some((d) => d.id === day.id));
-        if (wIdx <= 0) return;
-
-        const currWeek = plan.weeks[wIdx];
-        const dayIdx = currWeek.days.findIndex((d) => d.id === day.id);
-        if (dayIdx < 0) {
-          setGhost({});
+        const ordered: Array<{ weekId: string; dayId: string; dayIndex: number }> = [];
+        for (const w of plan.weeks) {
+          for (let di = 0; di < w.days.length; di++) {
+            ordered.push({ weekId: w.id, dayId: w.days[di].id, dayIndex: di });
+          }
+        }
+        const currentIdx = ordered.findIndex((d) => d.dayId === day.id && d.weekId === currentWeekId);
+        if (currentIdx <= 0) {
+          setPrevNotes({});
           return;
         }
 
-        const prevWeek = plan.weeks[wIdx - 1];
-        const prevDay = prevWeek.days[dayIdx];
-        if (!prevDay) {
+        const targets = day.items.map((item) => ({
+          exerciseId: item.exerciseId,
+          exerciseName: item.exerciseName,
+        }));
+        if (targets.length === 0) {
           setGhost({});
+          setPrevNotes({});
           return;
         }
 
-        let ghostData: SessionPayload | null = null;
-        if (serverId) {
-          try {
-            ghostData = await sessionApi.last(serverId, prevWeek.id, prevDay.id);
-          } catch {
-            /* ignore and try local */
+        const ghostMap: Record<string, { weight: number | null; reps: number | null }[]> = {};
+        const notesMap: Record<string, string | null> = {};
+        const remaining = new Set(targets.map((t) => exerciseKey(t)));
+
+        for (let idx = currentIdx - 1; idx >= 0; idx--) {
+          if (remaining.size === 0) break;
+          const prev = ordered[idx];
+          const payload = await readSessionForDay(prev.weekId, prev.dayId);
+          if (!payload || !payload.entries) continue;
+
+          for (const entry of payload.entries) {
+            for (const target of targets) {
+              const targetKey = exerciseKey(target);
+              if (!remaining.has(targetKey)) continue;
+              if (!matchesTarget(entry, target)) continue;
+
+              const sets = (entry.sets || []).map((s: Partial<SessionSetPayload>) => ({
+                weight: s.weight ?? null,
+                reps: s.reps ?? null,
+              }));
+              ghostMap[targetKey] = sets;
+              const nameKey = `name:${normalizeExerciseName(target.exerciseName).toLowerCase()}`;
+              if (nameKey && !ghostMap[nameKey]) ghostMap[nameKey] = sets;
+
+              const noteVal = (entry as any).note ?? null;
+              notesMap[targetKey] = noteVal;
+              if (nameKey && !notesMap[nameKey]) notesMap[nameKey] = noteVal;
+
+              remaining.delete(targetKey);
+            }
           }
         }
 
-        if (!ghostData || !ghostData.entries) {
-          // Try localStorage fallback (handles unsaved plans and pre-save sessions)
-          const keysToTry: string[] = [];
-          if (serverId) keysToTry.push(`session:${serverId}:${prevWeek.id}:${prevDay.id}`);
-          keysToTry.push(`session:${plan.id}:${prevWeek.id}:${prevDay.id}`);
-          for (const k of keysToTry) {
-            try {
-              const raw = localStorage.getItem(k);
-              if (raw) {
-                const parsed = JSON.parse(raw) as SessionPayload;
-                if (parsed && parsed.entries) {
-                  ghostData = parsed;
-                  break;
+        if (!cancelled) {
+          if (Object.keys(ghostMap).length > 0) setGhost(ghostMap);
+          else setGhost({});
+
+          const dayIndex = ordered[currentIdx]?.dayIndex ?? 0;
+          try {
+            const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dayIndex}`;
+            const raw = localStorage.getItem(seedKey);
+            if (raw) {
+              const seed = JSON.parse(raw) as Record<string, string>;
+              for (const [ex, note] of Object.entries(seed)) {
+                const nameKey = `name:${normalizeExerciseName(ex).toLowerCase()}`;
+                if (!notesMap[nameKey] || String(notesMap[nameKey]).trim() === '') {
+                  notesMap[nameKey] = note;
                 }
               }
-            } catch {
-              /* ignore */
             }
-          }
+          } catch { /* ignore */ }
+          setPrevNotes(notesMap);
         }
-
-        if (!ghostData || !ghostData.entries) {
-          setGhost({});
-          return;
-        }
-
-        const map: Record<string, { weight: number | null; reps: number | null }[]> = {};
-        const notesMap: Record<string, string | null> = {};
-        for (const entry of ghostData.entries) {
-          const key = exerciseKey(entry);
-          const sets = (entry.sets || []).map((s: Partial<SessionSetPayload>) => ({
-            weight: s.weight ?? null,
-            reps: s.reps ?? null,
-          }));
-          map[key] = sets;
-          const nameKey = `name:${normalizeExerciseName(entry.exerciseName || '').toLowerCase()}`;
-          if (nameKey && !map[nameKey]) map[nameKey] = sets;
-          const noteVal = (entry as any).note ?? null;
-          notesMap[key] = noteVal;
-          if (nameKey && !notesMap[nameKey]) notesMap[nameKey] = noteVal;
-        }
-        setGhost(map);
-        try {
-          const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dayIdx}`;
-          const raw = localStorage.getItem(seedKey);
-          if (raw) {
-            const seed = JSON.parse(raw) as Record<string, string>;
-            for (const [ex, note] of Object.entries(seed)) {
-              const nameKey = `name:${normalizeExerciseName(ex).toLowerCase()}`;
-              if (!notesMap[nameKey] || String(notesMap[nameKey]).trim() === '') {
-                notesMap[nameKey] = note;
-              }
-            }
-          }
-        } catch { /* ignore */ }
-        setPrevNotes(notesMap);
       } catch {
-        setGhost({});
-        setPrevNotes({});
+        if (!cancelled) {
+          setGhost({});
+          setPrevNotes({});
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [plan.serverId, currentWeekId, plan.weeks, day.id, plan.id]);
 
   // Seed notes from previous week where notes are missing
@@ -1673,11 +1734,11 @@ function WorkoutPage({
         <div key={entry.id} style={{ border: '2px solid #fff', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {renamingEntryId === entry.id ? (
+              {replacingEntryId === entry.id ? (
                 <>
                   <input
-                    value={renameDraft}
-                    onChange={(e) => setRenameDraft(e.target.value)}
+                    value={replaceDraft}
+                    onChange={(e) => setReplaceDraft(e.target.value)}
                     style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
                   />
                   <button
@@ -1691,8 +1752,8 @@ function WorkoutPage({
                   </button>
                   <button
                     onClick={() => {
-                      setRenamingEntryId(null);
-                      setRenameDraft('');
+                      setReplacingEntryId(null);
+                      setReplaceDraft('');
                       setShowReplacePromptForId(null);
                     }}
                     style={SMALL_BTN_STYLE}
@@ -1705,13 +1766,13 @@ function WorkoutPage({
                   <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
                   <button
                     onClick={() => {
-                      setRenamingEntryId(entry.id);
-                      setRenameDraft(entry.exerciseName);
+                      setReplacingEntryId(entry.id);
+                      setReplaceDraft(entry.exerciseName);
                       setShowReplacePromptForId(null);
                     }}
                     style={SMALL_BTN_STYLE}
                   >
-                    Rename
+                    Replace
                   </button>
                   <button
                     onClick={() => openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName })}
@@ -1741,38 +1802,52 @@ function WorkoutPage({
 
           {showReplacePromptForId === entry.id && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <div style={{ color: '#ddd', alignSelf: 'center' }}>Replace remaining exercises?</div>
+              <div style={{ color: '#ddd', alignSelf: 'center' }}>Replace for:</div>
               <button
                 onClick={() => {
-                  const trimmed = String(renameDraft || '').trim();
+                  const trimmed = String(replaceDraft || '').trim();
                   if (!trimmed) {
                     alert('Name cannot be empty');
                     return;
                   }
-                  if (typeof onRenameExercise === 'function') onRenameExercise(entry.exerciseName, trimmed, true);
-                  setRenamingEntryId(null);
-                  setRenameDraft('');
+                  if (typeof onReplaceExercise === 'function') {
+                    onReplaceExercise({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }, trimmed, "remaining");
+                  }
+                  setReplacingEntryId(null);
+                  setReplaceDraft('');
                   setShowReplacePromptForId(null);
                 }}
                 style={SMALL_BTN_STYLE}
               >
-                Yes
+                Remaining meso
               </button>
               <button
                 onClick={() => {
-                  const trimmed = String(renameDraft || '').trim();
+                  const trimmed = String(replaceDraft || '').trim();
                   if (!trimmed) {
                     alert('Name cannot be empty');
                     return;
                   }
-                  if (typeof onRenameExercise === 'function') onRenameExercise(entry.exerciseName, trimmed, false);
-                  setRenamingEntryId(null);
-                  setRenameDraft('');
+                  if (typeof onReplaceExercise === 'function') {
+                    onReplaceExercise({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }, trimmed, "today");
+                  }
+                  setReplacingEntryId(null);
+                  setReplaceDraft('');
                   setShowReplacePromptForId(null);
                 }}
                 style={SMALL_BTN_STYLE}
               >
-                No
+                Today only
+              </button>
+              <button
+                onClick={() => {
+                  setReplacingEntryId(null);
+                  setReplaceDraft('');
+                  setShowReplacePromptForId(null);
+                }}
+                style={SMALL_BTN_STYLE}
+              >
+                Cancel
               </button>
             </div>
           )}
