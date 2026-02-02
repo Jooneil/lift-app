@@ -70,6 +70,8 @@ const uuid = () =>
     : `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 
 const normalizeExerciseName = (name: string) => name.trim();
+const normalizeFilterValue = (value: string) => value.replace(/\s+/g, " ").trim().toLowerCase();
+const normalizeSourceFilter = (value: string) => normalizeFilterValue(value).replace(/\*/g, "");
 const exerciseKey = (entry: { exerciseId?: string; exerciseName?: string | null }) => {
   if (entry.exerciseId) return `id:${entry.exerciseId}`;
   const name = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
@@ -1611,16 +1613,17 @@ function WorkoutPage({
   }, [catalogExercises]);
 
   const replaceFilteredCatalog = useMemo(() => {
-    const text = replaceSearchText.trim().toLowerCase();
-    const source = replaceSearchSource.trim();
-    const wantSecondary = replaceSearchSecondary !== "All" ? replaceSearchSecondary.toLowerCase() : "";
+    const text = normalizeFilterValue(replaceSearchText);
+    const source = normalizeSourceFilter(replaceSearchSource);
+    const wantPrimary = replaceSearchPrimary !== "All" ? normalizeFilterValue(replaceSearchPrimary) : "";
+    const wantSecondary = replaceSearchSecondary !== "All" ? normalizeFilterValue(replaceSearchSecondary) : "";
     const filtered = catalogExercises.filter((ex) => {
       const isCustom = ex.isCustom === true;
-      if (text && !ex.name.toLowerCase().includes(text)) return false;
-      if (replaceSearchPrimary !== "All" && ex.primaryMuscle !== replaceSearchPrimary) return false;
-      if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
-      if (source === "Defaults" && isCustom) return false;
-      if (source === "Home Made" && !isCustom) return false;
+      if (text && !normalizeFilterValue(ex.name).includes(text)) return false;
+      if (wantPrimary && normalizeFilterValue(ex.primaryMuscle) !== wantPrimary) return false;
+      if (wantSecondary && !ex.secondaryMuscles.some((m) => normalizeFilterValue(m) === wantSecondary)) return false;
+      if (source === "defaults" && isCustom) return false;
+      if (source === "home made" && !isCustom) return false;
       if (replaceSearchMachine && !ex.machine) return false;
       if (replaceSearchFreeWeight && !ex.freeWeight) return false;
       if (replaceSearchCable && !ex.cable) return false;
@@ -1630,7 +1633,7 @@ function WorkoutPage({
     });
     const byName = new Map<string, CatalogExercise>();
     for (const ex of filtered) {
-      const key = ex.name.trim().toLowerCase();
+      const key = normalizeFilterValue(ex.name);
       if (!key) continue;
       const existing = byName.get(key);
       if (!existing || (ex.isCustom && !existing.isCustom)) {
@@ -2766,16 +2769,17 @@ function BuilderPage({
   }, [catalogExercises]);
 
   const filteredCatalog = useMemo(() => {
-    const text = searchText.trim().toLowerCase();
-    const source = searchSource.trim();
-    const wantSecondary = searchSecondary !== "All" ? searchSecondary.toLowerCase() : "";
+    const text = normalizeFilterValue(searchText);
+    const source = normalizeSourceFilter(searchSource);
+    const wantPrimary = searchPrimary !== "All" ? normalizeFilterValue(searchPrimary) : "";
+    const wantSecondary = searchSecondary !== "All" ? normalizeFilterValue(searchSecondary) : "";
     const filtered = catalogExercises.filter((ex) => {
       const isCustom = ex.isCustom === true;
-      if (text && !ex.name.toLowerCase().includes(text)) return false;
-      if (searchPrimary !== "All" && ex.primaryMuscle !== searchPrimary) return false;
-      if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
-      if (source === "Defaults" && isCustom) return false;
-      if (source === "Home Made" && !isCustom) return false;
+      if (text && !normalizeFilterValue(ex.name).includes(text)) return false;
+      if (wantPrimary && normalizeFilterValue(ex.primaryMuscle) !== wantPrimary) return false;
+      if (wantSecondary && !ex.secondaryMuscles.some((m) => normalizeFilterValue(m) === wantSecondary)) return false;
+      if (source === "defaults" && isCustom) return false;
+      if (source === "home made" && !isCustom) return false;
       if (searchMachine && !ex.machine) return false;
       if (searchFreeWeight && !ex.freeWeight) return false;
       if (searchCable && !ex.cable) return false;
@@ -2785,7 +2789,7 @@ function BuilderPage({
     });
     const byName = new Map<string, CatalogExercise>();
     for (const ex of filtered) {
-      const key = ex.name.trim().toLowerCase();
+      const key = normalizeFilterValue(ex.name);
       if (!key) continue;
       const existing = byName.get(key);
       if (!existing || (ex.isCustom && !existing.isCustom)) {
