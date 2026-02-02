@@ -1612,13 +1612,15 @@ function WorkoutPage({
 
   const replaceFilteredCatalog = useMemo(() => {
     const text = replaceSearchText.trim().toLowerCase();
+    const source = replaceSearchSource.trim();
     const wantSecondary = replaceSearchSecondary !== "All" ? replaceSearchSecondary.toLowerCase() : "";
     const filtered = catalogExercises.filter((ex) => {
+      const isCustom = ex.isCustom === true;
       if (text && !ex.name.toLowerCase().includes(text)) return false;
       if (replaceSearchPrimary !== "All" && ex.primaryMuscle !== replaceSearchPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
-      if (replaceSearchSource === "Defaults" && ex.isCustom) return false;
-      if (replaceSearchSource === "Home Made" && !ex.isCustom) return false;
+      if (source === "Defaults" && isCustom) return false;
+      if (source === "Home Made" && !isCustom) return false;
       if (replaceSearchMachine && !ex.machine) return false;
       if (replaceSearchFreeWeight && !ex.freeWeight) return false;
       if (replaceSearchCable && !ex.cable) return false;
@@ -2393,7 +2395,7 @@ function WorkoutPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value.trim() as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
                 <option value="All">Source (All)</option>
                 <option value="Defaults">Defaults</option>
                 <option value="Home Made">Home Made *</option>
@@ -2765,13 +2767,15 @@ function BuilderPage({
 
   const filteredCatalog = useMemo(() => {
     const text = searchText.trim().toLowerCase();
+    const source = searchSource.trim();
     const wantSecondary = searchSecondary !== "All" ? searchSecondary.toLowerCase() : "";
     const filtered = catalogExercises.filter((ex) => {
+      const isCustom = ex.isCustom === true;
       if (text && !ex.name.toLowerCase().includes(text)) return false;
       if (searchPrimary !== "All" && ex.primaryMuscle !== searchPrimary) return false;
       if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
-      if (searchSource === "Defaults" && ex.isCustom) return false;
-      if (searchSource === "Home Made" && !ex.isCustom) return false;
+      if (source === "Defaults" && isCustom) return false;
+      if (source === "Home Made" && !isCustom) return false;
       if (searchMachine && !ex.machine) return false;
       if (searchFreeWeight && !ex.freeWeight) return false;
       if (searchCable && !ex.cable) return false;
@@ -4188,7 +4192,7 @@ function BuilderPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value.trim() as "All" | "Defaults" | "Home Made")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
                 <option value="All">Source (All)</option>
                 <option value="Defaults">Defaults</option>
                 <option value="Home Made">Home Made *</option>
