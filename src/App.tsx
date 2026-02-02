@@ -430,7 +430,9 @@ function AuthedApp({
           cable: !!r.cable,
           bodyWeight: !!r.body_weight,
           isCompound: !!r.is_compound,
-          secondaryMuscles: [],
+          secondaryMuscles: Array.isArray(r.secondary_muscles)
+            ? r.secondary_muscles.filter((m) => !!m).map((m) => String(m))
+            : [],
           isCustom: true,
         }));
       mapped.sort((a, b) => a.name.localeCompare(b.name));
@@ -459,6 +461,7 @@ function AuthedApp({
     primaryMuscle: string;
     equipment: "machine" | "free_weight" | "cable" | "body_weight";
     isCompound: boolean;
+    secondaryMuscles?: string[];
   }) => {
     const trimmed = normalizeExerciseName(input.name);
     if (!trimmed) throw new Error("Enter a name.");
@@ -476,6 +479,7 @@ function AuthedApp({
       cable: input.equipment === "cable",
       body_weight: input.equipment === "body_weight",
       is_compound: input.isCompound,
+      secondary_muscles: input.secondaryMuscles ?? [],
     });
     if (!row || !row.name || !row.primary_muscle) throw new Error("Failed to add movement.");
 
@@ -488,7 +492,9 @@ function AuthedApp({
       cable: !!row.cable,
       bodyWeight: !!row.body_weight,
       isCompound: !!row.is_compound,
-      secondaryMuscles: [],
+      secondaryMuscles: Array.isArray(row.secondary_muscles)
+        ? row.secondary_muscles.filter((m) => !!m).map((m) => String(m))
+        : [],
       isCustom: true,
     };
     setCustomCatalogExercises((prev) => {
@@ -1461,6 +1467,7 @@ function WorkoutPage({
     primaryMuscle: string;
     equipment: "machine" | "free_weight" | "cable" | "body_weight";
     isCompound: boolean;
+    secondaryMuscles?: string[];
   }) => Promise<CatalogExercise>;
   onDeleteCustomExercise?: (id: string) => Promise<void>;
   onMarkDone: () => void;
@@ -1597,6 +1604,7 @@ function WorkoutPage({
     setReplaceAddMovementPrimary("");
     setReplaceAddMovementEquipment("");
     setReplaceAddMovementCompound(false);
+    setReplaceAddMovementSecondary("");
     setReplaceAddMovementError(null);
   };
 
@@ -1622,6 +1630,7 @@ function WorkoutPage({
         primaryMuscle: replaceAddMovementPrimary,
         equipment: replaceAddMovementEquipment,
         isCompound: replaceAddMovementCompound,
+        secondaryMuscles: replaceAddMovementCompound && replaceAddMovementSecondary ? [replaceAddMovementSecondary] : [],
       });
       resetReplaceAddMovement();
       setReplaceAddMovementOpen(false);
@@ -2343,32 +2352,6 @@ function WorkoutPage({
                     Can't find a movement? Create a new one!
                   </button>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
-                  {replaceFilteredCatalog.length === 0 ? (
-                    <div style={{ color: '#777' }}>No matches.</div>
-                  ) : (
-                    replaceFilteredCatalog.map((ex) => (
-                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: '#777', fontSize: 12 }}>
-                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => addReplaceQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
-                          {ex.isCustom && (
-                            <button onClick={() => handleDeleteCustomFromReplace(ex)} style={SMALL_BTN_STYLE}>Delete</button>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {replaceAddMovementOpen && (
                   <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input
@@ -2429,10 +2412,28 @@ function WorkoutPage({
                       <input
                         type="checkbox"
                         checked={replaceAddMovementCompound}
-                        onChange={(e) => setReplaceAddMovementCompound(e.target.checked)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setReplaceAddMovementCompound(checked);
+                          if (!checked) setReplaceAddMovementSecondary('');
+                        }}
                       />
                       Compound
                     </label>
+                    {replaceAddMovementCompound && (
+                      <select
+                        value={replaceAddMovementSecondary}
+                        onChange={(e) => setReplaceAddMovementSecondary(e.target.value)}
+                        style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                      >
+                        <option value="">Secondary muscle</option>
+                        {replacePrimaryMuscles
+                          .filter((m) => m !== replaceAddMovementPrimary)
+                          .map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                      </select>
+                    )}
                     {replaceAddMovementError && (
                       <div style={{ color: '#f88', fontSize: 12 }}>{replaceAddMovementError}</div>
                     )}
@@ -2452,6 +2453,32 @@ function WorkoutPage({
                     </div>
                   </div>
                 )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                  {replaceFilteredCatalog.length === 0 ? (
+                    <div style={{ color: '#777' }}>No matches.</div>
+                  ) : (
+                    replaceFilteredCatalog.map((ex) => (
+                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
+                          <div style={{ color: '#777', fontSize: 12 }}>
+                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => addReplaceQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                          {ex.isCustom && (
+                            <button onClick={() => handleDeleteCustomFromReplace(ex)} style={SMALL_BTN_STYLE}>Delete</button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {replaceQueue.length === 0 ? (
                   <div style={{ color: '#777' }}>No exercises selected.</div>
                 ) : (
@@ -2574,6 +2601,7 @@ function BuilderPage({
     primaryMuscle: string;
     equipment: "machine" | "free_weight" | "cable" | "body_weight";
     isCompound: boolean;
+    secondaryMuscles?: string[];
   }) => Promise<CatalogExercise>;
   onDeleteCustomExercise: (id: string) => Promise<void>;
 }) {
@@ -2606,6 +2634,7 @@ function BuilderPage({
   const [addMovementPrimary, setAddMovementPrimary] = useState("");
   const [addMovementEquipment, setAddMovementEquipment] = useState<"" | "machine" | "free_weight" | "cable" | "body_weight">("");
   const [addMovementCompound, setAddMovementCompound] = useState(false);
+  const [addMovementSecondary, setAddMovementSecondary] = useState("");
   const [addMovementError, setAddMovementError] = useState<string | null>(null);
 
   const primaryMuscles = useMemo(() => {
@@ -3088,6 +3117,7 @@ function BuilderPage({
     setAddMovementPrimary("");
     setAddMovementEquipment("");
     setAddMovementCompound(false);
+    setAddMovementSecondary("");
     setAddMovementError(null);
   };
 
@@ -3112,6 +3142,7 @@ function BuilderPage({
         primaryMuscle: addMovementPrimary,
         equipment: addMovementEquipment,
         isCompound: addMovementCompound,
+        secondaryMuscles: addMovementCompound && addMovementSecondary ? [addMovementSecondary] : [],
       });
       resetAddMovement();
       setAddMovementOpen(false);
@@ -4016,32 +4047,6 @@ function BuilderPage({
                     Can't find a movement? Create a new one!
                   </button>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
-                  {filteredCatalog.length === 0 ? (
-                    <div style={{ color: '#777' }}>No matches.</div>
-                  ) : (
-                    filteredCatalog.map((ex) => (
-                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: '#777', fontSize: 12 }}>
-                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => addToQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
-                          {ex.isCustom && (
-                            <button onClick={() => handleDeleteCustomFromSearch(ex)} style={SMALL_BTN_STYLE}>Delete</button>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {addMovementOpen && (
                   <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input
@@ -4102,10 +4107,28 @@ function BuilderPage({
                       <input
                         type="checkbox"
                         checked={addMovementCompound}
-                        onChange={(e) => setAddMovementCompound(e.target.checked)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAddMovementCompound(checked);
+                          if (!checked) setAddMovementSecondary('');
+                        }}
                       />
                       Compound
                     </label>
+                    {addMovementCompound && (
+                      <select
+                        value={addMovementSecondary}
+                        onChange={(e) => setAddMovementSecondary(e.target.value)}
+                        style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                      >
+                        <option value="">Secondary muscle</option>
+                        {primaryMuscles
+                          .filter((m) => m !== addMovementPrimary)
+                          .map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                      </select>
+                    )}
                     {addMovementError && (
                       <div style={{ color: '#f88', fontSize: 12 }}>{addMovementError}</div>
                     )}
@@ -4125,6 +4148,32 @@ function BuilderPage({
                     </div>
                   </div>
                 )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                  {filteredCatalog.length === 0 ? (
+                    <div style={{ color: '#777' }}>No matches.</div>
+                  ) : (
+                    filteredCatalog.map((ex) => (
+                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
+                          <div style={{ color: '#777', fontSize: 12 }}>
+                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => addToQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                          {ex.isCustom && (
+                            <button onClick={() => handleDeleteCustomFromSearch(ex)} style={SMALL_BTN_STYLE}>Delete</button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {searchQueue.length === 0 ? (
                   <div style={{ color: '#777' }}>No exercises selected.</div>
                 ) : (

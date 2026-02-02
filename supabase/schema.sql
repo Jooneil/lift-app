@@ -87,6 +87,7 @@ alter table public.exercises add column if not exists free_weight boolean defaul
 alter table public.exercises add column if not exists cable boolean default false;
 alter table public.exercises add column if not exists body_weight boolean default false;
 alter table public.exercises add column if not exists is_compound boolean default false;
+alter table public.exercises add column if not exists secondary_muscles text[] default '{}'::text[];
 alter table public.exercises add column if not exists is_custom boolean default false;
 alter table public.exercises enable row level security;
 drop policy if exists exercises_isolation on public.exercises;

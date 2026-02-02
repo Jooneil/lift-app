@@ -19,6 +19,7 @@ export type CustomExerciseRow = {
   cable?: boolean | null;
   body_weight?: boolean | null;
   is_compound?: boolean | null;
+  secondary_muscles?: string[] | null;
   is_custom?: boolean | null;
 };
 export type ExerciseCatalogRow = {
@@ -108,7 +109,7 @@ export const exerciseApi = {
   async listCustom(): Promise<CustomExerciseRow[]> {
     const { data, error } = await supabase
       .from('exercises')
-      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,is_custom')
+      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles,is_custom')
       .eq('is_custom', true)
       .order('name', { ascending: true });
     if (error) {
@@ -125,6 +126,7 @@ export const exerciseApi = {
     cable: boolean;
     body_weight: boolean;
     is_compound: boolean;
+    secondary_muscles?: string[];
   }): Promise<CustomExerciseRow | null> {
     const clean = input.name.trim();
     if (!clean) return null;
@@ -138,9 +140,10 @@ export const exerciseApi = {
         cable: input.cable,
         body_weight: input.body_weight,
         is_compound: input.is_compound,
+        secondary_muscles: input.secondary_muscles ?? [],
         is_custom: true,
       }])
-      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,is_custom')
+      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles,is_custom')
       .single();
     if (error) {
       if (isMissingTableError(error as { code?: string; message?: string })) return null;
@@ -155,10 +158,11 @@ export const exerciseApi = {
             cable: input.cable,
             body_weight: input.body_weight,
             is_compound: input.is_compound,
+            secondary_muscles: input.secondary_muscles ?? [],
             is_custom: true,
           })
           .ilike('name', clean)
-          .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,is_custom')
+          .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles,is_custom')
           .maybeSingle();
         if (retry.error) throw retry.error;
         return (retry.data as CustomExerciseRow | null) ?? null;
