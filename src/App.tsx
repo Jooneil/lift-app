@@ -1575,6 +1575,8 @@ function WorkoutPage({
   const [replaceSearchBodyWeight, setReplaceSearchBodyWeight] = useState(false);
   const [replaceSearchCompound, setReplaceSearchCompound] = useState(false);
   const [replaceQueue, setReplaceQueue] = useState<Array<{ name: string; id?: string }>>([]);
+  const [replaceSearchDomCount, setReplaceSearchDomCount] = useState<number | null>(null);
+  const replaceSearchListRef = useRef<HTMLDivElement | null>(null);
   const [replaceAddMovementOpen, setReplaceAddMovementOpen] = useState(false);
   const [replaceAddMovementName, setReplaceAddMovementName] = useState("");
   const [replaceAddMovementPrimary, setReplaceAddMovementPrimary] = useState("");
@@ -1663,6 +1665,30 @@ function WorkoutPage({
     [replaceFilteredCatalog]
   );
   const replaceFilteredDefaultCount = replaceFilteredCatalog.length - replaceFilteredCustomCount;
+  const replaceCatalogCustomCount = useMemo(
+    () => catalogExercises.reduce((count, ex) => count + (ex.isCustom ? 1 : 0), 0),
+    [catalogExercises]
+  );
+  const replaceCatalogDefaultCount = catalogExercises.length - replaceCatalogCustomCount;
+  const replaceDebugEntries = useMemo(
+    () => replaceFilteredCatalog.map((ex) => ({
+      id: ex.id,
+      name: ex.name,
+      isCustom: !!ex.isCustom,
+      primary: ex.primaryMuscle,
+    })),
+    [replaceFilteredCatalog]
+  );
+  useEffect(() => {
+    if (!replaceSearchDebugEnabled) return;
+    const node = replaceSearchListRef.current;
+    if (!node) {
+      setReplaceSearchDomCount(null);
+      return;
+    }
+    const count = node.querySelectorAll('[data-search-item="replace"]').length;
+    setReplaceSearchDomCount(count);
+  }, [replaceSearchDebugEnabled, replaceFilteredCatalog]);
 
   const openReplaceSearch = (entry: SessionEntry, entryIndex: number) => {
     setReplaceTargetEntry({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName });
@@ -2583,12 +2609,25 @@ function WorkoutPage({
                     </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                {replaceSearchDebugEnabled && (
+                  <details style={{ color: '#aaa', fontSize: 11, marginBottom: 8 }}>
+                    <summary style={{ cursor: 'pointer' }}>Debug details</summary>
+                    <div>catalog total={catalogExercises.length} custom={replaceCatalogCustomCount} defaults={replaceCatalogDefaultCount}</div>
+                    <div>domCount={replaceSearchDomCount ?? 'n/a'} listCount={replaceFilteredCatalog.length}</div>
+                    <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify(replaceDebugEntries, null, 2)}
+                    </pre>
+                  </details>
+                )}
+                <div
+                  ref={replaceSearchListRef}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}
+                >
                   {replaceFilteredCatalog.length === 0 ? (
                     <div style={{ color: '#777' }}>No matches.</div>
                   ) : (
                     replaceFilteredCatalog.map((ex) => (
-                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div data-search-item="replace" key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
                           <div style={{ color: '#777', fontSize: 12 }}>
@@ -2759,6 +2798,8 @@ function BuilderPage({
   const [searchBodyWeight, setSearchBodyWeight] = useState(false);
   const [searchCompound, setSearchCompound] = useState(false);
   const [searchQueue, setSearchQueue] = useState<Array<{ name: string; id?: string }>>([]);
+  const [searchDomCount, setSearchDomCount] = useState<number | null>(null);
+  const searchListRef = useRef<HTMLDivElement | null>(null);
   const [addMovementOpen, setAddMovementOpen] = useState(false);
   const [addMovementName, setAddMovementName] = useState("");
   const [addMovementPrimary, setAddMovementPrimary] = useState("");
@@ -2830,6 +2871,30 @@ function BuilderPage({
     [filteredCatalog]
   );
   const filteredDefaultCount = filteredCatalog.length - filteredCustomCount;
+  const catalogCustomCount = useMemo(
+    () => catalogExercises.reduce((count, ex) => count + (ex.isCustom ? 1 : 0), 0),
+    [catalogExercises]
+  );
+  const catalogDefaultCount = catalogExercises.length - catalogCustomCount;
+  const searchDebugEntries = useMemo(
+    () => filteredCatalog.map((ex) => ({
+      id: ex.id,
+      name: ex.name,
+      isCustom: !!ex.isCustom,
+      primary: ex.primaryMuscle,
+    })),
+    [filteredCatalog]
+  );
+  useEffect(() => {
+    if (!searchDebugEnabled) return;
+    const node = searchListRef.current;
+    if (!node) {
+      setSearchDomCount(null);
+      return;
+    }
+    const count = node.querySelectorAll('[data-search-item="builder"]').length;
+    setSearchDomCount(count);
+  }, [searchDebugEnabled, filteredCatalog]);
 
   const createDay = (index: number): PlanDay => ({
     id: uuid(),
@@ -4392,12 +4457,25 @@ function BuilderPage({
                     </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                {searchDebugEnabled && (
+                  <details style={{ color: '#aaa', fontSize: 11, marginBottom: 8 }}>
+                    <summary style={{ cursor: 'pointer' }}>Debug details</summary>
+                    <div>catalog total={catalogExercises.length} custom={catalogCustomCount} defaults={catalogDefaultCount}</div>
+                    <div>domCount={searchDomCount ?? 'n/a'} listCount={filteredCatalog.length}</div>
+                    <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify(searchDebugEntries, null, 2)}
+                    </pre>
+                  </details>
+                )}
+                <div
+                  ref={searchListRef}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}
+                >
                   {filteredCatalog.length === 0 ? (
                     <div style={{ color: '#777' }}>No matches.</div>
                   ) : (
                     filteredCatalog.map((ex) => (
-                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div data-search-item="builder" key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
                           <div style={{ color: '#777', fontSize: 12 }}>
