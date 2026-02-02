@@ -324,6 +324,7 @@ function nextWeekDay(plan: Plan, currentWeekId: string, currentDayId: string) {
 export default function App() {
   const [user, setUser] = useState<{ id: number; username: string } | null>(null);
   const [checking, setChecking] = useState(true);
+  const [forcePasswordReset, setForcePasswordReset] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -339,10 +340,32 @@ export default function App() {
     })();
   }, []);
 
+  useEffect(() => {
+    const hasRecoveryParam = () => {
+      if (typeof window === 'undefined') return false;
+      const search = new URLSearchParams(window.location.search);
+      if (search.get('reset') === '1') return true;
+      if (search.get('type') === 'recovery') return true;
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      return hash.get('type') === 'recovery';
+    };
+    if (hasRecoveryParam()) setForcePasswordReset(true);
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setForcePasswordReset(true);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   return (
     <div>
       {checking ? (
         <div style={{ padding: 20 }}>Loading...</div>
+      ) : forcePasswordReset ? (
+        <Auth
+          onAuthed={setUser}
+          forceMode="reset"
+          onResetComplete={() => setForcePasswordReset(false)}
+        />
       ) : !user ? (
         <Auth onAuthed={setUser} />
       ) : (
