@@ -918,6 +918,52 @@ function AuthedApp({
     })();
   };
 
+  const handleInsertExercisesAt = useCallback(
+    async (weekId: string, dayId: string, insertIndex: number, names: string[]) => {
+      if (!selectedPlan || names.length === 0) return;
+      const resolved = await Promise.all(
+        names.map(async (name) => {
+          const trimmed = normalizeExerciseName(name);
+          const ex = trimmed ? await ensureExerciseByName(trimmed) : null;
+          return { name: ex?.name ?? trimmed, id: ex?.id };
+        })
+      );
+      let nextPlanForSave: Plan | null = null;
+      setPlans((prev) =>
+        prev.map((p) => {
+          if (p.id !== selectedPlan.id) return p;
+          const weeks = p.weeks.map((week) => {
+            if (week.id !== weekId) return week;
+            const days = week.days.map((day) => {
+              if (day.id !== dayId) return day;
+              const items = day.items.slice();
+              const insertAt = Number.isFinite(insertIndex) ? Math.min(items.length, Math.max(0, insertIndex + 1)) : items.length;
+              const inserts = resolved
+                .filter((ex) => ex.name)
+                .map((ex) => ({
+                  id: uuid(),
+                  exerciseName: ex.name,
+                  exerciseId: ex.id,
+                  targetSets: 3,
+                  targetReps: '',
+                }));
+              if (inserts.length > 0) {
+                items.splice(insertAt, 0, ...inserts);
+              }
+              return { ...day, items };
+            });
+            return { ...week, days };
+          });
+          const next = { ...p, weeks };
+          nextPlanForSave = next;
+          return next;
+        })
+      );
+      if (nextPlanForSave?.serverId) queuePlanSave(nextPlanForSave);
+    },
+    [selectedPlan, ensureExerciseByName, queuePlanSave]
+  );
+
   const handleFinishPlan = async () => {
     if (!selectedPlan || !selectedWeek || !selectedDay || finishingPlan) return;
     setFinishingPlan(true);
@@ -1130,6 +1176,8 @@ function AuthedApp({
                 setSession={setSession}
                 onReplaceExercise={handleReplaceExercise}
                 exerciseOptions={exerciseOptions}
+                catalogExercises={catalogExercises}
+                onInsertExercisesAt={handleInsertExercisesAt}
                 onMarkDone={async () => {
                   if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   setCompleted(true);
@@ -1281,6 +1329,8 @@ function WorkoutPage({
   setSession,
   onReplaceExercise,
   exerciseOptions,
+  catalogExercises,
+  onInsertExercisesAt,
   onMarkDone,
   completed,
   setCompleted,
@@ -1294,6 +1344,8 @@ function WorkoutPage({
   setSession: React.Dispatch<React.SetStateAction<Session | null>>;
   onReplaceExercise?: (oldEntry: { exerciseId?: string; exerciseName: string }, newName: string, scope: "today" | "remaining") => void;
   exerciseOptions: string[];
+  catalogExercises: CatalogExercise[];
+  onInsertExercisesAt?: (weekId: string, dayId: string, insertIndex: number, names: string[]) => Promise<void>;
   onMarkDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
@@ -1301,9 +1353,18 @@ function WorkoutPage({
   onFinishPlan?: () => void;
   finishingPlan: boolean;
 }) {
-  const [replacingEntryId, setReplacingEntryId] = useState<string | null>(null);
-  const [replaceDraft, setReplaceDraft] = useState<string>('');
-  const [showReplacePromptForId, setShowReplacePromptForId] = useState<string | null>(null);
+  const [replaceSearchOpen, setReplaceSearchOpen] = useState(false);
+  const [replaceTargetEntry, setReplaceTargetEntry] = useState<{ exerciseId?: string; exerciseName: string } | null>(null);
+  const [replaceTargetIndex, setReplaceTargetIndex] = useState<number | null>(null);
+  const [replaceSearchText, setReplaceSearchText] = useState("");
+  const [replaceSearchPrimary, setReplaceSearchPrimary] = useState<string>("All");
+  const [replaceSearchSecondary, setReplaceSearchSecondary] = useState<string>("All");
+  const [replaceSearchMachine, setReplaceSearchMachine] = useState<"All" | "Yes" | "No">("All");
+  const [replaceSearchFreeWeight, setReplaceSearchFreeWeight] = useState<"All" | "Yes" | "No">("All");
+  const [replaceSearchCable, setReplaceSearchCable] = useState<"All" | "Yes" | "No">("All");
+  const [replaceSearchBodyWeight, setReplaceSearchBodyWeight] = useState<"All" | "Yes" | "No">("All");
+  const [replaceSearchCompound, setReplaceSearchCompound] = useState<"All" | "Yes" | "No">("All");
+  const [replaceQueue, setReplaceQueue] = useState<Array<{ name: string; id?: string }>>([]);
   const [ghost, setGhost] = useState<Record<string, { weight: number | null; reps: number | null }[]>>({});
   const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
@@ -1321,6 +1382,85 @@ function WorkoutPage({
     [plan.weeks, day.id]
   );
   const currentWeekId = currentWeek?.id ?? null;
+
+  const replacePrimaryMuscles = useMemo(() => {
+    const set = new Set<string>();
+    for (const ex of catalogExercises) {
+      if (ex.primaryMuscle) set.add(ex.primaryMuscle);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [catalogExercises]);
+
+  const replaceSecondaryMuscles = useMemo(() => {
+    const set = new Set<string>();
+    for (const ex of catalogExercises) {
+      for (const m of ex.secondaryMuscles) set.add(m);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [catalogExercises]);
+
+  const replaceFilteredCatalog = useMemo(() => {
+    const text = replaceSearchText.trim().toLowerCase();
+    const wantSecondary = replaceSearchSecondary !== "All" ? replaceSearchSecondary.toLowerCase() : "";
+    return catalogExercises.filter((ex) => {
+      if (text && !ex.name.toLowerCase().includes(text)) return false;
+      if (replaceSearchPrimary !== "All" && ex.primaryMuscle !== replaceSearchPrimary) return false;
+      if (wantSecondary && !ex.secondaryMuscles.some((m) => m.toLowerCase() === wantSecondary)) return false;
+      if (replaceSearchMachine !== "All" && ex.machine !== (replaceSearchMachine === "Yes")) return false;
+      if (replaceSearchFreeWeight !== "All" && ex.freeWeight !== (replaceSearchFreeWeight === "Yes")) return false;
+      if (replaceSearchCable !== "All" && ex.cable !== (replaceSearchCable === "Yes")) return false;
+      if (replaceSearchBodyWeight !== "All" && ex.bodyWeight !== (replaceSearchBodyWeight === "Yes")) return false;
+      if (replaceSearchCompound !== "All" && ex.isCompound !== (replaceSearchCompound === "Yes")) return false;
+      return true;
+    });
+  }, [
+    catalogExercises,
+    replaceSearchText,
+    replaceSearchPrimary,
+    replaceSearchSecondary,
+    replaceSearchMachine,
+    replaceSearchFreeWeight,
+    replaceSearchCable,
+    replaceSearchBodyWeight,
+    replaceSearchCompound,
+  ]);
+
+  const openReplaceSearch = (entry: SessionEntry, entryIndex: number) => {
+    setReplaceTargetEntry({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName });
+    setReplaceTargetIndex(entryIndex);
+    setReplaceQueue([]);
+    setReplaceSearchOpen(true);
+  };
+
+  const closeReplaceSearch = () => {
+    setReplaceSearchOpen(false);
+    setReplaceQueue([]);
+  };
+
+  const addReplaceQueue = (ex: CatalogExercise) => {
+    setReplaceQueue((prev) => {
+      const exists = prev.some((p) => p.name.toLowerCase() === ex.name.toLowerCase());
+      if (exists) return prev;
+      return [...prev, { name: ex.name, id: ex.id }];
+    });
+  };
+
+  const removeReplaceQueue = (name: string) => {
+    setReplaceQueue((prev) => prev.filter((q) => q.name.toLowerCase() !== name.toLowerCase()));
+  };
+
+  const applyReplaceQueue = async (scope: "today" | "remaining") => {
+    if (!replaceTargetEntry || replaceQueue.length === 0) return;
+    const first = replaceQueue[0];
+    if (typeof onReplaceExercise === "function") {
+      onReplaceExercise(replaceTargetEntry, first.name, scope);
+    }
+    const extras = replaceQueue.slice(1).map((q) => q.name);
+    if (extras.length > 0 && typeof onInsertExercisesAt === "function" && currentWeekId && replaceTargetIndex != null) {
+      await onInsertExercisesAt(currentWeekId, day.id, replaceTargetIndex, extras);
+    }
+    closeReplaceSearch();
+  };
 
   useEffect(() => {
     if (!currentWeek) return;
@@ -1798,59 +1938,25 @@ function WorkoutPage({
           <option key={name} value={name} />
         ))}
       </datalist>
-      {session.entries.map((entry) => (
+      {session.entries.map((entry, entryIndex) => (
         <div key={entry.id} style={{ border: '2px solid #fff', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {replacingEntryId === entry.id ? (
-                <>
-                  <input
-                    value={replaceDraft}
-                    onChange={(e) => setReplaceDraft(e.target.value)}
-                    list="exercise-options-workout"
-                    style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
-                  />
-                  <button
-                    onClick={() => {
-                      // show replace prompt for this entry
-                      setShowReplacePromptForId(entry.id);
-                    }}
-                    style={SMALL_BTN_STYLE}
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setReplacingEntryId(null);
-                      setReplaceDraft('');
-                      setShowReplacePromptForId(null);
-                    }}
-                    style={SMALL_BTN_STYLE}
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
-                  <button
-                    onClick={() => {
-                      setReplacingEntryId(entry.id);
-                      setReplaceDraft(entry.exerciseName);
-                      setShowReplacePromptForId(null);
-                    }}
-                    style={SMALL_BTN_STYLE}
-                  >
-                    Replace
-                  </button>
-                  <button
-                    onClick={() => openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName })}
-                    style={SMALL_BTN_STYLE}
-                  >
-                    History
-                  </button>
-                </>
-              )}
+              <>
+                <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
+                <button
+                  onClick={() => openReplaceSearch(entry, entryIndex)}
+                  style={SMALL_BTN_STYLE}
+                >
+                  Replace
+                </button>
+                <button
+                  onClick={() => openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName })}
+                  style={SMALL_BTN_STYLE}
+                >
+                  History
+                </button>
+              </>
             </div>
             <div>
               <button
@@ -1868,58 +1974,6 @@ function WorkoutPage({
               </button>
             </div>
           </div>
-
-          {showReplacePromptForId === entry.id && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <div style={{ color: '#ddd', alignSelf: 'center' }}>Replace for:</div>
-              <button
-                onClick={() => {
-                  const trimmed = String(replaceDraft || '').trim();
-                  if (!trimmed) {
-                    alert('Name cannot be empty');
-                    return;
-                  }
-                  if (typeof onReplaceExercise === 'function') {
-                    onReplaceExercise({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }, trimmed, "remaining");
-                  }
-                  setReplacingEntryId(null);
-                  setReplaceDraft('');
-                  setShowReplacePromptForId(null);
-                }}
-                style={SMALL_BTN_STYLE}
-              >
-                Remaining meso
-              </button>
-              <button
-                onClick={() => {
-                  const trimmed = String(replaceDraft || '').trim();
-                  if (!trimmed) {
-                    alert('Name cannot be empty');
-                    return;
-                  }
-                  if (typeof onReplaceExercise === 'function') {
-                    onReplaceExercise({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }, trimmed, "today");
-                  }
-                  setReplacingEntryId(null);
-                  setReplaceDraft('');
-                  setShowReplacePromptForId(null);
-                }}
-                style={SMALL_BTN_STYLE}
-              >
-                Today only
-              </button>
-              <button
-                onClick={() => {
-                  setReplacingEntryId(null);
-                  setReplaceDraft('');
-                  setShowReplacePromptForId(null);
-                }}
-                style={SMALL_BTN_STYLE}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
 
           {openNotes[entry.id] ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -2027,6 +2081,116 @@ function WorkoutPage({
           )}
         </div>
       </div>
+
+      {replaceSearchOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 30 }}>
+          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 980, width: '100%', maxHeight: '85vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <h3 style={{ margin: 0 }}>
+                Replace Exercise{replaceTargetEntry ? ` - ${replaceTargetEntry.exerciseName}` : ''}
+              </h3>
+              <button onClick={closeReplaceSearch} style={BTN_STYLE}>Cancel</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+              <input
+                value={replaceSearchText}
+                onChange={(e) => setReplaceSearchText(e.target.value)}
+                placeholder="Search name..."
+                style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+              />
+              <select value={replaceSearchPrimary} onChange={(e) => setReplaceSearchPrimary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Primary Muscle (All)</option>
+                {replacePrimaryMuscles.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <select value={replaceSearchSecondary} onChange={(e) => setReplaceSearchSecondary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Secondary Muscle (All)</option>
+                {replaceSecondaryMuscles.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <select value={replaceSearchMachine} onChange={(e) => setReplaceSearchMachine(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Machine (All)</option>
+                <option value="Yes">Machine (Yes)</option>
+                <option value="No">Machine (No)</option>
+              </select>
+              <select value={replaceSearchFreeWeight} onChange={(e) => setReplaceSearchFreeWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Free Weight (All)</option>
+                <option value="Yes">Free Weight (Yes)</option>
+                <option value="No">Free Weight (No)</option>
+              </select>
+              <select value={replaceSearchCable} onChange={(e) => setReplaceSearchCable(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Cable (All)</option>
+                <option value="Yes">Cable (Yes)</option>
+                <option value="No">Cable (No)</option>
+              </select>
+              <select value={replaceSearchBodyWeight} onChange={(e) => setReplaceSearchBodyWeight(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Bodyweight (All)</option>
+                <option value="Yes">Bodyweight (Yes)</option>
+                <option value="No">Bodyweight (No)</option>
+              </select>
+              <select value={replaceSearchCompound} onChange={(e) => setReplaceSearchCompound(e.target.value as "All" | "Yes" | "No")} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+                <option value="All">Compound (All)</option>
+                <option value="Yes">Compound (Yes)</option>
+                <option value="No">Compound (No)</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12, minHeight: 280 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600 }}>Results</div>
+                  <div style={{ color: '#777', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                  {replaceFilteredCatalog.length === 0 ? (
+                    <div style={{ color: '#777' }}>No matches.</div>
+                  ) : (
+                    replaceFilteredCatalog.map((ex) => (
+                      <div key={ex.id} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{ex.name}</div>
+                          <div style={{ color: '#777', fontSize: 12 }}>
+                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
+                          </div>
+                        </div>
+                        <button onClick={() => addReplaceQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
+                {replaceQueue.length === 0 ? (
+                  <div style={{ color: '#777' }}>No exercises selected.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {replaceQueue.map((q) => (
+                      <div key={q.name} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>{q.name}</div>
+                        <button onClick={() => removeReplaceQueue(q.name)} style={SMALL_BTN_STYLE}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                  <button onClick={closeReplaceSearch} style={BTN_STYLE}>Cancel</button>
+                  <button onClick={() => applyReplaceQueue("today")} style={PRIMARY_BTN_STYLE} disabled={replaceQueue.length === 0}>
+                    Today Only
+                  </button>
+                  <button onClick={() => applyReplaceQueue("remaining")} style={PRIMARY_BTN_STYLE} disabled={replaceQueue.length === 0}>
+                    Rest of Meso
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {historyOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 30 }}>
