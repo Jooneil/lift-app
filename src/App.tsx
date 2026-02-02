@@ -959,7 +959,7 @@ function AuthedApp({
           return next;
         })
       );
-      if (nextPlanForSave?.serverId) queuePlanSave(nextPlanForSave);
+      if (nextPlanForSave && (nextPlanForSave as Plan).serverId) queuePlanSave(nextPlanForSave as Plan);
     },
     [selectedPlan, ensureExerciseByName, queuePlanSave]
   );
