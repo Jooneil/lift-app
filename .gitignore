@@ -39,3 +39,9 @@ server/.env
 server/.env.local
 server/.env.*.local
 
+# Local backup/version snapshots (contain node_modules)
+Lift App Versions/
+
+# Windows device-name artifact
+nul
+

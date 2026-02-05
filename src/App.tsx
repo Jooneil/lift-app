@@ -134,7 +134,7 @@ function planToCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>): st
       if (!dy.items || dy.items.length === 0) continue;
       let seed: Record<string, string> = {};
       try {
-        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${di}`;
+        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dy.id}`;
         const raw = localStorage.getItem(seedKey);
         if (raw) seed = JSON.parse(raw) || {};
       } catch { /* ignore */ }
@@ -199,21 +199,6 @@ function exportPlanCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>)
   downloadCSV(`${plan.name || 'plan'}.csv`, csv);
 }
 
-// Some environments can accidentally store garbled unicode (mojibake). Sanitize display names where needed.
-/* function sanitizeName(name: any, fallback: string) {
-  try {
-    if (!name || typeof name !== 'string') return fallback;
-    const s = name;
-    if (s.trim() === '') return fallback;
-    // Common mojibake fragment seen in this repo: starts with 'Ãƒ'
-    if (s.includes('Ãƒ') || s.includes('Ã…') || s.includes('�')) return fallback;
-    return s;
-  } catch {
-    return fallback;
-  }
-}
-
-*/
 // Fix common mojibake (UTF‑8 shown as Windows‑1252/Latin‑1) when reading data.
 function fixMojibake(value: unknown): string {
   const s = typeof value === 'string' ? value : '';
@@ -297,6 +282,45 @@ function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
   return { ...prev, entries: nextEntries };
 }
 
+
+function mapRowToWeeks(d: import("./api").ServerPlanData, { includeLegacyFlatDays = false } = {}): PlanWeek[] {
+  if (Array.isArray(d.weeks)) {
+    return (d.weeks as ServerPlanWeek[]).map((week) => ({
+      id: week.id ?? uuid(),
+      name: fixMojibake(week.name) || "Week",
+      days: (week.days ?? []).map((day: ServerPlanDayRow) => ({
+        id: day.id ?? uuid(),
+        name: fixMojibake(day.name) || "Day",
+        items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
+          id: item.id ?? uuid(),
+          exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
+          exerciseName: fixMojibake(item.exerciseName) || "Exercise",
+          targetSets: Number(item.targetSets) || 0,
+          targetReps: item.targetReps ?? "",
+        })),
+      })),
+    }));
+  }
+  // Legacy plans stored days at the top level without weeks
+  if (includeLegacyFlatDays && Array.isArray(d.days) && d.days.length > 0) {
+    return [{
+      id: uuid(),
+      name: "Week 1",
+      days: (d.days as ServerPlanDayRow[]).map((day) => ({
+        id: day.id ?? uuid(),
+        name: fixMojibake(day.name) || "Day",
+        items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
+          id: item.id ?? uuid(),
+          exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
+          exerciseName: fixMojibake(item.exerciseName) || "Exercise",
+          targetSets: Number(item.targetSets) || 0,
+          targetReps: item.targetReps ?? "",
+        })),
+      })),
+    }];
+  }
+  return [];
+}
 
 function firstWeekDayOf(plan: Plan) {
   const wk = plan.weeks[0] ?? null;
@@ -619,6 +643,7 @@ function AuthedApp({
 
   // Debounced auto-save for plan edits when the plan already exists on server
   const planSaveDebounceRef = useRef<number | null>(null);
+  const prefsSaveDebounceRef = useRef<number | null>(null);
   const queuePlanSave = useCallback((planToSave: Plan) => {
     if (!planToSave?.serverId) return;
     try { if (planSaveDebounceRef.current) window.clearTimeout(planSaveDebounceRef.current); } catch {}
@@ -640,50 +665,13 @@ function AuthedApp({
     loadCustomExercises();
   }, [loadExercises, loadCatalogExercises, loadCustomExercises]);
 
-  const mapServerPlan = (row: ServerPlanRow): Plan => {
-    const d = (row?.data ?? {}) as import("./api").ServerPlanData;
-    const weeks: PlanWeek[] = Array.isArray(d.weeks)
-      ? (d.weeks as ServerPlanWeek[]).map((week) => ({
-          id: week.id ?? uuid(),
-          name: fixMojibake(week.name) || "Week",
-          days: (week.days ?? []).map((day: ServerPlanDayRow) => ({
-            id: day.id ?? uuid(),
-            name: fixMojibake(day.name) || "Day",
-            items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
-              id: item.id ?? uuid(),
-              exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
-              exerciseName: fixMojibake(item.exerciseName) || "Exercise",
-              targetSets: Number(item.targetSets) || 0,
-              targetReps: item.targetReps ?? "",
-            })),
-          })),
-        }))
-      : [
-          {
-            id: uuid(),
-            name: "Week 1",
-            days: (d.days ?? []).map((day: ServerPlanDayRow) => ({
-            id: day.id ?? uuid(),
-            name: fixMojibake(day.name) || "Day",
-            items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
-              id: item.id ?? uuid(),
-              exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
-              exerciseName: fixMojibake(item.exerciseName) || "Exercise",
-              targetSets: Number(item.targetSets) || 0,
-              targetReps: item.targetReps ?? "",
-            })),
-          })),
-        },
-        ];
-
-    return {
-      id: uuid(),
-      serverId: row.id,
-      predecessorPlanId: typeof row.predecessor_plan_id === "string" ? row.predecessor_plan_id : undefined,
-      name: fixMojibake(row.name) || "Plan",
-      weeks,
-    };
-  };
+  const mapServerPlan = (row: ServerPlanRow): Plan => ({
+    id: uuid(),
+    serverId: row.id,
+    predecessorPlanId: typeof row.predecessor_plan_id === "string" ? row.predecessor_plan_id : undefined,
+    name: fixMojibake(row.name) || "Plan",
+    weeks: mapRowToWeeks((row?.data ?? {}) as import("./api").ServerPlanData, { includeLegacyFlatDays: true }),
+  });
 
   const handleDeleteArchivedPlan = async (plan: Plan) => {
     if (!plan.serverId) return;
@@ -808,7 +796,14 @@ function AuthedApp({
     const weekId = selectedWeekId ?? null;
     const dayId = selectedDayId ?? null;
     const planIdStr: string | null = serverId == null ? null : String(serverId);
-    upsertUserPrefs({ last_plan_server_id: planIdStr, last_week_id: weekId, last_day_id: dayId }).catch(() => {});
+    if (prefsSaveDebounceRef.current) window.clearTimeout(prefsSaveDebounceRef.current);
+    prefsSaveDebounceRef.current = window.setTimeout(() => {
+      upsertUserPrefs({ last_plan_server_id: planIdStr, last_week_id: weekId, last_day_id: dayId }).catch(() => {});
+      prefsSaveDebounceRef.current = null;
+    }, 1200);
+    return () => {
+      if (prefsSaveDebounceRef.current) window.clearTimeout(prefsSaveDebounceRef.current);
+    };
   }, [plans, selectedPlanId, selectedWeekId, selectedDayId]);
 
   useEffect(() => {
@@ -946,39 +941,44 @@ function AuthedApp({
     setViewArchivedSessions({});
     if (!plan.serverId) return;
     setViewArchivedLoading(true);
-    const map: ArchivedSessionMap = {};
     try {
-      for (const week of plan.weeks) {
-        map[week.id] = {};
-        for (const day of week.days) {
-          let sessionData: Session | null = null;
+      const fetches = plan.weeks.flatMap((week) =>
+        week.days.map(async (day) => {
           try {
-            const raw = await sessionApi.last(plan.serverId, week.id, day.id);
+            const raw = await sessionApi.last(plan.serverId!, week.id, day.id);
             if (raw && raw.entries) {
-              sessionData = {
-                id: uuid(),
-                planId: plan.id,
-                planWeekId: week.id,
-                planDayId: day.id,
-                date: raw.date ?? new Date().toISOString(),
-                entries: raw.entries.map((entry: SessionEntryPayload) => ({
+              return {
+                weekId: week.id,
+                dayId: day.id,
+                session: {
                   id: uuid(),
-                  exerciseId: entry.exerciseId,
-                  exerciseName: entry.exerciseName ?? "Exercise",
-                  sets: (entry.sets ?? []).map((set: Partial<SessionSetPayload>, index: number) => ({
+                  planId: plan.id,
+                  planWeekId: week.id,
+                  planDayId: day.id,
+                  date: raw.date ?? new Date().toISOString(),
+                  entries: raw.entries.map((entry: SessionEntryPayload) => ({
                     id: uuid(),
-                    setIndex: index,
-                    weight: set.weight ?? null,
-                    reps: set.reps ?? null,
+                    exerciseId: entry.exerciseId,
+                    exerciseName: entry.exerciseName ?? "Exercise",
+                    sets: (entry.sets ?? []).map((set: Partial<SessionSetPayload>, index: number) => ({
+                      id: uuid(),
+                      setIndex: index,
+                      weight: set.weight ?? null,
+                      reps: set.reps ?? null,
+                    })),
                   })),
-                })),
+                } as Session,
               };
             }
-          } catch {
-            sessionData = null;
-          }
-          map[week.id][day.id] = sessionData;
-        }
+          } catch { /* ignore */ }
+          return { weekId: week.id, dayId: day.id, session: null };
+        })
+      );
+      const results = await Promise.all(fetches);
+      const map: ArchivedSessionMap = {};
+      for (const week of plan.weeks) map[week.id] = {};
+      for (const { weekId, dayId, session: s } of results) {
+        map[weekId][dayId] = s;
       }
       setViewArchivedSessions(map);
     } finally {
@@ -1618,6 +1618,10 @@ function WorkoutPage({
   const [historyPr, setHistoryPr] = useState<{ date: string; weight: number; reps: number } | null>(null);
   const historyCacheRef = useRef<SessionRow[] | null>(null);
 
+  useEffect(() => {
+    historyCacheRef.current = null;
+  }, [plan.serverId]);
+
   const currentWeek = useMemo(
     () => plan.weeks.find((w) => w.days.some((d) => d.id === day.id)) || null,
     [plan.weeks, day.id]
@@ -1953,9 +1957,8 @@ function WorkoutPage({
           if (Object.keys(ghostMap).length > 0) setGhost(ghostMap);
           else setGhost({});
 
-          const dayIndex = ordered[currentIdx]?.dayIndex ?? 0;
           try {
-            const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dayIndex}`;
+            const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${day.id}`;
             const raw = localStorage.getItem(seedKey);
             if (raw) {
               const seed = JSON.parse(raw) as Record<string, string>;
@@ -2065,7 +2068,9 @@ function WorkoutPage({
         historyCacheRef.current = rows;
       }
       const targetName = normalizeExerciseName(entry.exerciseName).toLowerCase();
-      const items: Array<{ date: string; weight: number; reps: number }> = [];
+
+      // Collect all valid sets for this exercise across all sessions
+      const allSets: Array<{ date: string; weight: number; reps: number }> = [];
       for (const row of rows) {
         const data = (row as SessionRow).data;
         if (!data || !Array.isArray(data.entries)) continue;
@@ -2082,42 +2087,38 @@ function WorkoutPage({
             const reps = typeof set.reps === 'number' ? set.reps : null;
             if (weight == null || reps == null) continue;
             if (Number.isNaN(weight) || Number.isNaN(reps)) continue;
-            items.push({ date: sessionDate, weight, reps });
+            allSets.push({ date: sessionDate, weight, reps });
           }
         }
       }
-      items.sort((a, b) => {
-        const at = Date.parse(a.date || '') || 0;
-        const bt = Date.parse(b.date || '') || 0;
-        return bt - at;
-      });
 
-      let pr: { date: string; weight: number; reps: number } | null = null;
-      for (const item of items) {
-        if (!pr) {
-          pr = item;
-          continue;
-        }
-        if (item.weight > pr.weight) {
-          pr = item;
-          continue;
-        }
-        if (item.weight === pr.weight && item.reps > pr.reps) {
-          pr = item;
-          continue;
-        }
-        if (item.weight === pr.weight && item.reps === pr.reps) {
-          const it = Date.parse(item.date || '') || 0;
-          const pt = Date.parse(pr.date || '') || 0;
-          if (it > pt) pr = item;
+      // Group by date (date portion only), keep only the best set per session
+      const bestByDate = new Map<string, { date: string; weight: number; reps: number }>();
+      for (const s of allSets) {
+        const dateKey = s.date ? new Date(s.date).toLocaleDateString() : '';
+        if (!dateKey) continue;
+        const cur = bestByDate.get(dateKey);
+        if (!cur || s.weight > cur.weight || (s.weight === cur.weight && s.reps > cur.reps)) {
+          bestByDate.set(dateKey, s);
         }
       }
 
-      const rest = pr
-        ? items.filter((item) => !(item.weight === pr!.weight && item.reps === pr!.reps && item.date === pr!.date))
-        : items;
+      // Sort oldest first (ascending) for progression view
+      const grouped = Array.from(bestByDate.values()).sort((a, b) => {
+        return (Date.parse(a.date || '') || 0) - (Date.parse(b.date || '') || 0);
+      });
+
+      // PR = highest weight, ties broken by most reps
+      let pr: { date: string; weight: number; reps: number } | null = null;
+      for (const item of grouped) {
+        if (!pr || item.weight > pr.weight || (item.weight === pr.weight && item.reps > pr.reps)) {
+          pr = item;
+        }
+      }
+
       setHistoryPr(pr);
-      setHistoryItems(rest);
+      // History list excludes the PR entry so it isn't shown twice
+      setHistoryItems(pr ? grouped.filter((item) => item !== pr) : grouped);
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : String(err));
       setHistoryItems([]);
@@ -2128,6 +2129,7 @@ function WorkoutPage({
   };
 
   const openHistory = (entry: { exerciseId?: string; exerciseName: string }) => {
+    historyCacheRef.current = null;
     setHistoryEntry(entry);
     setHistoryOpen(true);
     void loadHistoryFor(entry);
@@ -2179,10 +2181,8 @@ function WorkoutPage({
       ),
     };
     try {
-      const wIdx = plan.weeks.findIndex((w) => w.days.some((d) => d.id === day.id));
-      const dIdx = wIdx >= 0 ? plan.weeks[wIdx].days.findIndex((d) => d.id === day.id) : -1;
-      if (entry && wIdx >= 0 && dIdx >= 0) {
-        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dIdx}`;
+      if (entry) {
+        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${day.id}`;
         let seed: Record<string, string> = {};
         try {
           const raw = localStorage.getItem(seedKey);
@@ -2332,8 +2332,9 @@ function WorkoutPage({
                       onChange={(e) => {
                         const v = e.target.value;
                         const normalized = v.replace(',', '.');
+                        const num = normalized === '' ? null : Number(normalized);
                         updateSet(entry.id, set.id, {
-                          weight: normalized === '' ? null : Number(normalized),
+                          weight: num !== null && Number.isNaN(num) ? null : num,
                         });
                       }}
                       style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.weight == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
@@ -2342,11 +2343,12 @@ function WorkoutPage({
                       inputMode="numeric"
                       placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
                       value={set.reps ?? ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const num = e.target.value === '' ? null : Number(e.target.value);
                         updateSet(entry.id, set.id, {
-                          reps: e.target.value === '' ? null : Number(e.target.value),
-                        })
-                      }
+                          reps: num !== null && Number.isNaN(num) ? null : num,
+                        });
+                      }}
                       style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.reps == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
                     />
                   </div>
@@ -2672,27 +2674,32 @@ function WorkoutPage({
               <div style={{ color: '#777' }}>Loading history...</div>
             ) : historyError ? (
               <div style={{ color: '#f88' }}>{historyError}</div>
+            ) : !historyPr && historyItems.length === 0 ? (
+              <div style={{ color: '#777' }}>No recorded sets yet.</div>
             ) : (
               <>
-                {historyPr ? (
-                  <div style={{ border: '2px solid #fff', borderRadius: 10, padding: 10 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 6 }}>PR</div>
-                    <div style={{ fontSize: 18 }}>
-                      {historyPr.weight} x {historyPr.reps}
+                {historyPr && (
+                  <div style={{ border: '2px solid #4c4', borderRadius: 10, padding: 10, background: 'rgba(68,204,68,0.08)' }}>
+                    <div style={{ fontWeight: 700, color: '#4c4', fontSize: 13, marginBottom: 4 }}>Personal Best</div>
+                    <div style={{ fontSize: 20, fontWeight: 600 }}>
+                      {historyPr.weight} <span style={{ color: '#888', fontSize: 14, fontWeight: 400 }}>×</span> {historyPr.reps}
                     </div>
-                    <div style={{ color: '#aaa', fontSize: 12 }}>{formatHistoryDate(historyPr.date)}</div>
+                    <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>{formatHistoryDate(historyPr.date)}</div>
                   </div>
-                ) : (
-                  <div style={{ color: '#777' }}>No recorded sets yet.</div>
                 )}
 
                 {historyItems.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ fontWeight: 600 }}>History</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#888', marginBottom: 6 }}>Progression</div>
                     {historyItems.map((item, idx) => (
-                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} style={{ border: '1px solid #333', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <div>{item.weight} x {item.reps}</div>
-                        <div style={{ color: '#aaa', fontSize: 12 }}>{formatHistoryDate(item.date)}</div>
+                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: idx < historyItems.length - 1 ? '1px solid #222' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#555' }} />
+                          <span style={{ fontWeight: 500 }}>{item.weight}</span>
+                          <span style={{ color: '#666' }}>×</span>
+                          <span style={{ fontWeight: 500 }}>{item.reps}</span>
+                        </div>
+                        <div style={{ color: '#666', fontSize: 12 }}>{formatHistoryDate(item.date)}</div>
                       </div>
                     ))}
                   </div>
@@ -2863,27 +2870,12 @@ function BuilderPage({
 
   
 
-  const mapServerTemplate = (row: ServerPlanRow): Plan => {
-    const d = (row?.data ?? {}) as ServerPlanData;
-    const weeks: PlanWeek[] = Array.isArray(d.weeks)
-      ? (d.weeks as ServerPlanWeek[]).map((week) => ({
-          id: week.id ?? uuid(),
-          name: fixMojibake(week.name) || "Week",
-          days: (week.days ?? []).map((day: ServerPlanDayRow) => ({
-            id: day.id ?? uuid(),
-            name: fixMojibake(day.name) || "Day",
-            items: (day.items ?? []).map((item: ServerPlanItemRow) => ({
-              id: item.id ?? uuid(),
-              exerciseId: item.exerciseId != null ? String(item.exerciseId) : undefined,
-              exerciseName: fixMojibake(item.exerciseName) || "Exercise",
-              targetSets: Number(item.targetSets) || 0,
-              targetReps: item.targetReps ?? "",
-            })),
-          })),
-        }))
-      : [];
-    return { id: uuid(), serverId: row.id, name: fixMojibake(row.name) || "Template", weeks };
-  };
+  const mapServerTemplate = (row: ServerPlanRow): Plan => ({
+    id: uuid(),
+    serverId: row.id,
+    name: fixMojibake(row.name) || "Template",
+    weeks: mapRowToWeeks((row?.data ?? {}) as ServerPlanData),
+  });
 
   const loadTemplates = useCallback(async () => {
     setTemplatesLoading(true);
@@ -3107,27 +3099,6 @@ function BuilderPage({
       ),
     }));
 
-    // Also queue a save for server-backed plans
-    if (selectedPlan.serverId) {
-      // Prepare next weeks structure (kept for potential future autosave)
-      /* const nextWeeks = selectedPlan.weeks.map((week) =>
-        week.id === weekId
-          ? {
-              ...week,
-              days: week.days.map((day) =>
-                day.id === dayId
-                  ? {
-                      ...day,
-                      items: day.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
-                    }
-                  : day
-              ),
-            }
-          : week
-      ); */
-      // Save will happen when user clicks Save Plan; autosave removed to avoid scope issues
-      // queuePlanSave({ ...selectedPlan, weeks: nextWeeks });
-    }
   };
 
   const handleExerciseNameCommit = async (

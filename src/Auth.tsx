@@ -84,7 +84,9 @@ export default function Auth({
       </h2>
       <form onSubmit={submit}>
         <div style={{ display: "grid", gap: 8 }}>
-          <input placeholder="email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} style={{ padding: 8 }} />
+          {mode !== 'reset' && (
+            <input placeholder="email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} style={{ padding: 8 }} />
+          )}
           {(mode === 'login' || mode === 'register' || mode === 'reset') && (
             <input placeholder={mode === 'reset' ? 'new password' : 'password'} type="password" value={password} onChange={(e)=>setPassword(e.target.value)} style={{ padding: 8 }} />
           )}

@@ -264,8 +264,8 @@ app.post("/api/plans/:id/archive", requireAuth, (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
 
-  const sql = "UPDATE plans SET archived = 1 WHERE id = ?";
-  db.run(sql, [id], function (err) {
+  const sql = "UPDATE plans SET archived = 1 WHERE id = ? AND user_id = ?";
+  db.run(sql, [id, req.session.user.id], function (err) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) return res.status(404).json({ error: "Plan not found" });
     res.json({ ok: true, id });
