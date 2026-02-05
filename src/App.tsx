@@ -413,7 +413,7 @@ function AuthedApp({
   user: { id: number; username: string };
   onLogout: () => void;
 }) {
-  const [mode, setMode] = useState<Mode>("builder");
+  const [mode, setMode] = useState<Mode>("workout");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
@@ -654,10 +654,6 @@ function AuthedApp({
     }, 800);
   }, []);
 
-  // Ensure default view is Builder on load
-  useEffect(() => {
-    setMode("builder");
-  }, []);
 
   useEffect(() => {
     loadExercises();
