@@ -72,8 +72,16 @@ export default function Auth({
   };
 
   return (
-    <div style={{ maxWidth: 360, margin: "40px auto", padding: 16, border: "1px solid #444", borderRadius: 12 }}>
-      <h2>
+    <div style={{
+      maxWidth: 380,
+      margin: "60px auto",
+      padding: 24,
+      background: "var(--bg-elevated)",
+      border: "1px solid var(--border-subtle)",
+      borderRadius: 16,
+      boxShadow: "var(--shadow-lg)"
+    }}>
+      <h2 style={{ marginTop: 0, marginBottom: 24, textAlign: 'center', fontSize: 24, fontWeight: 600 }}>
         {mode === 'login'
           ? 'Sign In'
           : mode === 'register'
@@ -83,19 +91,89 @@ export default function Auth({
               : 'Set New Password'}
       </h2>
       <form onSubmit={submit}>
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 12 }}>
           {mode !== 'reset' && (
-            <input placeholder="email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} style={{ padding: 8 }} />
+            <input
+              placeholder="Email"
+              type="email"
+              value={email}
+              onChange={(e)=>setEmail(e.target.value)}
+              style={{
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: '1px solid var(--border-default)',
+                background: 'var(--bg-input)',
+                color: 'var(--text-primary)',
+                fontSize: 16,
+              }}
+            />
           )}
           {(mode === 'login' || mode === 'register' || mode === 'reset') && (
-            <input placeholder={mode === 'reset' ? 'new password' : 'password'} type="password" value={password} onChange={(e)=>setPassword(e.target.value)} style={{ padding: 8 }} />
+            <input
+              placeholder={mode === 'reset' ? 'New password' : 'Password'}
+              type="password"
+              value={password}
+              onChange={(e)=>setPassword(e.target.value)}
+              style={{
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: '1px solid var(--border-default)',
+                background: 'var(--bg-input)',
+                color: 'var(--text-primary)',
+                fontSize: 16,
+              }}
+            />
           )}
           {mode === 'reset' && (
-            <input placeholder="confirm new password" type="password" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} style={{ padding: 8 }} />
+            <input
+              placeholder="Confirm new password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e)=>setConfirmPassword(e.target.value)}
+              style={{
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: '1px solid var(--border-default)',
+                background: 'var(--bg-input)',
+                color: 'var(--text-primary)',
+                fontSize: 16,
+              }}
+            />
           )}
-          {err && <div style={{ color: 'tomato' }}>{err}</div>}
-          {message && <div style={{ color: '#7fc47f' }}>{message}</div>}
-          <button type="submit" style={{ padding: 10 }} disabled={busy}>
+          {err && (
+            <div style={{
+              color: '#f88',
+              padding: '10px 12px',
+              background: 'rgba(255, 136, 136, 0.1)',
+              borderRadius: 8,
+              fontSize: 14
+            }}>{err}</div>
+          )}
+          {message && (
+            <div style={{
+              color: 'var(--success)',
+              padding: '10px 12px',
+              background: 'var(--success-muted)',
+              borderRadius: 8,
+              fontSize: 14
+            }}>{message}</div>
+          )}
+          <button
+            type="submit"
+            style={{
+              padding: '14px 16px',
+              marginTop: 8,
+              borderRadius: 10,
+              border: '1px solid var(--border-strong)',
+              background: 'var(--text-primary)',
+              color: 'var(--bg-base)',
+              fontWeight: 600,
+              fontSize: 16,
+              cursor: busy ? 'wait' : 'pointer',
+              opacity: busy ? 0.7 : 1,
+            }}
+            disabled={busy}
+          >
             {busy
               ? 'Please wait...'
               : mode === 'login'
@@ -108,18 +186,62 @@ export default function Auth({
           </button>
         </div>
       </form>
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {mode === 'login' && (
-          <div style={{ display: 'grid', gap: 8 }}>
-            <button onClick={()=>setMode('register')}>Need an account? Sign Up</button>
-            <button onClick={()=>setMode('forgot')}>Forgot password?</button>
-          </div>
+          <>
+            <button
+              onClick={()=>setMode('register')}
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: '1px solid var(--border-subtle)',
+                background: 'transparent',
+                color: 'var(--text-secondary)',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >Need an account? Sign Up</button>
+            <button
+              onClick={()=>setMode('forgot')}
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >Forgot password?</button>
+          </>
         )}
         {mode === 'register' && (
-          <button onClick={()=>setMode('login')}>Have an account? Sign In</button>
+          <button
+            onClick={()=>setMode('login')}
+            style={{
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid var(--border-subtle)',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >Have an account? Sign In</button>
         )}
         {(mode === 'forgot' || mode === 'reset') && !isForcedReset && (
-          <button onClick={()=>setMode('login')}>Back to Sign In</button>
+          <button
+            onClick={()=>setMode('login')}
+            style={{
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid var(--border-subtle)',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >Back to Sign In</button>
         )}
       </div>
     </div>

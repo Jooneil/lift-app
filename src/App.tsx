@@ -78,18 +78,92 @@ const exerciseKey = (entry: { exerciseId?: string; exerciseName?: string | null 
   return `name:${name}`;
 };
 
-const BTN_STYLE = { padding: "8px 10px", borderRadius: 8, border: "1px solid #444", background: "transparent" } as const;
-const PRIMARY_BTN_STYLE = { padding: "10px 12px", borderRadius: 10, border: "1px solid #444", background: "#222", color: "#fff" } as const;
-const SMALL_BTN_STYLE = { padding: "6px 8px", borderRadius: 8, border: "1px solid #444", background: "transparent", fontSize: 12 } as const;
+const BTN_STYLE = {
+  padding: "10px 14px",
+  borderRadius: 10,
+  border: "1px solid var(--border-default)",
+  background: "var(--bg-card)",
+  color: "var(--text-primary)",
+  fontWeight: 500,
+  transition: "all 0.15s ease",
+} as const;
+
+const PRIMARY_BTN_STYLE = {
+  padding: "12px 16px",
+  borderRadius: 10,
+  border: "1px solid var(--border-strong)",
+  background: "var(--text-primary)",
+  color: "var(--bg-base)",
+  fontWeight: 600,
+  boxShadow: "0 2px 8px rgba(255, 255, 255, 0.1)",
+} as const;
+
+const SMALL_BTN_STYLE = {
+  padding: "6px 10px",
+  borderRadius: 8,
+  border: "1px solid var(--border-subtle)",
+  background: "var(--bg-elevated)",
+  color: "var(--text-secondary)",
+  fontSize: 12,
+  fontWeight: 500,
+  transition: "all 0.15s ease",
+} as const;
+
 const FILTER_TOGGLE_STYLE = {
   display: "inline-flex",
   alignItems: "center",
   gap: 6,
-  padding: "6px 10px",
+  padding: "8px 12px",
   borderRadius: 999,
-  border: "1px solid #444",
-  background: "transparent",
+  border: "1px solid var(--border-subtle)",
+  background: "var(--bg-elevated)",
   fontSize: 12,
+  fontWeight: 500,
+  transition: "all 0.15s ease",
+} as const;
+
+const CARD_STYLE = {
+  background: "var(--bg-card)",
+  border: "1px solid var(--border-subtle)",
+  borderRadius: 14,
+  padding: 16,
+  boxShadow: "var(--shadow-card)",
+} as const;
+
+const MODAL_OVERLAY_STYLE = {
+  position: "fixed" as const,
+  inset: 0,
+  background: "rgba(0, 0, 0, 0.75)",
+  backdropFilter: "blur(4px)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 16,
+  zIndex: 30,
+} as const;
+
+const MODAL_CONTENT_STYLE = {
+  background: "var(--bg-elevated)",
+  border: "1px solid var(--border-subtle)",
+  borderRadius: 16,
+  padding: 20,
+  boxShadow: "var(--shadow-lg)",
+  maxHeight: "85vh",
+  overflowY: "auto" as const,
+} as const;
+
+const INPUT_STYLE = {
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid var(--border-default)",
+  background: "var(--bg-input)",
+  color: "var(--text-primary)",
+  transition: "all 0.15s ease",
+} as const;
+
+const SELECT_STYLE = {
+  ...INPUT_STYLE,
+  cursor: "pointer",
 } as const;
 
 // Shared CSV export helpers (used by active and archived plan exports)
@@ -1253,26 +1327,61 @@ function AuthedApp({
   })();
   
   return (
-    <div style={{ maxWidth: 680, width: "100%", margin: "0 auto", padding: 16, fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, marginBottom: 12, borderBottom: "1px solid #444" }}>
+    <div style={{ maxWidth: 680, width: "100%", margin: "0 auto", padding: 20 }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingBottom: 12,
+        marginBottom: 16,
+        borderBottom: "1px solid var(--border-subtle)"
+      }}>
         <div style={{ position: 'relative' }}>
           <button onClick={() => setUserMenuOpen((v) => !v)} style={BTN_STYLE} aria-expanded={userMenuOpen} aria-haspopup="menu">Profile</button>
           {userMenuOpen && (
-            <div role="menu" style={{ position: 'absolute', top: '100%', left: 0, background: '#111', border: '1px solid #444', borderRadius: 8, padding: 8, marginTop: 6, minWidth: 200, zIndex: 30 }}>
-              <div style={{ padding: '4px 6px', color: '#bbb', fontSize: 12 }}>Logged in as</div>
+            <div role="menu" style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 12,
+              padding: 12,
+              marginTop: 8,
+              minWidth: 220,
+              zIndex: 30,
+              boxShadow: 'var(--shadow-lg)'
+            }}>
+              <div style={{ padding: '4px 8px', color: 'var(--text-muted)', fontSize: 12, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logged in as</div>
               <div
-                style={{ padding: '0 6px 6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}
+                style={{ padding: '4px 8px 12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220, color: 'var(--text-primary)' }}
                 title={user.username}
               >
                 <strong>{user.username}</strong>
               </div>
-              <button onClick={() => { setUserMenuOpen(false); onLogout(); }} style={SMALL_BTN_STYLE} role="menuitem">Logout</button>
+              <button onClick={() => { setUserMenuOpen(false); onLogout(); }} style={{ ...SMALL_BTN_STYLE, width: '100%' }} role="menuitem">Logout</button>
             </div>
           )}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }} style={BTN_STYLE} aria-pressed={mode === "builder"}>Builder</button>
-          <button onClick={() => { setUserMenuOpen(false); setMode("workout"); }} style={BTN_STYLE} aria-pressed={mode === "workout"}>Workout</button>
+          <button
+            onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }}
+            style={{
+              ...BTN_STYLE,
+              background: mode === "builder" ? "var(--accent-muted)" : "var(--bg-card)",
+              borderColor: mode === "builder" ? "var(--border-strong)" : "var(--border-default)"
+            }}
+            aria-pressed={mode === "builder"}
+          >Builder</button>
+          <button
+            onClick={() => { setUserMenuOpen(false); setMode("workout"); }}
+            style={{
+              ...BTN_STYLE,
+              background: mode === "workout" ? "var(--accent-muted)" : "var(--bg-card)",
+              borderColor: mode === "workout" ? "var(--border-strong)" : "var(--border-default)"
+            }}
+            aria-pressed={mode === "workout"}
+          >Workout</button>
           <button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} style={BTN_STYLE}>Archive</button>
         </div>
       </div>
@@ -1311,9 +1420,9 @@ function AuthedApp({
       )}
 
       {mode === "workout" && (
-        <div style={{ border: "1px solid #444", borderRadius: 12, padding: 12 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-            <label>Plan:</label>
+        <div style={CARD_STYLE}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+            <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Plan:</label>
             <select
               value={selectedPlanId ?? ''}
               onChange={(e) => {
@@ -1321,7 +1430,7 @@ function AuthedApp({
                 selectPlan(newPlanId);
                 setSession(null);
               }}
-              style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #444" }}
+              style={SELECT_STYLE}
             >
               {plans.length === 0 && <option value="">No plans yet</option>}
               {plans.map((p) => (
@@ -1333,7 +1442,7 @@ function AuthedApp({
 
             {selectedPlan && (
               <>
-                <label>Week:</label>
+                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Week:</label>
                 <select
                   value={selectedWeekId ?? ''}
                   onChange={(e) => {
@@ -1344,7 +1453,7 @@ function AuthedApp({
                     setSession(null);
                     setShouldAutoNavigate(false);
                   }}
-                  style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #444" }}
+                  style={SELECT_STYLE}
                 >
                   {selectedPlan.weeks.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -1353,7 +1462,7 @@ function AuthedApp({
                   ))}
                 </select>
 
-                <label>Day:</label>
+                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Day:</label>
                 <select
                   value={selectedDayId ?? ''}
                   onChange={(e) => {
@@ -1361,7 +1470,7 @@ function AuthedApp({
                     setSession(null);
                     setShouldAutoNavigate(false);
                   }}
-                  style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #444" }}
+                  style={SELECT_STYLE}
                 >
                   {(selectedWeek ?? { days: [] as PlanDay[] }).days.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -1374,15 +1483,15 @@ function AuthedApp({
           </div>
 
           {!selectedPlan ? (
-            <p style={{ color: '#777' }}>No plan selected.</p>
+            <p style={{ color: 'var(--text-muted)' }}>No plan selected.</p>
           ) : !selectedDay ? (
-            <div style={{ color: '#777' }}>Select a day.</div>
+            <div style={{ color: 'var(--text-muted)' }}>Select a day.</div>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
                 <div>
-                  <div style={{ fontWeight: 600 }}>{selectedPlan.name}</div>
-                  <div style={{ color: '#888', fontSize: 12 }}>{selectedDay.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: 18 }}>{selectedPlan.name}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{selectedDay.name}</div>
                 </div>
               </div>
 
@@ -1424,28 +1533,38 @@ function AuthedApp({
         </div>
       )}
       {showArchiveList && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 20 }}>
-          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 950, width: '100%', maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ ...MODAL_OVERLAY_STYLE, zIndex: 20 }}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 950, width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <h3 style={{ margin: 0 }}>Archived Plans</h3>
+              <h3 style={{ margin: 0, fontSize: 18 }}>Archived Plans</h3>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={closeArchive} style={BTN_STYLE}>Close</button>
               </div>
             </div>
-            {archivedError && <div style={{ color: '#f88' }}>{archivedError}</div>}
+            {archivedError && <div style={{ color: '#f88', padding: '8px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{archivedError}</div>}
             {archivedLoading ? (
-              <div style={{ color: '#777' }}>Loading archived plans...</div>
+              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading archived plans...</div>
             ) : archivedPlans.length === 0 ? (
-              <div style={{ color: '#777' }}>No archived plans yet.</div>
+              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>No archived plans yet.</div>
             ) : (
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ flex: '0 0 260px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {archivedPlans.map((plan) => (
                     <div
                       key={plan.id}
-                      style={{ border: '1px solid #333', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}
+                      style={{
+                        background: viewArchivedPlan?.id === plan.id ? 'var(--accent-muted)' : 'var(--bg-card)',
+                        border: `1px solid ${viewArchivedPlan?.id === plan.id ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
+                        borderRadius: 10,
+                        padding: 12,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 10,
+                        transition: 'all 0.15s ease',
+                      }}
                     >
-                      <button onClick={() => openArchivedPlan(plan)} style={BTN_STYLE}>
+                      <button onClick={() => openArchivedPlan(plan)} style={{ ...BTN_STYLE, flex: 1, textAlign: 'left' }}>
                         {plan.name}
                       </button>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -1455,11 +1574,20 @@ function AuthedApp({
                     </div>
                   ))}
                 </div>
-                <div style={{ flex: 1, minWidth: 320, border: '1px solid #333', borderRadius: 8, padding: 12, maxHeight: '60vh', overflowY: 'auto' }}>
+                <div style={{
+                  flex: 1,
+                  minWidth: 320,
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 12,
+                  padding: 16,
+                  maxHeight: '60vh',
+                  overflowY: 'auto'
+                }}>
                   {!viewArchivedPlan ? (
-                    <div style={{ color: '#777' }}>Select an archived plan to view details.</div>
+                    <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Select an archived plan to view details.</div>
                   ) : viewArchivedLoading ? (
-                    <div style={{ color: '#777' }}>Loading sessions...</div>
+                    <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading sessions...</div>
                   ) : (
                     <div>
                       <h3 style={{ marginTop: 0 }}>{viewArchivedPlan.name}</h3>
@@ -1488,31 +1616,36 @@ function AuthedApp({
                                         const sets = entry?.sets ?? [];
                                         const rowCount = Math.max(item.targetSets, sets.length);
                                         return (
-                                          <div key={item.id} style={{ border: '2px solid #fff', borderRadius: 8, padding: 8 }}>
-                                            <div style={{ fontWeight: 600 }}>{item.exerciseName}</div>
-                                            <div style={{ fontSize: 12, color: '#aaa', marginBottom: 6 }}>
+                                          <div key={item.id} style={{
+                                            background: 'var(--bg-elevated)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: 10,
+                                            padding: 12
+                                          }}>
+                                            <div style={{ fontWeight: 600, fontSize: 14 }}>{item.exerciseName}</div>
+                                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
                                               Target: {item.targetSets} set{item.targetSets === 1 ? '' : 's'}
                                               {item.targetReps ? ` - ${item.targetReps}` : ''}
                                             </div>
                                             {rowCount === 0 ? (
-                                              <div style={{ color: '#777' }}>No recorded sets.</div>
+                                              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No recorded sets.</div>
                                             ) : (
                                               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                                                 <thead>
                                                   <tr style={{ textAlign: 'left' }}>
-                                                    <th style={{ paddingBottom: 4, borderBottom: '1px solid #333' }}>Set</th>
-                                                    <th style={{ paddingBottom: 4, borderBottom: '1px solid #333' }}>Weight</th>
-                                                    <th style={{ paddingBottom: 4, borderBottom: '1px solid #333' }}>Reps</th>
+                                                    <th style={{ padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Set</th>
+                                                    <th style={{ padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Weight</th>
+                                                    <th style={{ padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Reps</th>
                                                   </tr>
                                                 </thead>
                                                 <tbody>
                                                   {Array.from({ length: rowCount }).map((_, idx) => {
                                                     const recorded = sets[idx];
                                                     return (
-                                                      <tr key={idx} style={{ borderBottom: '1px solid #222' }}>
-                                                        <td style={{ padding: '4px 0' }}>{idx + 1}</td>
-                                                        <td style={{ padding: '4px 0' }}>{recorded?.weight ?? '-'}</td>
-                                                        <td style={{ padding: '4px 0' }}>{recorded?.reps ?? '-'}</td>
+                                                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                                        <td style={{ padding: '8px 0', color: 'var(--text-secondary)' }}>{idx + 1}</td>
+                                                        <td style={{ padding: '8px 0', fontWeight: recorded?.weight != null ? 600 : 400 }}>{recorded?.weight ?? '-'}</td>
+                                                        <td style={{ padding: '8px 0', fontWeight: recorded?.reps != null ? 600 : 400 }}>{recorded?.reps ?? '-'}</td>
                                                       </tr>
                                                     );
                                                   })}
@@ -2250,11 +2383,19 @@ function WorkoutPage({
         ))}
       </datalist>
       {session.entries.map((entry, entryIndex) => (
-        <div key={entry.id} style={{ border: '2px solid #fff', borderRadius: 12, padding: 12, marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div key={entry.id} style={{
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-default)',
+          borderRadius: 14,
+          padding: 16,
+          marginBottom: 14,
+          boxShadow: 'var(--shadow-card)',
+          transition: 'all 0.15s ease',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <>
-                <h3 style={{ margin: 0 }}>{entry.exerciseName}</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{entry.exerciseName}</h3>
                 <button
                   onClick={() => openReplaceSearch(entry, entryIndex)}
                   style={SMALL_BTN_STYLE}
@@ -2277,7 +2418,8 @@ function WorkoutPage({
                 }}
                 style={{
                   ...SMALL_BTN_STYLE,
-                  border: `1px solid ${entry.note && String(entry.note).trim() !== '' ? '#0ff' : '#fff'}`,
+                  borderColor: entry.note && String(entry.note).trim() !== '' ? 'var(--success)' : 'var(--border-subtle)',
+                  background: entry.note && String(entry.note).trim() !== '' ? 'var(--success-muted)' : 'var(--bg-elevated)',
                 }}
                 title="Notes"
               >
@@ -2287,14 +2429,25 @@ function WorkoutPage({
           </div>
 
           {openNotes[entry.id] ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <textarea
                 value={notesDraft[entry.id] ?? ''}
                 onChange={(e) => setNotesDraft((prev) => ({ ...prev, [entry.id]: e.target.value }))}
-                style={{ padding: 8, borderRadius: 8, border: '1px solid #444', minHeight: 120, resize: 'vertical', width: '100%' }}
+                style={{
+                  ...INPUT_STYLE,
+                  minHeight: 120,
+                  resize: 'vertical',
+                  width: '100%',
+                }}
                 placeholder="Add notes for this exercise"
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  onClick={() => setOpenNotes((prev) => ({ ...prev, [entry.id]: false }))}
+                  style={SMALL_BTN_STYLE}
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={() => {
                     updateEntryNote(entry.id, notesDraft[entry.id] ?? '');
@@ -2308,7 +2461,18 @@ function WorkoutPage({
             </div>
           ) : (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8, color: '#777' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '50px 1fr 1fr',
+                gap: 10,
+                marginBottom: 10,
+                padding: '0 4px',
+                color: 'var(--text-muted)',
+                fontSize: 12,
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
                 <div>Set</div>
                 <div>Weight</div>
                 <div>Reps</div>
@@ -2316,9 +2480,25 @@ function WorkoutPage({
 
               {entry.sets.map((set, i) => {
                 const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
+                const hasValue = set.weight != null || set.reps != null;
                 return (
-                  <div key={set.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-                    <div style={{ alignSelf: 'center' }}>{i + 1}</div>
+                  <div key={set.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '50px 1fr 1fr',
+                    gap: 10,
+                    marginBottom: 10,
+                    padding: '4px',
+                    borderRadius: 10,
+                    background: hasValue ? 'var(--accent-subtle)' : 'transparent',
+                    transition: 'background 0.15s ease',
+                  }}>
+                    <div style={{
+                      alignSelf: 'center',
+                      textAlign: 'center',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      fontSize: 14,
+                    }}>{i + 1}</div>
                     <input
                       type="number"
                       step="any"
@@ -2333,7 +2513,13 @@ function WorkoutPage({
                           weight: num !== null && Number.isNaN(num) ? null : num,
                         });
                       }}
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.weight == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
+                      style={{
+                        ...INPUT_STYLE,
+                        width: '100%',
+                        minWidth: 0,
+                        textAlign: 'center',
+                        fontWeight: set.weight != null ? 600 : 400,
+                      }}
                     />
                     <input
                       inputMode="numeric"
@@ -2345,13 +2531,19 @@ function WorkoutPage({
                           reps: num !== null && Number.isNaN(num) ? null : num,
                         });
                       }}
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444', opacity: (set.reps == null ? 0.9 : 1), width: '100%', minWidth: 0 }}
+                      style={{
+                        ...INPUT_STYLE,
+                        width: '100%',
+                        minWidth: 0,
+                        textAlign: 'center',
+                        fontWeight: set.reps != null ? 600 : 400,
+                      }}
                     />
                   </div>
                 );
               })}
 
-              {entry.sets.length === 0 && <div style={{ color: '#777' }}>No sets yet.</div>}
+              {entry.sets.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No sets yet.</div>}
             </>
           )}
         </div>
@@ -2359,7 +2551,9 @@ function WorkoutPage({
 
       <div
         style={{
-          marginTop: 12,
+          marginTop: 20,
+          paddingTop: 16,
+          borderTop: '1px solid var(--border-subtle)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -2367,7 +2561,17 @@ function WorkoutPage({
           gap: 12,
         }}
       >
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          cursor: 'pointer',
+          padding: '8px 12px',
+          borderRadius: 10,
+          background: completed ? 'var(--success-muted)' : 'transparent',
+          border: `1px solid ${completed ? 'var(--success)' : 'var(--border-subtle)'}`,
+          transition: 'all 0.15s ease',
+        }}>
           <input
             type="checkbox"
             checked={completed}
@@ -2377,10 +2581,12 @@ function WorkoutPage({
               setCompleted(value);
             }}
           />
-          Completed
+          <span style={{ fontWeight: 500, color: completed ? 'var(--success)' : 'var(--text-secondary)' }}>
+            Completed
+          </span>
         </label>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {isLastDay && onFinishPlan && (
             <button onClick={onFinishPlan} style={PRIMARY_BTN_STYLE} disabled={finishingPlan}>
               {finishingPlan ? 'Finishing...' : 'Finish & Archive'}
@@ -2396,10 +2602,10 @@ function WorkoutPage({
       </div>
 
       {replaceSearchOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 30 }}>
-          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 980, width: '100%', maxHeight: '85vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={MODAL_OVERLAY_STYLE}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 980, width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <h3 style={{ margin: 0 }}>
+              <h3 style={{ margin: 0, fontSize: 18 }}>
                 Replace Exercise{replaceTargetEntry ? ` - ${replaceTargetEntry.exerciseName}` : ''}
               </h3>
               <button onClick={closeReplaceSearch} style={BTN_STYLE}>Cancel</button>
@@ -2410,21 +2616,21 @@ function WorkoutPage({
                 value={replaceSearchText}
                 onChange={(e) => setReplaceSearchText(e.target.value)}
                 placeholder="Search name..."
-                style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                style={INPUT_STYLE}
               />
-              <select value={replaceSearchPrimary} onChange={(e) => setReplaceSearchPrimary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={replaceSearchPrimary} onChange={(e) => setReplaceSearchPrimary(e.target.value)} style={SELECT_STYLE}>
                 <option value="All">Primary Muscle (All)</option>
                 {replacePrimaryMuscles.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={replaceSearchSecondary} onChange={(e) => setReplaceSearchSecondary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={replaceSearchSecondary} onChange={(e) => setReplaceSearchSecondary(e.target.value)} style={SELECT_STYLE}>
                 <option value="All">Secondary Muscle (All)</option>
                 {replaceSecondaryMuscles.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value as SearchSource)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value as SearchSource)} style={SELECT_STYLE}>
                 <option value="all">Source (All)</option>
                 <option value="defaults">Defaults</option>
                 <option value="home_made">Home Made *</option>
@@ -2432,46 +2638,66 @@ function WorkoutPage({
               <button
                 type="button"
                 onClick={() => setReplaceSearchMachine((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: replaceSearchMachine ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: replaceSearchMachine ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={replaceSearchMachine}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchMachine ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchMachine ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Machine
               </button>
               <button
                 type="button"
                 onClick={() => setReplaceSearchFreeWeight((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: replaceSearchFreeWeight ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: replaceSearchFreeWeight ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={replaceSearchFreeWeight}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchFreeWeight ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchFreeWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Free weight
               </button>
               <button
                 type="button"
                 onClick={() => setReplaceSearchCable((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: replaceSearchCable ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: replaceSearchCable ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={replaceSearchCable}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchCable ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchCable ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Cable
               </button>
               <button
                 type="button"
                 onClick={() => setReplaceSearchBodyWeight((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: replaceSearchBodyWeight ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: replaceSearchBodyWeight ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={replaceSearchBodyWeight}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchBodyWeight ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchBodyWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Bodyweight
               </button>
               <button
                 type="button"
                 onClick={() => setReplaceSearchCompound((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: replaceSearchCompound ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: replaceSearchCompound ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={replaceSearchCompound}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: replaceSearchCompound ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchCompound ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Compound
               </button>
             </div>
@@ -2651,10 +2877,10 @@ function WorkoutPage({
       )}
 
       {historyOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 30 }}>
-          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 520, width: '100%', maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={MODAL_OVERLAY_STYLE}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 520, width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <h3 style={{ margin: 0 }}>History{historyEntry ? ` - ${historyEntry.exerciseName}` : ''}</h3>
+              <h3 style={{ margin: 0, fontSize: 18 }}>History{historyEntry ? ` - ${historyEntry.exerciseName}` : ''}</h3>
               <button
                 onClick={() => {
                   setHistoryOpen(false);
@@ -2667,35 +2893,62 @@ function WorkoutPage({
             </div>
 
             {historyLoading ? (
-              <div style={{ color: '#777' }}>Loading history...</div>
+              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading history...</div>
             ) : historyError ? (
-              <div style={{ color: '#f88' }}>{historyError}</div>
+              <div style={{ color: '#f88', padding: '10px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{historyError}</div>
             ) : !historyPr && historyItems.length === 0 ? (
-              <div style={{ color: '#777' }}>No recorded sets yet.</div>
+              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>No recorded sets yet.</div>
             ) : (
               <>
                 {historyPr && (
-                  <div style={{ border: '2px solid #4c4', borderRadius: 10, padding: 10, background: 'rgba(68,204,68,0.08)' }}>
-                    <div style={{ fontWeight: 700, color: '#4c4', fontSize: 13, marginBottom: 4 }}>Personal Best</div>
-                    <div style={{ fontSize: 20, fontWeight: 600 }}>
-                      {historyPr.weight} <span style={{ color: '#888', fontSize: 14, fontWeight: 400 }}>×</span> {historyPr.reps}
+                  <div style={{
+                    border: '1px solid var(--success)',
+                    borderRadius: 12,
+                    padding: 16,
+                    background: 'var(--success-muted)',
+                    boxShadow: '0 0 20px rgba(74, 222, 128, 0.1)'
+                  }}>
+                    <div style={{
+                      fontWeight: 600,
+                      color: 'var(--success)',
+                      fontSize: 12,
+                      marginBottom: 8,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Personal Best</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
+                      {historyPr.weight} <span style={{ color: 'var(--text-muted)', fontSize: 16, fontWeight: 400 }}>×</span> {historyPr.reps}
                     </div>
-                    <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>{formatHistoryDate(historyPr.date)}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6 }}>{formatHistoryDate(historyPr.date)}</div>
                   </div>
                 )}
 
                 {historyItems.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#888', marginBottom: 6 }}>Progression</div>
+                    <div style={{
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      marginBottom: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Progression</div>
                     {historyItems.map((item, idx) => (
-                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: idx < historyItems.length - 1 ? '1px solid #222' : 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#555' }} />
-                          <span style={{ fontWeight: 500 }}>{item.weight}</span>
-                          <span style={{ color: '#666' }}>×</span>
-                          <span style={{ fontWeight: 500 }}>{item.reps}</span>
+                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '12px 0',
+                        borderBottom: idx < historyItems.length - 1 ? '1px solid var(--border-subtle)' : 'none'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border-strong)' }} />
+                          <span style={{ fontWeight: 600, fontSize: 15 }}>{item.weight}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>×</span>
+                          <span style={{ fontWeight: 600, fontSize: 15 }}>{item.reps}</span>
                         </div>
-                        <div style={{ color: '#666', fontSize: 12 }}>{formatHistoryDate(item.date)}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{formatHistoryDate(item.date)}</div>
                       </div>
                     ))}
                   </div>
@@ -3766,21 +4019,21 @@ function BuilderPage({
   
 
   return (
-    <div style={{ border: '1px solid #444', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+    <div style={CARD_STYLE}>
       <datalist id="exercise-options">
         {catalogExercises.map((exercise) => (
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button onClick={() => setShowPlanList(true)} style={BTN_STYLE}>
             Manage Plans & Templates</button>
           <button onClick={handleCreatePlan} style={BTN_STYLE}>
             + Plan
           </button>
           {(exerciseLoading || catalogLoading) && (
-            <div style={{ color: '#777', alignSelf: 'center', fontSize: 12 }}>Loading exercises...</div>
+            <div style={{ color: 'var(--text-muted)', alignSelf: 'center', fontSize: 12 }}>Loading exercises...</div>
           )}
           {selectedPlan && (
             <>
@@ -3803,30 +4056,30 @@ function BuilderPage({
         </div>
       </div>
 
-      {error && <div style={{ color: '#f88', marginTop: 8 }}>{error}</div>}
+      {error && <div style={{ color: '#f88', marginTop: 8, padding: '10px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{error}</div>}
 
       {!selectedPlan ? (
-        <div style={{ marginTop: 16, color: '#777' }}>Create a plan to get started.</div>
+        <div style={{ marginTop: 16, color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>Create a plan to get started.</div>
       ) : (
-        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Plan Name</label>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 14, color: 'var(--text-secondary)' }}>Plan Name</label>
             <input
               value={selectedPlan.name}
               onChange={(e) => handlePlanNameChange(e.target.value)}
-              style={{ padding: 8, borderRadius: 8, border: '1px solid #444', width: '100%' }}
+              style={{ ...INPUT_STYLE, width: '100%' }}
             />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {selectedPlan.weeks.map((week) => (
-              <div key={week.id} style={{ border: '1px solid #444', borderRadius: 10, padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div key={week.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                       value={week.name}
                       onChange={(e) => handleWeekNameChange(week.id, e.target.value)}
-                      style={{ padding: 6, borderRadius: 8, border: '1px solid #444', minWidth: 140 }}
+                      style={{ ...INPUT_STYLE, minWidth: 140, fontWeight: 600 }}
                     />
                     <button onClick={() => handleAddDay(week.id)} style={SMALL_BTN_STYLE}>
                       + Day
@@ -3875,9 +4128,15 @@ function BuilderPage({
                   }}
                 >
                 {week.days.map((day, dayIdx) => (
-                  <div key={day.id} data-day-id={day.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div key={day.id} data-day-id={day.id} style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 10,
+                    padding: 12,
+                    transition: 'all 0.15s ease',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                         <div
                           onPointerDown={(e) => {
                             e.preventDefault();
@@ -3890,7 +4149,18 @@ function BuilderPage({
                             dayDragTimerRef.current = window.setTimeout(() => setDayDragActive(true), 150);
                             try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
                           }}
-                          style={{ textAlign: 'center', fontSize: 18, lineHeight: '18px', padding: '0 6px', userSelect: 'none', touchAction: 'none', cursor: 'grab', borderRight: '1px solid #333', borderRadius: 8 }}
+                          style={{
+                            textAlign: 'center',
+                            fontSize: 18,
+                            lineHeight: '18px',
+                            padding: '6px 10px',
+                            userSelect: 'none',
+                            touchAction: 'none',
+                            cursor: 'grab',
+                            background: 'var(--bg-elevated)',
+                            borderRadius: 8,
+                            color: 'var(--text-muted)',
+                          }}
                           aria-label="Drag day handle"
                           title="Drag to reorder day"
                         >
@@ -3899,7 +4169,7 @@ function BuilderPage({
                         <input
                           value={day.name}
                           onChange={(e) => handleDayNameChange(week.id, day.id, e.target.value)}
-                          style={{ padding: 6, borderRadius: 8, border: '1px solid #444', minWidth: 120 }}
+                          style={{ ...INPUT_STYLE, minWidth: 120 }}
                         />
                         <button onClick={() => handleAddExercise(week.id, day.id)} style={SMALL_BTN_STYLE}>
                           + Exercise
@@ -4088,10 +4358,10 @@ function BuilderPage({
       )}
 
       {showPlanList && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 10 }}>
-          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 420, width: '100%', maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ ...MODAL_OVERLAY_STYLE, zIndex: 10 }}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 480, width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Manage {manageTab === 'plans' ? 'Plans' : 'Templates'}</h3>
+              <h3 style={{ margin: 0, fontSize: 18 }}>Manage {manageTab === 'plans' ? 'Plans' : 'Templates'}</h3>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {manageTab === 'plans' && (
                   <>
@@ -4104,18 +4374,44 @@ function BuilderPage({
                 </button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setManageTab('plans')} style={manageTab === 'plans' ? PRIMARY_BTN_STYLE : BTN_STYLE} aria-pressed={manageTab === 'plans'}>Plans</button>
-              <button onClick={() => setManageTab('templates')} style={manageTab === 'templates' ? PRIMARY_BTN_STYLE : BTN_STYLE} aria-pressed={manageTab === 'templates'}>Templates</button>
+            <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
+              <button
+                onClick={() => setManageTab('plans')}
+                style={{
+                  ...BTN_STYLE,
+                  background: manageTab === 'plans' ? 'var(--accent-muted)' : 'var(--bg-card)',
+                  borderColor: manageTab === 'plans' ? 'var(--border-strong)' : 'var(--border-default)',
+                }}
+                aria-pressed={manageTab === 'plans'}
+              >Plans</button>
+              <button
+                onClick={() => setManageTab('templates')}
+                style={{
+                  ...BTN_STYLE,
+                  background: manageTab === 'templates' ? 'var(--accent-muted)' : 'var(--bg-card)',
+                  borderColor: manageTab === 'templates' ? 'var(--border-strong)' : 'var(--border-default)',
+                }}
+                aria-pressed={manageTab === 'templates'}
+              >Templates</button>
             </div>
             {manageTab === 'plans' ? (
-              <>
-                {plans.length === 0 && <div style={{ color: '#777' }}>No plans yet.</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {plans.length === 0 && <div style={{ color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>No plans yet.</div>}
                 {plans.map((plan) => (
-                  <div key={plan.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div key={plan.id} style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 10,
+                    padding: 12,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 10,
+                    transition: 'all 0.15s ease',
+                  }}>
                     <div>
                       <div style={{ fontWeight: 600 }}>{plan.name}</div>
-                      {plan.serverId && <div style={{ fontSize: 12, color: '#777' }}>Synced</div>}
+                      {plan.serverId && <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>Synced</div>}
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button
@@ -4135,17 +4431,27 @@ function BuilderPage({
                     </div>
                   </div>
                 ))}
-              </>
+              </div>
             ) : (
-              <>
-                {templatesError && <div style={{ color: '#f88' }}>{templatesError}</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {templatesError && <div style={{ color: '#f88', padding: '10px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{templatesError}</div>}
                 {templatesLoading ? (
-                  <div style={{ color: '#777' }}>Loading templates...</div>
+                  <div style={{ color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>Loading templates...</div>
                 ) : templates.length === 0 ? (
-                  <div style={{ color: '#777' }}>No templates yet.</div>
+                  <div style={{ color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>No templates yet.</div>
                 ) : (
                   templates.map((tpl) => (
-                    <div key={tpl.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div key={tpl.id} style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 10,
+                      padding: 12,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 10,
+                      transition: 'all 0.15s ease',
+                    }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{tpl.name}</div>
                       </div>
@@ -4158,17 +4464,17 @@ function BuilderPage({
                     </div>
                   ))
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
       )}
 
       {searchOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 30 }}>
-          <div style={{ background: '#111', border: '1px solid #444', borderRadius: 12, padding: 16, maxWidth: 980, width: '100%', maxHeight: '85vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={MODAL_OVERLAY_STYLE}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 980, width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <h3 style={{ margin: 0 }}>Search Exercises</h3>
+              <h3 style={{ margin: 0, fontSize: 18 }}>Search Exercises</h3>
               <button onClick={() => setSearchOpen(false)} style={BTN_STYLE}>Close</button>
             </div>
 
@@ -4177,9 +4483,9 @@ function BuilderPage({
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder="Search name..."
-                style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                style={INPUT_STYLE}
               />
-              <select value={searchPrimary} onChange={(e) => setSearchPrimary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={searchPrimary} onChange={(e) => setSearchPrimary(e.target.value)} style={SELECT_STYLE}>
                 <option value="All">Primary Muscle (All)</option>
                 {primaryMuscles.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -4199,56 +4505,76 @@ function BuilderPage({
               <button
                 type="button"
                 onClick={() => setSearchMachine((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: searchMachine ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: searchMachine ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={searchMachine}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchMachine ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchMachine ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Machine
               </button>
               <button
                 type="button"
                 onClick={() => setSearchFreeWeight((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: searchFreeWeight ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: searchFreeWeight ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={searchFreeWeight}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchFreeWeight ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchFreeWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Free weight
               </button>
               <button
                 type="button"
                 onClick={() => setSearchCable((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: searchCable ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: searchCable ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={searchCable}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchCable ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchCable ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Cable
               </button>
               <button
                 type="button"
                 onClick={() => setSearchBodyWeight((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: searchBodyWeight ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: searchBodyWeight ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={searchBodyWeight}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchBodyWeight ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchBodyWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Bodyweight
               </button>
               <button
                 type="button"
                 onClick={() => setSearchCompound((prev) => !prev)}
-                style={FILTER_TOGGLE_STYLE}
+                style={{
+                  ...FILTER_TOGGLE_STYLE,
+                  background: searchCompound ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+                  borderColor: searchCompound ? 'var(--border-strong)' : 'var(--border-subtle)',
+                }}
                 aria-pressed={searchCompound}
               >
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid #888", background: searchCompound ? "#fff" : "transparent" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchCompound ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
                 Compound
               </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12, minHeight: 280 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 14, minHeight: 280 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ fontWeight: 600 }}>Results</div>
-                    <div style={{ color: '#777', fontSize: 12 }}>{filteredCatalog.length} found</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredCatalog.length} found</div>
                   </div>
                   <button
                     onClick={() => {
@@ -4261,17 +4587,17 @@ function BuilderPage({
                   </button>
                 </div>
                 {addMovementOpen && (
-                  <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 12, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <input
                       value={addMovementName}
                       onChange={(e) => setAddMovementName(e.target.value)}
                       placeholder="Movement name"
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                      style={INPUT_STYLE}
                     />
                     <select
                       value={addMovementPrimary}
                       onChange={(e) => setAddMovementPrimary(e.target.value)}
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                      style={SELECT_STYLE}
                     >
                       <option value="">Primary muscle</option>
                       {primaryMuscles.map((m) => (
