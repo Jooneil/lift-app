@@ -2785,12 +2785,10 @@ function WorkoutPage({
         //   only if their current weight is null or equal to the old value
         if (Object.prototype.hasOwnProperty.call(patch, 'weight')) {
           const newWeight = patch.weight ?? null;
-          if (newWeight !== null) {
-            for (let j = idx + 1; j < updatedSets.length; j++) {
-              const w = updatedSets[j].weight;
-              if (w === null || w === prevWeight) {
-                updatedSets[j] = { ...updatedSets[j], weight: newWeight };
-              }
+          for (let j = idx + 1; j < updatedSets.length; j++) {
+            const w = updatedSets[j].weight;
+            if (w === null || w === prevWeight) {
+              updatedSets[j] = { ...updatedSets[j], weight: newWeight };
             }
           }
         }
