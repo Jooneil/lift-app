@@ -1609,27 +1609,29 @@ function AuthedApp({
 
       {mode === "workout" && (
         <div style={CARD_STYLE}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
-            <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Plan:</label>
-            <select
-              value={selectedPlanId ?? ''}
-              onChange={(e) => {
-                const newPlanId = e.target.value || null;
-                selectPlan(newPlanId);
-                setSession(null);
-              }}
-              style={SELECT_STYLE}
-            >
-              {plans.length === 0 && <option value="">No plans yet</option>}
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Plan:</label>
+              <select
+                value={selectedPlanId ?? ''}
+                onChange={(e) => {
+                  const newPlanId = e.target.value || null;
+                  selectPlan(newPlanId);
+                  setSession(null);
+                }}
+                style={SELECT_STYLE}
+              >
+                {plans.length === 0 && <option value="">No plans yet</option>}
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {selectedPlan && (
-              <>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Week:</label>
                 <select
                   value={selectedWeekId ?? ''}
@@ -1666,7 +1668,7 @@ function AuthedApp({
                     </option>
                   ))}
                 </select>
-              </>
+              </div>
             )}
           </div>
 
