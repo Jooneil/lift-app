@@ -54,7 +54,7 @@ type Session = {
   completed?: boolean;
   ghostSeed?: boolean;
 };
-type SessionEntry = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSet[]; note?: string | null };
+type SessionEntry = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSet[]; note?: string | null; myoRepMatch?: boolean };
 type SessionSet = { id: string; setIndex: number; weight: number | null; reps: number | null };
 
 type ArchivedSessionMap = Record<string, Record<string, Session | null>>;
@@ -2183,6 +2183,7 @@ function WorkoutPage({
   const [historyItems, setHistoryItems] = useState<Array<{ date: string; weight: number; reps: number }>>([]);
   const [historyPr, setHistoryPr] = useState<{ date: string; weight: number; reps: number } | null>(null);
   const historyCacheRef = useRef<SessionRow[] | null>(null);
+  const [openExerciseMenu, setOpenExerciseMenu] = useState<string | null>(null);
 
   useEffect(() => {
     historyCacheRef.current = null;
@@ -2736,6 +2737,21 @@ function WorkoutPage({
     });
   };
 
+  const toggleMyoRepMatch = (entryId: string) => {
+    setSession((s) => {
+      if (!s) return s;
+      const next: Session = {
+        ...s,
+        entries: s.entries.map((e) =>
+          e.id === entryId ? { ...e, myoRepMatch: !e.myoRepMatch } : e
+        ),
+      };
+      saveNow(next);
+      return next;
+    });
+    setOpenExerciseMenu(null);
+  };
+
     const updateEntryNote = (entryId: string, noteText: string) => {
   setSession((s) => {
     if (!s) return s;
@@ -2829,21 +2845,66 @@ function WorkoutPage({
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{entry.exerciseName}</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+                {entry.exerciseName}
+                {entry.myoRepMatch && (
+                  <span style={{ marginLeft: 8, fontSize: 11, color: '#a78bfa', fontWeight: 500 }}>MYO</span>
+                )}
+              </h3>
+              <div style={{ position: 'relative' }}>
                 <button
-                  onClick={() => openReplaceSearch(entry, entryIndex)}
-                  style={SMALL_BTN_STYLE}
+                  onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
+                  style={{
+                    ...SMALL_BTN_STYLE,
+                    padding: '4px 8px',
+                    minWidth: 32,
+                  }}
+                  title="Options"
                 >
-                  Replace
+                  ⋮
                 </button>
-                <button
-                  onClick={() => openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName })}
-                  style={SMALL_BTN_STYLE}
-                >
-                  History
-                </button>
-              </>
+                {openExerciseMenu === entry.id && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 10,
+                    padding: 8,
+                    marginTop: 4,
+                    minWidth: 160,
+                    zIndex: 20,
+                    boxShadow: 'var(--shadow-lg)',
+                  }}>
+                    <button
+                      onClick={() => { setOpenExerciseMenu(null); openReplaceSearch(entry, entryIndex); }}
+                      style={{ ...SMALL_BTN_STYLE, width: '100%', textAlign: 'left', marginBottom: 4 }}
+                    >
+                      Replace
+                    </button>
+                    <button
+                      onClick={() => { setOpenExerciseMenu(null); openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }); }}
+                      style={{ ...SMALL_BTN_STYLE, width: '100%', textAlign: 'left', marginBottom: 4 }}
+                    >
+                      History
+                    </button>
+                    <button
+                      onClick={() => toggleMyoRepMatch(entry.id)}
+                      style={{
+                        ...SMALL_BTN_STYLE,
+                        width: '100%',
+                        textAlign: 'left',
+                        background: entry.myoRepMatch ? 'rgba(167, 139, 250, 0.15)' : 'var(--bg-card)',
+                        borderColor: entry.myoRepMatch ? '#a78bfa' : 'var(--border-subtle)',
+                        color: entry.myoRepMatch ? '#a78bfa' : 'var(--text-primary)',
+                      }}
+                    >
+                      Myo-Rep Match {entry.myoRepMatch ? '✓' : ''}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <button
@@ -2910,7 +2971,9 @@ function WorkoutPage({
               }}>
                 <div>Set</div>
                 <div>Weight</div>
-                <div>Reps</div>
+                <div style={{ color: entry.myoRepMatch ? '#a78bfa' : 'var(--text-muted)' }}>
+                  {entry.myoRepMatch ? 'Match' : 'Reps'}
+                </div>
               </div>
 
               {entry.sets.map((set, i) => {
