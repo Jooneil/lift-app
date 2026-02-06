@@ -1,11 +1,38 @@
 import { supabase } from '../supabaseClient'
 
+// Streak types
+export type StreakScheduleMode = 'daily' | 'rolling' | 'weekly'
+
+export type StreakConfig = {
+  enabled: boolean
+  scheduleMode: StreakScheduleMode
+  rollingDaysOn?: number      // For rolling mode (e.g., 3)
+  rollingDaysOff?: number     // For rolling mode (e.g., 1)
+  weeklyDays?: number[]       // For weekly mode (0=Sun, 1=Mon, etc.)
+  startDate: string           // ISO date when streak was configured
+  timezone: string            // User's timezone for date calculations
+}
+
+export type StreakState = {
+  currentStreak: number
+  longestStreak: number
+  lastWorkoutDate: string | null  // ISO date of last completed workout
+}
+
+export type UserPrefsData = {
+  last_plan_server_id?: string | null
+  last_week_id?: string | null
+  last_day_id?: string | null
+  streak_config?: StreakConfig | null
+  streak_state?: StreakState | null
+}
+
 export type UserPrefs = {
   user_id: string
   last_plan_server_id?: string | null
   last_week_id?: string | null
   last_day_id?: string | null
-  prefs?: Record<string, unknown> | null
+  prefs?: UserPrefsData | null
 }
 
 export async function getUserPrefs() {
@@ -26,16 +53,35 @@ export async function upsertUserPrefs(partial: {
   last_plan_server_id?: string | null
   last_week_id?: string | null
   last_day_id?: string | null
+  streak_config?: StreakConfig | null
+  streak_state?: StreakState | null
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
 
-  // Write only to prefs JSON to avoid column type mismatches
-  const prefs: Record<string, unknown> = {
-    last_plan_server_id: typeof partial.last_plan_server_id === 'string' || partial.last_plan_server_id === null ? partial.last_plan_server_id : null,
-    last_week_id: typeof partial.last_week_id === 'string' || partial.last_week_id === null ? partial.last_week_id : null,
-    last_day_id: typeof partial.last_day_id === 'string' || partial.last_day_id === null ? partial.last_day_id : null,
+  // Fetch existing prefs to merge (don't overwrite streak data when saving nav state)
+  let existingPrefs: UserPrefsData = {}
+  try {
+    const existing = await supabase
+      .from('user_prefs')
+      .select('prefs')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (existing.data?.prefs) {
+      existingPrefs = existing.data.prefs as UserPrefsData
+    }
+  } catch { /* ignore - will use empty object */ }
+
+  // Merge new values with existing prefs
+  const prefs: UserPrefsData = {
+    ...existingPrefs,
+    ...(partial.last_plan_server_id !== undefined && { last_plan_server_id: partial.last_plan_server_id }),
+    ...(partial.last_week_id !== undefined && { last_week_id: partial.last_week_id }),
+    ...(partial.last_day_id !== undefined && { last_day_id: partial.last_day_id }),
+    ...(partial.streak_config !== undefined && { streak_config: partial.streak_config }),
+    ...(partial.streak_state !== undefined && { streak_state: partial.streak_state }),
   }
+
   // Try update-first: if a row exists for this user, update it; otherwise insert.
   const upd = await supabase
     .from('user_prefs')

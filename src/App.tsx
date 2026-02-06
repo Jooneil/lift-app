@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
 import { api, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
-import { getUserPrefs, upsertUserPrefs } from './api/userPrefs';
+import { getUserPrefs, upsertUserPrefs, type StreakConfig, type StreakState, type StreakScheduleMode, type UserPrefsData } from './api/userPrefs';
 import { supabase } from "./supabaseClient";
 import type {
   ServerPlanRow,
@@ -165,6 +165,105 @@ const SELECT_STYLE = {
   ...INPUT_STYLE,
   cursor: "pointer",
 } as const;
+
+// Streak helper functions
+const getUserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+};
+
+const toLocalDateString = (date: Date, timezone: string): string => {
+  try {
+    return date.toLocaleDateString('en-CA', { timeZone: timezone }); // Returns YYYY-MM-DD
+  } catch {
+    return date.toISOString().split('T')[0];
+  }
+};
+
+const daysBetween = (startDateStr: string, endDate: Date, timezone: string): number => {
+  const startStr = startDateStr.split('T')[0];
+  const endStr = toLocalDateString(endDate, timezone);
+  const start = new Date(startStr + 'T00:00:00');
+  const end = new Date(endStr + 'T00:00:00');
+  return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const isWorkoutDay = (config: StreakConfig, date: Date): boolean => {
+  if (!config.enabled) return false;
+  const timezone = config.timezone || getUserTimezone();
+
+  switch (config.scheduleMode) {
+    case 'daily':
+      return true;
+
+    case 'rolling': {
+      const daysOn = config.rollingDaysOn ?? 1;
+      const daysOff = config.rollingDaysOff ?? 0;
+      const cycleLength = daysOn + daysOff;
+      if (cycleLength <= 0) return true;
+      const daysSinceStart = daysBetween(config.startDate, date, timezone);
+      if (daysSinceStart < 0) return false; // Before start date
+      const dayInCycle = daysSinceStart % cycleLength;
+      return dayInCycle < daysOn;
+    }
+
+    case 'weekly': {
+      // Get day of week in user's timezone
+      const dayOfWeek = new Date(toLocalDateString(date, timezone) + 'T12:00:00').getDay();
+      return (config.weeklyDays ?? []).includes(dayOfWeek);
+    }
+
+    default:
+      return false;
+  }
+};
+
+const checkStreakStatus = (
+  config: StreakConfig,
+  state: StreakState | null,
+  now: Date
+): { currentStreak: number; isHitToday: boolean; streakBroken: boolean } => {
+  if (!config.enabled || !state) {
+    return { currentStreak: 0, isHitToday: false, streakBroken: false };
+  }
+
+  const timezone = config.timezone || getUserTimezone();
+  const todayStr = toLocalDateString(now, timezone);
+  const lastWorkoutStr = state.lastWorkoutDate;
+
+  // Check if hit today
+  const isHitToday = lastWorkoutStr === todayStr;
+
+  // If no previous workout, no streak to check
+  if (!lastWorkoutStr) {
+    return { currentStreak: 0, isHitToday: false, streakBroken: false };
+  }
+
+  // Check for missed workout days between last workout and today
+  let streakBroken = false;
+  let checkDate = new Date(lastWorkoutStr + 'T12:00:00');
+  checkDate.setDate(checkDate.getDate() + 1); // Start checking day after last workout
+
+  const todayDate = new Date(todayStr + 'T12:00:00');
+
+  while (checkDate < todayDate) {
+    if (isWorkoutDay(config, checkDate)) {
+      // Missed a scheduled workout day
+      streakBroken = true;
+      break;
+    }
+    checkDate.setDate(checkDate.getDate() + 1);
+  }
+
+  return {
+    currentStreak: streakBroken ? 0 : state.currentStreak,
+    isHitToday,
+    streakBroken,
+  };
+};
 
 // Shared CSV export helpers (used by active and archived plan exports)
 const csvEscape = (val: string) => '"' + String(val ?? '').replace(/"/g, '""') + '"';
@@ -512,6 +611,14 @@ function AuthedApp({
   const [catalogLoading, setCatalogLoading] = useState(false);
   const selectionOriginRef = useRef<"auto" | "user">("auto");
 
+  // Streak state
+  const [streakConfig, setStreakConfig] = useState<StreakConfig | null>(null);
+  const [streakState, setStreakState] = useState<StreakState | null>(null);
+  const [streakHitToday, setStreakHitToday] = useState(false);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [showStreakSettings, setShowStreakSettings] = useState(false);
+  const [showStreakReconfigPrompt, setShowStreakReconfigPrompt] = useState(false);
+
   const exerciseByName = useMemo(() => {
     const map = new Map<string, Exercise>();
     for (const ex of exerciseLibrary) {
@@ -728,6 +835,38 @@ function AuthedApp({
     }, 800);
   }, []);
 
+  // Update streak when workout is completed
+  const updateStreak = useCallback(async () => {
+    if (!streakConfig?.enabled) return;
+
+    const now = new Date();
+    const today = toLocalDateString(now, streakConfig.timezone);
+
+    // Check if already hit today
+    if (streakState?.lastWorkoutDate === today) return;
+
+    // Check if today is a workout day
+    if (!isWorkoutDay(streakConfig, now)) return;
+
+    // Update streak
+    const newStreak = (streakState?.currentStreak ?? 0) + 1;
+    const newLongest = Math.max(newStreak, streakState?.longestStreak ?? 0);
+    const newState: StreakState = {
+      currentStreak: newStreak,
+      longestStreak: newLongest,
+      lastWorkoutDate: today,
+    };
+
+    setStreakState(newState);
+    setCurrentStreak(newStreak);
+    setStreakHitToday(true);
+
+    try {
+      await upsertUserPrefs({ streak_state: newState });
+    } catch (err) {
+      console.error('Failed to save streak:', err);
+    }
+  }, [streakConfig, streakState]);
 
   useEffect(() => {
     loadExercises();
@@ -805,12 +944,35 @@ function AuthedApp({
         setPlans(loaded);
 
         const up = await getUserPrefs().catch(() => null);
-        const p = (up?.prefs as { last_plan_server_id?: string|null; last_week_id?: string|null; last_day_id?: string|null } | null) || null;
+        const p = (up?.prefs as UserPrefsData | null) || null;
         const prefs = {
           lastPlanServerId: p?.last_plan_server_id ?? null,
           lastWeekId: p?.last_week_id ?? null,
           lastDayId: p?.last_day_id ?? null,
         };
+
+        // Load streak config/state
+        if (p?.streak_config) {
+          setStreakConfig(p.streak_config);
+          if (p.streak_state) {
+            setStreakState(p.streak_state);
+            // Check streak status on load
+            const now = new Date();
+            const status = checkStreakStatus(p.streak_config, p.streak_state, now);
+            setCurrentStreak(status.currentStreak);
+            setStreakHitToday(status.isHitToday);
+            // If streak was broken, persist the reset
+            if (status.streakBroken && status.currentStreak !== p.streak_state.currentStreak) {
+              const resetState: StreakState = {
+                currentStreak: status.currentStreak,
+                longestStreak: p.streak_state.longestStreak,
+                lastWorkoutDate: p.streak_state.lastWorkoutDate,
+              };
+              setStreakState(resetState);
+              upsertUserPrefs({ streak_state: resetState }).catch(() => {});
+            }
+          }
+        }
 
         let plan = prefs.lastPlanServerId
           ? loaded.find((p) => String(p.serverId ?? '') === String(prefs.lastPlanServerId)) || null
@@ -1294,6 +1456,12 @@ function AuthedApp({
         });
       }
       await loadArchivedPlans();
+
+      // Update streak and show reconfigure prompt
+      await updateStreak();
+      if (streakConfig?.enabled) {
+        setShowStreakReconfigPrompt(true);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1312,10 +1480,14 @@ function AuthedApp({
       if (serverId && weekId && dayId) {
         try {
           await sessionApi.complete(serverId, weekId, dayId, val);
+          // Update streak when marking as completed
+          if (val) {
+            await updateStreak();
+          }
         } catch { void 0; }
       }
     },
-    [selectedPlan?.serverId, selectedWeekId, selectedDayId]
+    [selectedPlan?.serverId, selectedWeekId, selectedDayId, updateStreak]
   );
 
   const isLastDayOfPlan = (() => {
@@ -1336,7 +1508,22 @@ function AuthedApp({
         marginBottom: 16,
         borderBottom: "1px solid var(--border-subtle)"
       }}>
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {streakConfig?.enabled && (
+            <span
+              style={{
+                fontSize: 20,
+                filter: streakHitToday ? 'none' : 'grayscale(100%)',
+                opacity: streakHitToday ? 1 : 0.5,
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)',
+              }}
+              onClick={() => setShowStreakSettings(true)}
+              title={`${currentStreak} day streak`}
+            >
+              🔥
+            </span>
+          )}
           <button onClick={() => setUserMenuOpen((v) => !v)} style={BTN_STYLE} aria-expanded={userMenuOpen} aria-haspopup="menu">Profile</button>
           {userMenuOpen && (
             <div role="menu" style={{
@@ -1359,6 +1546,7 @@ function AuthedApp({
               >
                 <strong>{user.username}</strong>
               </div>
+              <button onClick={() => { setUserMenuOpen(false); setShowStreakSettings(true); }} style={{ ...SMALL_BTN_STYLE, width: '100%', marginBottom: 8 }} role="menuitem">Streak Settings</button>
               <button onClick={() => { setUserMenuOpen(false); onLogout(); }} style={{ ...SMALL_BTN_STYLE, width: '100%' }} role="menuitem">Logout</button>
             </div>
           )}
@@ -1516,6 +1704,9 @@ function AuthedApp({
                     } catch { void 0; }
                   }
 
+                  // Update streak
+                  await updateStreak();
+
                   const nxt = nextWeekDay(selectedPlan, selectedWeek.id, selectedDay.id);
                   setSelectedWeekId(nxt.weekId);
                   setSelectedDayId(nxt.dayId);
@@ -1668,6 +1859,252 @@ function AuthedApp({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Streak Settings Modal */}
+      {showStreakSettings && (
+        <div style={MODAL_OVERLAY_STYLE}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 18 }}>Streak Settings</h3>
+              <button onClick={() => setShowStreakSettings(false)} style={BTN_STYLE}>Close</button>
+            </div>
+
+            {/* Current streak display */}
+            {streakConfig?.enabled && (
+              <div style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 20,
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>🔥</div>
+                <div style={{ fontSize: 32, fontWeight: 700 }}>{currentStreak}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+                  {currentStreak === 1 ? 'day streak' : 'day streak'}
+                </div>
+                {streakState?.longestStreak != null && streakState.longestStreak > 0 && (
+                  <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
+                    Longest: {streakState.longestStreak} days
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Enable/disable toggle */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 0',
+              borderBottom: '1px solid var(--border-subtle)'
+            }}>
+              <span style={{ fontWeight: 500 }}>Enable Streak Tracking</span>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={streakConfig?.enabled ?? false}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    if (enabled && !streakConfig) {
+                      // Initialize new streak config
+                      const newConfig: StreakConfig = {
+                        enabled: true,
+                        scheduleMode: 'daily',
+                        startDate: new Date().toISOString().split('T')[0],
+                        timezone: getUserTimezone(),
+                      };
+                      setStreakConfig(newConfig);
+                      setStreakState({ currentStreak: 0, longestStreak: 0, lastWorkoutDate: null });
+                      setCurrentStreak(0);
+                      upsertUserPrefs({ streak_config: newConfig, streak_state: { currentStreak: 0, longestStreak: 0, lastWorkoutDate: null } });
+                    } else if (streakConfig) {
+                      const updated = { ...streakConfig, enabled };
+                      setStreakConfig(updated);
+                      upsertUserPrefs({ streak_config: updated });
+                    }
+                  }}
+                  style={{ width: 20, height: 20 }}
+                />
+              </label>
+            </div>
+
+            {/* Schedule mode selection */}
+            {streakConfig?.enabled && (
+              <>
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontWeight: 500, marginBottom: 12 }}>Schedule Mode</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {(['daily', 'rolling', 'weekly'] as StreakScheduleMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          const updated: StreakConfig = {
+                            ...streakConfig,
+                            scheduleMode: mode,
+                            startDate: new Date().toISOString().split('T')[0],
+                          };
+                          if (mode === 'rolling' && !updated.rollingDaysOn) {
+                            updated.rollingDaysOn = 3;
+                            updated.rollingDaysOff = 1;
+                          }
+                          if (mode === 'weekly' && !updated.weeklyDays) {
+                            updated.weeklyDays = [1, 2, 3, 4, 5]; // Mon-Fri
+                          }
+                          setStreakConfig(updated);
+                          // Reset streak when changing mode
+                          const resetState = { currentStreak: 0, longestStreak: streakState?.longestStreak ?? 0, lastWorkoutDate: null };
+                          setStreakState(resetState);
+                          setCurrentStreak(0);
+                          setStreakHitToday(false);
+                          upsertUserPrefs({ streak_config: updated, streak_state: resetState });
+                        }}
+                        style={{
+                          ...BTN_STYLE,
+                          flex: 1,
+                          background: streakConfig.scheduleMode === mode ? 'var(--accent-muted)' : 'var(--bg-card)',
+                          borderColor: streakConfig.scheduleMode === mode ? 'var(--border-strong)' : 'var(--border-default)',
+                          textTransform: 'capitalize'
+                        }}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rolling mode settings */}
+                {streakConfig.scheduleMode === 'rolling' && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Days On</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={14}
+                          value={streakConfig.rollingDaysOn ?? 3}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(14, parseInt(e.target.value) || 1));
+                            const updated = { ...streakConfig, rollingDaysOn: val, startDate: new Date().toISOString().split('T')[0] };
+                            setStreakConfig(updated);
+                            upsertUserPrefs({ streak_config: updated });
+                          }}
+                          style={{ width: '100%', padding: '10px 12px' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Days Off</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={14}
+                          value={streakConfig.rollingDaysOff ?? 1}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(14, parseInt(e.target.value) || 1));
+                            const updated = { ...streakConfig, rollingDaysOff: val, startDate: new Date().toISOString().split('T')[0] };
+                            setStreakConfig(updated);
+                            upsertUserPrefs({ streak_config: updated });
+                          }}
+                          style={{ width: '100%', padding: '10px 12px' }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+                      Example: {streakConfig.rollingDaysOn ?? 3} days on, {streakConfig.rollingDaysOff ?? 1} day{(streakConfig.rollingDaysOff ?? 1) !== 1 ? 's' : ''} off
+                    </div>
+                  </div>
+                )}
+
+                {/* Weekly mode settings */}
+                {streakConfig.scheduleMode === 'weekly' && (
+                  <div style={{ marginTop: 16 }}>
+                    <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>Workout Days</label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, idx) => {
+                        const selected = streakConfig.weeklyDays?.includes(idx) ?? false;
+                        return (
+                          <button
+                            key={dayName}
+                            onClick={() => {
+                              const days = new Set(streakConfig.weeklyDays ?? []);
+                              if (selected) {
+                                days.delete(idx);
+                              } else {
+                                days.add(idx);
+                              }
+                              const updated = { ...streakConfig, weeklyDays: Array.from(days).sort((a, b) => a - b) };
+                              setStreakConfig(updated);
+                              upsertUserPrefs({ streak_config: updated });
+                            }}
+                            style={{
+                              ...SMALL_BTN_STYLE,
+                              minWidth: 44,
+                              background: selected ? 'var(--accent-muted)' : 'var(--bg-card)',
+                              borderColor: selected ? 'var(--border-strong)' : 'var(--border-default)',
+                            }}
+                          >
+                            {dayName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reset streak button */}
+                <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+                  <button
+                    onClick={() => {
+                      if (confirm('Reset your streak to 0? This cannot be undone.')) {
+                        const resetState = { currentStreak: 0, longestStreak: streakState?.longestStreak ?? 0, lastWorkoutDate: null };
+                        setStreakState(resetState);
+                        setCurrentStreak(0);
+                        setStreakHitToday(false);
+                        upsertUserPrefs({ streak_state: resetState });
+                      }
+                    }}
+                    style={{ ...SMALL_BTN_STYLE, color: '#f88' }}
+                  >
+                    Reset Streak
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Streak Reconfigure Prompt (after Finish & Archive) */}
+      {showStreakReconfigPrompt && (
+        <div style={MODAL_OVERLAY_STYLE}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 360, textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 20 }}>Plan Complete!</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
+              Great work finishing your plan. Would you like to update your streak schedule?
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowStreakReconfigPrompt(false)}
+                style={BTN_STYLE}
+              >
+                Keep Current
+              </button>
+              <button
+                onClick={() => {
+                  setShowStreakReconfigPrompt(false);
+                  setShowStreakSettings(true);
+                }}
+                style={{ ...BTN_STYLE, background: 'var(--accent-muted)', borderColor: 'var(--border-strong)' }}
+              >
+                Update Schedule
+              </button>
+            </div>
           </div>
         </div>
       )}
