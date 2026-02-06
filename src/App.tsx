@@ -2968,6 +2968,7 @@ function WorkoutPage({
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
+                textAlign: 'center',
               }}>
                 <div>Set</div>
                 <div>Weight</div>
