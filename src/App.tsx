@@ -59,6 +59,12 @@ type SessionSet = { id: string; setIndex: number; weight: number | null; reps: n
 
 type ArchivedSessionMap = Record<string, Record<string, Session | null>>;
 
+type GhostSource = 'regular' | 'historical' | 'previous-set';
+type EnhancedGhostSet = {
+  weight: number | null;
+  reps: number | null;
+  source: GhostSource;
+};
 
 type Mode = "builder" | "workout";
 type SearchSource = "all" | "defaults" | "home_made";
@@ -2215,10 +2221,12 @@ function WorkoutPage({
   const [historyItems, setHistoryItems] = useState<Array<{ date: string; weight: number; reps: number }>>([]);
   const [historyPr, setHistoryPr] = useState<{ date: string; weight: number; reps: number } | null>(null);
   const historyCacheRef = useRef<SessionRow[] | null>(null);
+  const historicalGhostRef = useRef<Map<string, Map<number, { weight: number; reps: number }>> | null>(null);
   const [openExerciseMenu, setOpenExerciseMenu] = useState<string | null>(null);
 
   useEffect(() => {
     historyCacheRef.current = null;
+    historicalGhostRef.current = null;
   }, [plan.serverId]);
 
   const currentWeek = useMemo(
@@ -2556,6 +2564,9 @@ function WorkoutPage({
           if (Object.keys(ghostMap).length > 0) setGhost(ghostMap);
           else setGhost({});
 
+          // Load historical ghost data for sets that might not have regular ghost
+          void loadHistoricalGhost(targets);
+
           try {
             const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${day.id}`;
             const raw = localStorage.getItem(seedKey);
@@ -2632,16 +2643,54 @@ function WorkoutPage({
   }, [plan.id, plan.serverId, day.items, session]);
 
 
-  const getGhost = (exerciseId: string | undefined, exerciseName: string, idx: number) => {
+  const getGhost = (exerciseId: string | undefined, exerciseName: string, idx: number): EnhancedGhostSet => {
     const keys: string[] = [];
     if (exerciseId) keys.push(`id:${exerciseId}`);
     const nameKey = `name:${normalizeExerciseName(exerciseName).toLowerCase()}`;
     if (nameKey) keys.push(nameKey);
+
+    // Tier 1: Regular ghost (from same-day previous session)
     for (const key of keys) {
       const arr = ghost[key];
-      if (arr && arr[idx]) return arr[idx];
+      if (arr && arr[idx] && (arr[idx].weight != null || arr[idx].reps != null)) {
+        return { ...arr[idx], source: 'regular' };
+      }
     }
-    return { weight: null, reps: null };
+
+    // Tier 2: Historical ghost (from any past session with this set index)
+    const histData = historicalGhostRef.current;
+    if (histData) {
+      for (const key of keys) {
+        const setMap = histData.get(key);
+        if (setMap && setMap.has(idx)) {
+          const histSet = setMap.get(idx)!;
+          return { weight: histSet.weight, reps: histSet.reps, source: 'historical' };
+        }
+      }
+    }
+
+    // Tier 3: Previous-set fallback (copy idx-1 values)
+    if (idx > 0) {
+      // Try regular ghost for previous set
+      for (const key of keys) {
+        const arr = ghost[key];
+        if (arr && arr[idx - 1] && (arr[idx - 1].weight != null || arr[idx - 1].reps != null)) {
+          return { weight: arr[idx - 1].weight, reps: arr[idx - 1].reps, source: 'previous-set' };
+        }
+      }
+      // Try historical for previous set
+      if (histData) {
+        for (const key of keys) {
+          const setMap = histData.get(key);
+          if (setMap && setMap.has(idx - 1)) {
+            const histSet = setMap.get(idx - 1)!;
+            return { weight: histSet.weight, reps: histSet.reps, source: 'previous-set' };
+          }
+        }
+      }
+    }
+
+    return { weight: null, reps: null, source: 'regular' };
   };
 
   const formatHistoryDate = (raw: string) => {
@@ -2725,6 +2774,67 @@ function WorkoutPage({
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const loadHistoricalGhost = async (targets: Array<{ exerciseId?: string; exerciseName: string }>) => {
+    if (!plan.serverId) return;
+
+    // Use existing history cache if available
+    let rows = historyCacheRef.current;
+    if (!rows) {
+      try {
+        rows = await sessionApi.listAll();
+        historyCacheRef.current = rows;
+      } catch {
+        return;
+      }
+    }
+
+    const result = new Map<string, Map<number, { weight: number; reps: number }>>();
+
+    for (const target of targets) {
+      const targetKey = exerciseKey(target);
+      const targetName = normalizeExerciseName(target.exerciseName).toLowerCase();
+      const nameKey = `name:${targetName}`;
+
+      const setsByIndex = new Map<number, { weight: number; reps: number }>();
+
+      // Iterate through all sessions (newest first - already sorted by updated_at desc)
+      for (const row of rows) {
+        const data = (row as SessionRow).data;
+        if (!data || !Array.isArray(data.entries)) continue;
+
+        for (const entry of data.entries) {
+          const entryName = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+          const match =
+            (target.exerciseId && entry.exerciseId && String(entry.exerciseId) === String(target.exerciseId)) ||
+            (target.exerciseId && !entry.exerciseId && entryName === targetName) ||
+            (!target.exerciseId && entryName === targetName);
+          if (!match) continue;
+
+          for (const set of entry.sets ?? []) {
+            const setIdx = typeof set.setIndex === 'number' ? set.setIndex : 0;
+            // Only store if we haven't found data for this set index yet (newest first)
+            if (!setsByIndex.has(setIdx)) {
+              const weight = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : null;
+              const reps = typeof set.reps === 'number' && !Number.isNaN(set.reps) ? set.reps : null;
+              if (weight != null && reps != null) {
+                setsByIndex.set(setIdx, { weight, reps });
+              }
+            }
+          }
+        }
+      }
+
+      if (setsByIndex.size > 0) {
+        result.set(targetKey, setsByIndex);
+        if (!result.has(nameKey)) {
+          result.set(nameKey, setsByIndex);
+        }
+      }
+    }
+
+    historicalGhostRef.current = result;
   };
 
   const openHistory = (entry: { exerciseId?: string; exerciseName: string }) => {
@@ -3012,6 +3122,7 @@ function WorkoutPage({
               {entry.sets.map((set, i) => {
                 const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
                 const hasValue = set.weight != null || set.reps != null;
+                const isSuggested = ghostSet.source === 'historical' || ghostSet.source === 'previous-set';
                 return (
                   <div key={set.id} style={{
                     display: 'grid',
@@ -3034,6 +3145,7 @@ function WorkoutPage({
                       type="number"
                       step="any"
                       inputMode="decimal"
+                      className={isSuggested && ghostSet.weight != null ? 'suggested-ghost' : undefined}
                       placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
                       value={set.weight ?? ''}
                       onChange={(e) => {
@@ -3054,6 +3166,7 @@ function WorkoutPage({
                     />
                     <input
                       inputMode="numeric"
+                      className={isSuggested && ghostSet.reps != null ? 'suggested-ghost' : undefined}
                       placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
                       value={set.reps ?? ''}
                       onChange={(e) => {
