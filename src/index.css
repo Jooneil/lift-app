@@ -162,6 +162,11 @@ input.suggested-ghost::placeholder {
   color: var(--suggested) !important;
 }
 
+/* Disable iOS shake-to-undo dialog */
+input, textarea {
+  -webkit-touch-callout: none;
+}
+
 select {
   cursor: pointer;
   appearance: none;
