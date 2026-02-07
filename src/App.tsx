@@ -542,6 +542,17 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [forcePasswordReset, setForcePasswordReset] = useState(false);
 
+  // Prevent iOS shake-to-undo from triggering undo actions
+  useEffect(() => {
+    const preventUndo = (e: InputEvent) => {
+      if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('beforeinput', preventUndo as EventListener);
+    return () => document.removeEventListener('beforeinput', preventUndo as EventListener);
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
