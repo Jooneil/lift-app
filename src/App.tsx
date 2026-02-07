@@ -1678,13 +1678,6 @@ function AuthedApp({
             <div style={{ color: 'var(--text-muted)' }}>Select a day.</div>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 18 }}>{selectedPlan.name}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{selectedDay.name}</div>
-                </div>
-              </div>
-
               <WorkoutPage
                 plan={selectedPlan}
                 day={selectedDay}
