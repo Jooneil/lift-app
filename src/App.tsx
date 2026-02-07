@@ -516,8 +516,21 @@ function nextWeekDay(plan: Plan, currentWeekId: string, currentDayId: string) {
   return { weekId: plan.weeks[nextWIdx].id, dayId: plan.weeks[nextWIdx].days[0].id };
 }
 
+function prevWeekDay(plan: Plan, currentWeekId: string, currentDayId: string) {
+  const wIdx = plan.weeks.findIndex((w) => w.id === currentWeekId);
+  if (wIdx < 0) return firstWeekDayOf(plan);
 
-// previousWeekDay function was unused; removed to satisfy lints
+  const days = plan.weeks[wIdx].days;
+  const dIdx = days.findIndex((d) => d.id === currentDayId);
+  if (dIdx < 0) return firstWeekDayOf(plan);
+
+  if (dIdx > 0) {
+    return { weekId: plan.weeks[wIdx].id, dayId: days[dIdx - 1].id };
+  }
+  const prevWIdx = (wIdx - 1 + plan.weeks.length) % plan.weeks.length;
+  const prevWeek = plan.weeks[prevWIdx];
+  return { weekId: prevWeek.id, dayId: prevWeek.days[prevWeek.days.length - 1].id };
+}
 export default function App() {
   const [user, setUser] = useState<{ id: number; username: string } | null>(null);
   const [checking, setChecking] = useState(true);
@@ -1632,6 +1645,17 @@ function AuthedApp({
 
             {selectedPlan && (
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  onClick={() => {
+                    if (!selectedWeekId || !selectedDayId) return;
+                    const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                    setSelectedWeekId(prev.weekId);
+                    setSelectedDayId(prev.dayId);
+                    setSession(null);
+                    setShouldAutoNavigate(false);
+                  }}
+                  style={SMALL_BTN_STYLE}
+                >Previous</button>
                 <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Week:</label>
                 <select
                   value={selectedWeekId ?? ''}
@@ -1668,6 +1692,17 @@ function AuthedApp({
                     </option>
                   ))}
                 </select>
+                <button
+                  onClick={() => {
+                    if (!selectedWeekId || !selectedDayId) return;
+                    const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                    setSelectedWeekId(next.weekId);
+                    setSelectedDayId(next.dayId);
+                    setSession(null);
+                    setShouldAutoNavigate(false);
+                  }}
+                  style={SMALL_BTN_STYLE}
+                >Next</button>
               </div>
             )}
           </div>
