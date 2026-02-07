@@ -553,6 +553,72 @@ export default function App() {
     return () => document.removeEventListener('beforeinput', preventUndo as EventListener);
   }, []);
 
+  // Pull-to-refresh functionality
+  useEffect(() => {
+    let startY = 0;
+    let pulling = false;
+    const threshold = 100;
+    let indicator: HTMLDivElement | null = null;
+
+    const createIndicator = () => {
+      const el = document.createElement('div');
+      el.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; height: 0;
+        background: var(--bg-elevated); display: flex; align-items: center;
+        justify-content: center; font-size: 14px; color: var(--text-secondary);
+        overflow: hidden; z-index: 9999; transition: none;
+      `;
+      document.body.prepend(el);
+      return el;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (window.scrollY === 0) {
+        startY = e.touches[0].clientY;
+        pulling = true;
+        if (!indicator) indicator = createIndicator();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!pulling || !indicator) return;
+      const currentY = e.touches[0].clientY;
+      const pullDistance = Math.max(0, currentY - startY);
+
+      if (pullDistance > 0 && window.scrollY === 0) {
+        const height = Math.min(pullDistance * 0.5, threshold);
+        indicator.style.height = `${height}px`;
+        indicator.textContent = pullDistance > threshold ? 'Release to refresh' : 'Pull to refresh';
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!pulling || !indicator) return;
+      const height = parseFloat(indicator.style.height);
+
+      if (height >= threshold * 0.5) {
+        indicator.textContent = 'Refreshing...';
+        indicator.style.height = '50px';
+        setTimeout(() => window.location.reload(), 300);
+      } else {
+        indicator.style.height = '0';
+        setTimeout(() => { indicator?.remove(); indicator = null; }, 200);
+      }
+      pulling = false;
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      indicator?.remove();
+    };
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
