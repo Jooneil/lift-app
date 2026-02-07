@@ -3021,9 +3021,18 @@ function WorkoutPage({
                       value={set.reps ?? ''}
                       onChange={(e) => {
                         const num = e.target.value === '' ? null : Number(e.target.value);
-                        updateSet(entry.id, set.id, {
-                          reps: num !== null && Number.isNaN(num) ? null : num,
-                        });
+                        const repsValue = num !== null && Number.isNaN(num) ? null : num;
+                        // Auto-populate weight from ghost if weight is empty and entering reps
+                        if (set.weight == null && repsValue != null && ghostSet.weight != null) {
+                          updateSet(entry.id, set.id, {
+                            reps: repsValue,
+                            weight: ghostSet.weight,
+                          });
+                        } else {
+                          updateSet(entry.id, set.id, {
+                            reps: repsValue,
+                          });
+                        }
                       }}
                       style={{
                         ...INPUT_STYLE,
