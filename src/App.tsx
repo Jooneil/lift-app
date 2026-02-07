@@ -1547,6 +1547,7 @@ function AuthedApp({
                 <strong>{user.username}</strong>
               </div>
               <button onClick={() => { setUserMenuOpen(false); setShowStreakSettings(true); }} style={{ ...SMALL_BTN_STYLE, width: '100%', marginBottom: 8 }} role="menuitem">Streak Settings</button>
+              <button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} style={{ ...SMALL_BTN_STYLE, width: '100%', marginBottom: 8 }} role="menuitem">Archive</button>
               <button onClick={() => { setUserMenuOpen(false); onLogout(); }} style={{ ...SMALL_BTN_STYLE, width: '100%' }} role="menuitem">Logout</button>
             </div>
           )}
@@ -1570,7 +1571,6 @@ function AuthedApp({
             }}
             aria-pressed={mode === "workout"}
           >Workout</button>
-          <button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} style={BTN_STYLE}>Archive</button>
         </div>
       </div>
 
