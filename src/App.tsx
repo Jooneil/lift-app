@@ -1641,21 +1641,34 @@ function AuthedApp({
                   </option>
                 ))}
               </select>
+              {selectedPlan && selectedWeekId && selectedDayId && (
+                <>
+                  <button
+                    onClick={() => {
+                      const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                      setSelectedWeekId(prev.weekId);
+                      setSelectedDayId(prev.dayId);
+                      setSession(null);
+                      setShouldAutoNavigate(false);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >Previous</button>
+                  <button
+                    onClick={() => {
+                      const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                      setSelectedWeekId(next.weekId);
+                      setSelectedDayId(next.dayId);
+                      setSession(null);
+                      setShouldAutoNavigate(false);
+                    }}
+                    style={SMALL_BTN_STYLE}
+                  >Next</button>
+                </>
+              )}
             </div>
 
             {selectedPlan && (
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <button
-                  onClick={() => {
-                    if (!selectedWeekId || !selectedDayId) return;
-                    const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                    setSelectedWeekId(prev.weekId);
-                    setSelectedDayId(prev.dayId);
-                    setSession(null);
-                    setShouldAutoNavigate(false);
-                  }}
-                  style={SMALL_BTN_STYLE}
-                >Previous</button>
                 <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Week:</label>
                 <select
                   value={selectedWeekId ?? ''}
@@ -1692,17 +1705,6 @@ function AuthedApp({
                     </option>
                   ))}
                 </select>
-                <button
-                  onClick={() => {
-                    if (!selectedWeekId || !selectedDayId) return;
-                    const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                    setSelectedWeekId(next.weekId);
-                    setSelectedDayId(next.dayId);
-                    setSession(null);
-                    setShouldAutoNavigate(false);
-                  }}
-                  style={SMALL_BTN_STYLE}
-                >Next</button>
               </div>
             )}
           </div>
