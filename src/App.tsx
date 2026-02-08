@@ -3700,6 +3700,14 @@ function calculateSetsPerMuscle(
   return setsPerMuscle;
 }
 
+function calculateWeekSetsPerMuscle(
+  week: PlanWeek,
+  catalogExercises: CatalogExercise[]
+): Record<string, number> {
+  const allItems = week.days.flatMap((day) => day.items);
+  return calculateSetsPerMuscle(allItems, catalogExercises);
+}
+
 function BuilderPage({
   plans,
   setPlans,
@@ -4828,6 +4836,30 @@ function BuilderPage({
                     Delete Week
                   </button>
                 </div>
+
+                {week.days.some((d) => d.items.length > 0) && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    marginBottom: 12,
+                    padding: '8px 12px',
+                    background: 'var(--bg-card)',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    color: 'var(--text-secondary)',
+                  }}>
+                    <span style={{ fontWeight: 600, marginRight: 4 }}>Week Total:</span>
+                    {Object.entries(calculateWeekSetsPerMuscle(week, catalogExercises))
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([muscle, sets]) => (
+                        <span key={muscle}>
+                          <strong>{muscle}:</strong> {sets}
+                        </span>
+                      ))
+                    }
+                  </div>
+                )}
 
                 <div
                   style={{ display: 'flex', flexDirection: 'column', gap: 12, touchAction: draggingDayId && dayDragActive ? 'none' as any : 'auto' }}
