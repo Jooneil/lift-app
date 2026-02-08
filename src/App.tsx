@@ -542,17 +542,6 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [forcePasswordReset, setForcePasswordReset] = useState(false);
 
-  // Prevent iOS shake-to-undo from triggering undo actions
-  useEffect(() => {
-    const preventUndo = (e: InputEvent) => {
-      if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
-        e.preventDefault();
-      }
-    };
-    document.addEventListener('beforeinput', preventUndo as EventListener);
-    return () => document.removeEventListener('beforeinput', preventUndo as EventListener);
-  }, []);
-
   // Pull-to-refresh functionality
   useEffect(() => {
     let startY = 0;
@@ -3691,6 +3680,26 @@ function WorkoutPage({
     </div>
   );
 }
+
+function calculateSetsPerMuscle(
+  items: PlanExercise[],
+  catalogExercises: CatalogExercise[]
+): Record<string, number> {
+  const catalogByName = new Map<string, CatalogExercise>();
+  for (const ex of catalogExercises) {
+    catalogByName.set(ex.name.trim().toLowerCase(), ex);
+  }
+
+  const setsPerMuscle: Record<string, number> = {};
+  for (const item of items) {
+    const key = item.exerciseName.trim().toLowerCase();
+    const catalogEntry = catalogByName.get(key);
+    const muscle = catalogEntry?.primaryMuscle || 'Unknown';
+    setsPerMuscle[muscle] = (setsPerMuscle[muscle] || 0) + item.targetSets;
+  }
+  return setsPerMuscle;
+}
+
 function BuilderPage({
   plans,
   setPlans,
@@ -4912,6 +4921,29 @@ function BuilderPage({
                         Delete Day
                       </button>
                     </div>
+
+                    {day.items.length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                        marginBottom: 12,
+                        padding: '8px 12px',
+                        background: 'var(--bg-elevated)',
+                        borderRadius: 10,
+                        fontSize: 13,
+                        color: 'var(--text-secondary)',
+                      }}>
+                        {Object.entries(calculateSetsPerMuscle(day.items, catalogExercises))
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([muscle, sets]) => (
+                            <span key={muscle}>
+                              <strong>{muscle}:</strong> {sets}
+                            </span>
+                          ))
+                        }
+                      </div>
+                    )}
 
                     {day.items.length === 0 ? (
                       <div style={{ color: '#777', fontSize: 13 }}>No exercises yet.</div>
