@@ -5347,11 +5347,12 @@ function BuilderPage({
                                     targetSets: Number(e.target.value),
                                   })
                                 }
-                                style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
+                                style={{ padding: '6px 24px 6px 8px', borderRadius: 8, border: '1px solid #444', minWidth: 0, width: 'auto' }}
+                                title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
                               >
                                 {options.map((count) => (
                                   <option key={count} value={count}>
-                                    {count} {count === 1 ? 'set' : 'sets'}
+                                    {count}
                                   </option>
                                 ))}
                               </select>
