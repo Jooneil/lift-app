@@ -3405,7 +3405,6 @@ function WorkoutPage({
                       inputMode="decimal"
                       placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
                       value={set.weight ?? ''}
-                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
                         const v = e.target.value;
                         const normalized = v.replace(',', '.');
@@ -3426,7 +3425,6 @@ function WorkoutPage({
                       inputMode="numeric"
                       placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
                       value={set.reps ?? ''}
-                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
                         const num = e.target.value === '' ? null : Number(e.target.value);
                         const repsValue = num !== null && Number.isNaN(num) ? null : num;
@@ -5345,6 +5343,7 @@ function BuilderPage({
                                 </div>
                               <input
                                 value={item.exerciseName}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) =>
                                   handleExerciseChange(week.id, day.id, item.id, {
                                     exerciseName: e.target.value,
