@@ -5347,7 +5347,7 @@ function BuilderPage({
                                     targetSets: Number(e.target.value),
                                   })
                                 }
-                                style={{ padding: '6px 24px 6px 8px', borderRadius: 8, border: '1px solid #444', minWidth: 0, width: 'auto' }}
+                                style={{ padding: '6px 20px 6px 6px', borderRadius: 8, border: '1px solid #444', width: 48 }}
                                 title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
                               >
                                 {options.map((count) => (
