@@ -2933,11 +2933,22 @@ function WorkoutPage({
       }
     }
 
-    // In full-body mode, filter to only sessions from the same day
+    // In full-body mode, filter to only sessions from days with the same NAME
     const ghostMode = plan.ghostMode ?? 'default';
-    const filteredRows = ghostMode === 'full-body'
-      ? rows.filter((row) => row.day_id === day.id)
-      : rows;
+    let filteredRows = rows;
+    if (ghostMode === 'full-body') {
+      // Find all day IDs in the plan that have the same name as the current day
+      const currentDayName = day.name.trim().toLowerCase();
+      const matchingDayIds = new Set<string>();
+      for (const week of plan.weeks) {
+        for (const d of week.days) {
+          if (d.name.trim().toLowerCase() === currentDayName) {
+            matchingDayIds.add(d.id);
+          }
+        }
+      }
+      filteredRows = rows.filter((row) => matchingDayIds.has(row.day_id));
+    }
 
     const result = new Map<string, Map<number, { weight: number; reps: number }>>();
 
