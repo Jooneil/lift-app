@@ -1605,19 +1605,46 @@ function AuthedApp({
       }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
           {streakConfig?.enabled && (
-            <span
+            <div
               style={{
-                fontSize: 20,
-                filter: streakHitToday ? 'none' : 'grayscale(100%)',
-                opacity: streakHitToday ? 1 : 0.5,
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 32,
+                height: 32,
                 cursor: 'pointer',
                 transition: 'all var(--transition-fast)',
               }}
               onClick={() => setShowStreakSettings(true)}
               title={`${currentStreak} day streak`}
             >
-              🔥
-            </span>
+              <span
+                style={{
+                  fontSize: 28,
+                  filter: streakHitToday ? 'none' : 'grayscale(100%)',
+                  opacity: streakHitToday ? 1 : 0.5,
+                  lineHeight: 1,
+                }}
+              >
+                🔥
+              </span>
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -45%)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: streakHitToday ? '#000' : 'var(--text-muted)',
+                  textShadow: streakHitToday ? '0 0 2px rgba(255,255,255,0.8)' : 'none',
+                  pointerEvents: 'none',
+                }}
+              >
+                {currentStreak}
+              </span>
+            </div>
           )}
           <button onClick={() => setUserMenuOpen((v) => !v)} style={BTN_STYLE} aria-expanded={userMenuOpen} aria-haspopup="menu">Profile</button>
           {userMenuOpen && (
