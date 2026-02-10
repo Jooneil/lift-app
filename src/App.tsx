@@ -2878,8 +2878,9 @@ function WorkoutPage({
             (!target.exerciseId && entryName === targetName);
           if (!match) continue;
 
-          for (const set of entry.sets ?? []) {
-            const setIdx = typeof set.setIndex === 'number' ? set.setIndex : 0;
+          const sets = entry.sets ?? [];
+          for (let setIdx = 0; setIdx < sets.length; setIdx++) {
+            const set = sets[setIdx];
             // Only store if we haven't found data for this set index yet (newest first)
             if (!setsByIndex.has(setIdx)) {
               const weight = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : null;
