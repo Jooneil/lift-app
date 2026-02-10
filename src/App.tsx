@@ -59,12 +59,7 @@ type SessionSet = { id: string; setIndex: number; weight: number | null; reps: n
 
 type ArchivedSessionMap = Record<string, Record<string, Session | null>>;
 
-type GhostSource = 'regular' | 'historical' | 'previous-set';
-type EnhancedGhostSet = {
-  weight: number | null;
-  reps: number | null;
-  source: GhostSource;
-};
+type GhostSet = { weight: number | null; reps: number | null };
 
 type Mode = "builder" | "workout";
 type SearchSource = "all" | "defaults" | "home_made";
@@ -2786,7 +2781,7 @@ function WorkoutPage({
   }, [plan.id, plan.serverId, day.items, session]);
 
 
-  const getGhost = (exerciseId: string | undefined, exerciseName: string, idx: number): EnhancedGhostSet => {
+  const getGhost = (exerciseId: string | undefined, exerciseName: string, idx: number): GhostSet => {
     const keys: string[] = [];
     if (exerciseId) keys.push(`id:${exerciseId}`);
     const nameKey = `name:${normalizeExerciseName(exerciseName).toLowerCase()}`;
@@ -2796,44 +2791,42 @@ function WorkoutPage({
     for (const key of keys) {
       const arr = ghost[key];
       if (arr && arr[idx] && (arr[idx].weight != null || arr[idx].reps != null)) {
-        return { ...arr[idx], source: 'regular' };
+        return { weight: arr[idx].weight, reps: arr[idx].reps };
       }
     }
 
-    // Tier 2: Historical ghost (from any past session with this set index)
+    // Tier 2: Historical ghost (from past sessions)
     const histData = historicalGhostRef.current;
     if (histData) {
       for (const key of keys) {
         const setMap = histData.get(key);
         if (setMap && setMap.has(idx)) {
           const histSet = setMap.get(idx)!;
-          return { weight: histSet.weight, reps: histSet.reps, source: 'historical' };
+          return { weight: histSet.weight, reps: histSet.reps };
         }
       }
     }
 
     // Tier 3: Previous-set fallback (copy idx-1 values)
     if (idx > 0) {
-      // Try regular ghost for previous set
       for (const key of keys) {
         const arr = ghost[key];
         if (arr && arr[idx - 1] && (arr[idx - 1].weight != null || arr[idx - 1].reps != null)) {
-          return { weight: arr[idx - 1].weight, reps: arr[idx - 1].reps, source: 'previous-set' };
+          return { weight: arr[idx - 1].weight, reps: arr[idx - 1].reps };
         }
       }
-      // Try historical for previous set
       if (histData) {
         for (const key of keys) {
           const setMap = histData.get(key);
           if (setMap && setMap.has(idx - 1)) {
             const histSet = setMap.get(idx - 1)!;
-            return { weight: histSet.weight, reps: histSet.reps, source: 'previous-set' };
+            return { weight: histSet.weight, reps: histSet.reps };
           }
         }
       }
     }
 
-    return { weight: null, reps: null, source: 'regular' };
+    return { weight: null, reps: null };
   };
 
   const formatHistoryDate = (raw: string) => {
@@ -3283,7 +3276,6 @@ function WorkoutPage({
               {entry.sets.map((set, i) => {
                 const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
                 const hasValue = set.weight != null || set.reps != null;
-                const isSuggested = ghostSet.source === 'historical' || ghostSet.source === 'previous-set';
                 return (
                   <div key={set.id} style={{
                     display: 'grid',
@@ -3306,7 +3298,6 @@ function WorkoutPage({
                       type="number"
                       step="any"
                       inputMode="decimal"
-                      className={isSuggested && ghostSet.weight != null ? 'suggested-ghost' : undefined}
                       placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
                       value={set.weight ?? ''}
                       onChange={(e) => {
@@ -3327,7 +3318,6 @@ function WorkoutPage({
                     />
                     <input
                       inputMode="numeric"
-                      className={isSuggested && ghostSet.reps != null ? 'suggested-ghost' : undefined}
                       placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
                       value={set.reps ?? ''}
                       onChange={(e) => {
