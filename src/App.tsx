@@ -5277,8 +5277,8 @@ function BuilderPage({
                                 data-exercise-id={item.id}
                                 style={{
                                   display: 'grid',
-                                  gridTemplateColumns: 'auto 2fr auto 1fr auto',
-                                  gap: 8,
+                                  gridTemplateColumns: 'auto 1fr auto auto auto auto',
+                                  gap: 6,
                                   alignItems: 'center',
                                   cursor: 'grab',
                                   opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
@@ -5370,8 +5370,8 @@ function BuilderPage({
                               >
                                 MYO
                               </button>
-                              <button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} style={SMALL_BTN_STYLE}>
-                                Remove
+                              <button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} style={{ ...SMALL_BTN_STYLE, padding: '4px 8px' }} title="Remove exercise">
+                                X
                               </button>
                               </div>
                               {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx + 1 && (
