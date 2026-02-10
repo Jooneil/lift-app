@@ -18,7 +18,7 @@ import type {
   CustomExerciseRow,
 } from "./api";
 
-type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[] };
+type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[]; ghostMode?: 'default' | 'full-body' };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
 type PlanDay = { id: string; name: string; items: PlanExercise[] };
 type PlanExercise = { id: string; exerciseId?: string; exerciseName: string; targetSets: number; targetReps?: string };
@@ -703,6 +703,7 @@ function AuthedApp({
   const [currentStreak, setCurrentStreak] = useState(0);
   const [showStreakSettings, setShowStreakSettings] = useState(false);
   const [showStreakReconfigPrompt, setShowStreakReconfigPrompt] = useState(false);
+  const [showPlanSettings, setShowPlanSettings] = useState(false);
 
   const exerciseByName = useMemo(() => {
     const map = new Map<string, Exercise>();
@@ -1496,6 +1497,13 @@ function AuthedApp({
     [selectedPlan, ensureExerciseByName, queuePlanSave]
   );
 
+  const handleGhostModeChange = (mode: 'default' | 'full-body') => {
+    if (!selectedPlan) return;
+    setPlans(prev => prev.map(p =>
+      p.id === selectedPlan.id ? { ...p, ghostMode: mode } : p
+    ));
+  };
+
   const handleFinishPlan = async () => {
     if (!selectedPlan || !selectedWeek || !selectedDay || finishingPlan) return;
     setFinishingPlan(true);
@@ -1777,6 +1785,14 @@ function AuthedApp({
                     </option>
                   ))}
                 </select>
+
+                <button
+                  onClick={() => setShowPlanSettings(true)}
+                  style={SMALL_BTN_STYLE}
+                  title="Plan Settings"
+                >
+                  Settings
+                </button>
               </div>
             )}
           </div>
@@ -2183,6 +2199,53 @@ function AuthedApp({
         </div>
       )}
 
+      {/* Plan Settings Modal */}
+      {showPlanSettings && selectedPlan && (
+        <div style={MODAL_OVERLAY_STYLE}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 360 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 18 }}>Plan Settings</h3>
+              <button onClick={() => setShowPlanSettings(false)} style={BTN_STYLE}>Close</button>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: 'var(--text-secondary)', fontSize: 14 }}>
+                Plan Type
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => handleGhostModeChange('default')}
+                  style={{
+                    ...BTN_STYLE,
+                    flex: 1,
+                    background: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--accent-muted)' : 'var(--bg-card)',
+                    borderColor: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--border-strong)' : 'var(--border-default)',
+                  }}
+                >
+                  Default
+                </button>
+                <button
+                  onClick={() => handleGhostModeChange('full-body')}
+                  style={{
+                    ...BTN_STYLE,
+                    flex: 1,
+                    background: selectedPlan.ghostMode === 'full-body' ? 'var(--accent-muted)' : 'var(--bg-card)',
+                    borderColor: selectedPlan.ghostMode === 'full-body' ? 'var(--border-strong)' : 'var(--border-default)',
+                  }}
+                >
+                  Full Body
+                </button>
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+                {(selectedPlan.ghostMode ?? 'default') === 'default'
+                  ? 'Ghost shows your most recent performance regardless of day.'
+                  : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Streak Reconfigure Prompt (after Finish & Archive) */}
       {showStreakReconfigPrompt && (
         <div style={MODAL_OVERLAY_STYLE}>
@@ -2293,7 +2356,7 @@ function WorkoutPage({
   useEffect(() => {
     historyCacheRef.current = null;
     historicalGhostRef.current = null;
-  }, [plan.serverId]);
+  }, [plan.serverId, plan.ghostMode]);
 
   const currentWeek = useMemo(
     () => plan.weeks.find((w) => w.days.some((d) => d.id === day.id)) || null,
@@ -2856,6 +2919,12 @@ function WorkoutPage({
       }
     }
 
+    // In full-body mode, filter to only sessions from the same day
+    const ghostMode = plan.ghostMode ?? 'default';
+    const filteredRows = ghostMode === 'full-body'
+      ? rows.filter((row) => row.day_id === day.id)
+      : rows;
+
     const result = new Map<string, Map<number, { weight: number; reps: number }>>();
 
     for (const target of targets) {
@@ -2865,8 +2934,8 @@ function WorkoutPage({
 
       const setsByIndex = new Map<number, { weight: number; reps: number }>();
 
-      // Iterate through all sessions (newest first - already sorted by updated_at desc)
-      for (const row of rows) {
+      // Iterate through sessions (newest first - already sorted by updated_at desc)
+      for (const row of filteredRows) {
         const data = (row as SessionRow).data;
         if (!data || !Array.isArray(data.entries)) continue;
 
