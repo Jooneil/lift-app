@@ -21,7 +21,7 @@ import type {
 type Plan = { id: string; serverId?: string; predecessorPlanId?: string; name: string; weeks: PlanWeek[]; ghostMode?: 'default' | 'full-body' };
 type PlanWeek = { id: string; name: string; days: PlanDay[] };
 type PlanDay = { id: string; name: string; items: PlanExercise[] };
-type PlanExercise = { id: string; exerciseId?: string; exerciseName: string; targetSets: number; targetReps?: string };
+type PlanExercise = { id: string; exerciseId?: string; exerciseName: string; targetSets: number; targetReps?: string; myoReps?: boolean };
 type Exercise = { id: string; name: string };
 type CatalogExercise = {
   id: string;
@@ -292,6 +292,7 @@ function planToCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>): st
     'exerciseName',
     'targetSets',
     'targetReps',
+    'myoReps',
     'note',
     'isCustom',
     'primaryMuscle',
@@ -339,6 +340,7 @@ function planToCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>): st
           csvEscape(exerciseName),
           String(Number(it.targetSets) || 0),
           csvEscape(it.targetReps || ''),
+          csvEscape(it.myoReps ? 'true' : ''),
           csvEscape(note),
           csvEscape(isCustom),
           csvEscape(primaryMuscle),
@@ -417,6 +419,7 @@ function startSessionFromDay(plan: Plan, weekId: string, dayId: string): Session
         reps: null,
       })),
       note: null,
+      myoRepMatch: item.myoReps || undefined,
     })),
     completed: false,
   };
@@ -451,6 +454,7 @@ function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
       exerciseName: item.exerciseName,
       sets,
       note: existing?.note ?? null,
+      myoRepMatch: item.myoReps || existing?.myoRepMatch || undefined,
     };
   });
   return { ...prev, entries: nextEntries };
@@ -471,6 +475,7 @@ function mapRowToWeeks(d: import("./api").ServerPlanData, { includeLegacyFlatDay
           exerciseName: fixMojibake(item.exerciseName) || "Exercise",
           targetSets: Number(item.targetSets) || 0,
           targetReps: item.targetReps ?? "",
+          myoReps: (item as { myoReps?: boolean }).myoReps || undefined,
         })),
       })),
     }));
@@ -489,6 +494,7 @@ function mapRowToWeeks(d: import("./api").ServerPlanData, { includeLegacyFlatDay
           exerciseName: fixMojibake(item.exerciseName) || "Exercise",
           targetSets: Number(item.targetSets) || 0,
           targetReps: item.targetReps ?? "",
+          myoReps: (item as { myoReps?: boolean }).myoReps || undefined,
         })),
       })),
     }];
@@ -1834,6 +1840,13 @@ function AuthedApp({
                 isLastDay={isLastDayOfPlan}
                 onFinishPlan={handleFinishPlan}
                 finishingPlan={finishingPlan}
+                onUpdatePlan={(updatedPlan) => {
+                  setPlans(prev => prev.map(p => p.id === updatedPlan.id ? updatedPlan : p));
+                  if (updatedPlan.serverId) {
+                    const payload = { weeks: updatedPlan.weeks, ghostMode: updatedPlan.ghostMode };
+                    planApi.update(updatedPlan.serverId, updatedPlan.name, payload).catch(() => void 0);
+                  }
+                }}
               />
             </>
           )}
@@ -2304,6 +2317,7 @@ function WorkoutPage({
   isLastDay,
   onFinishPlan,
   finishingPlan,
+  onUpdatePlan,
 }: {
   plan: Plan;
   day: PlanDay;
@@ -2327,6 +2341,7 @@ function WorkoutPage({
   isLastDay: boolean;
   onFinishPlan?: () => void;
   finishingPlan: boolean;
+  onUpdatePlan: (plan: Plan) => void;
 }) {
   const [replaceSearchOpen, setReplaceSearchOpen] = useState(false);
   const [replaceTargetEntry, setReplaceTargetEntry] = useState<{ exerciseId?: string; exerciseName: string } | null>(null);
@@ -2361,6 +2376,7 @@ function WorkoutPage({
   const historyCacheRef = useRef<SessionRow[] | null>(null);
   const historicalGhostRef = useRef<Map<string, Map<number, { weight: number; reps: number }>> | null>(null);
   const [openExerciseMenu, setOpenExerciseMenu] = useState<string | null>(null);
+  const [myoScopeEntry, setMyoScopeEntry] = useState<{ entryId: string; exerciseId?: string; exerciseName: string; currentValue: boolean } | null>(null);
 
   useEffect(() => {
     historyCacheRef.current = null;
@@ -3033,19 +3049,81 @@ function WorkoutPage({
     });
   };
 
-  const toggleMyoRepMatch = (entryId: string) => {
+  const openMyoScopeModal = (entryId: string) => {
+    const entry = session?.entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    setMyoScopeEntry({
+      entryId,
+      exerciseId: entry.exerciseId,
+      exerciseName: entry.exerciseName,
+      currentValue: !!entry.myoRepMatch,
+    });
+    setOpenExerciseMenu(null);
+  };
+
+  const applyMyoToday = () => {
+    if (!myoScopeEntry) return;
+    const newValue = !myoScopeEntry.currentValue;
     setSession((s) => {
       if (!s) return s;
       const next: Session = {
         ...s,
         entries: s.entries.map((e) =>
-          e.id === entryId ? { ...e, myoRepMatch: !e.myoRepMatch } : e
+          e.id === myoScopeEntry.entryId ? { ...e, myoRepMatch: newValue } : e
         ),
       };
       saveNow(next);
       return next;
     });
-    setOpenExerciseMenu(null);
+    setMyoScopeEntry(null);
+  };
+
+  const applyMyoRestOfPlan = () => {
+    if (!myoScopeEntry) return;
+    const newValue = !myoScopeEntry.currentValue;
+    const targetName = myoScopeEntry.exerciseName.trim().toLowerCase();
+    const targetId = myoScopeEntry.exerciseId;
+    const currentDayName = day.name.trim().toLowerCase();
+    const isFullBody = plan.ghostMode === 'full-body';
+
+    // Update the plan
+    const updatedPlan = {
+      ...plan,
+      weeks: plan.weeks.map((week) => ({
+        ...week,
+        days: week.days.map((d) => {
+          // In full-body mode, only update days with the same name
+          if (isFullBody && d.name.trim().toLowerCase() !== currentDayName) {
+            return d;
+          }
+          return {
+            ...d,
+            items: d.items.map((item) => {
+              const itemName = item.exerciseName.trim().toLowerCase();
+              const matches = targetId
+                ? (item.exerciseId === targetId || itemName === targetName)
+                : itemName === targetName;
+              return matches ? { ...item, myoReps: newValue || undefined } : item;
+            }),
+          };
+        }),
+      })),
+    };
+    onUpdatePlan(updatedPlan);
+
+    // Also apply to current session
+    setSession((s) => {
+      if (!s) return s;
+      const next: Session = {
+        ...s,
+        entries: s.entries.map((e) =>
+          e.id === myoScopeEntry.entryId ? { ...e, myoRepMatch: newValue } : e
+        ),
+      };
+      saveNow(next);
+      return next;
+    });
+    setMyoScopeEntry(null);
   };
 
     const updateEntryNote = (entryId: string, noteText: string) => {
@@ -3186,7 +3264,7 @@ function WorkoutPage({
                       History
                     </button>
                     <button
-                      onClick={() => toggleMyoRepMatch(entry.id)}
+                      onClick={() => openMyoScopeModal(entry.id)}
                       style={{
                         ...SMALL_BTN_STYLE,
                         width: '100%',
@@ -3675,6 +3753,43 @@ function WorkoutPage({
             </div>
             <div style={{ color: '#777', fontSize: 12, textAlign: 'left' }}>
               * = self made movement
+            </div>
+          </div>
+        </div>
+      )}
+
+      {myoScopeEntry && (
+        <div style={MODAL_OVERLAY_STYLE}>
+          <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 320, textAlign: 'center' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Myo-Rep Match</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>
+              {myoScopeEntry.currentValue ? 'Turn off' : 'Turn on'} Myo-Rep Match for <strong>{myoScopeEntry.exerciseName}</strong>?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={applyMyoToday}
+                style={{ ...BTN_STYLE, width: '100%' }}
+              >
+                Just Today
+              </button>
+              <button
+                onClick={applyMyoRestOfPlan}
+                style={{
+                  ...BTN_STYLE,
+                  width: '100%',
+                  background: 'rgba(167, 139, 250, 0.15)',
+                  borderColor: '#a78bfa',
+                  color: '#a78bfa',
+                }}
+              >
+                {plan.ghostMode === 'full-body' ? 'All ' + day.name + ' Days' : 'Entire Plan'}
+              </button>
+              <button
+                onClick={() => setMyoScopeEntry(null)}
+                style={{ ...BTN_STYLE, width: '100%', marginTop: 8 }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -4674,6 +4789,7 @@ function BuilderPage({
       exerciseName: header.indexOf('exercisename'),
       targetSets: header.indexOf('targetsets'),
       targetReps: header.indexOf('targetreps'),
+      myoReps: header.indexOf('myoreps'),
       note: header.indexOf('note'),
       isCustom: header.indexOf('iscustom'),
       primaryMuscle: header.indexOf('primarymuscle'),
@@ -4715,7 +4831,8 @@ function BuilderPage({
       const week = getWeek(wName);
       const day = getDay(week, dName);
       if (exName) {
-        day.items.push({ id: uuid(), exerciseName: exName, targetSets: Number.isFinite(sets) && sets > 0 ? sets : 0, targetReps: reps });
+        const myoReps = idx.myoReps >= 0 && parseBool(row[idx.myoReps]);
+        day.items.push({ id: uuid(), exerciseName: exName, targetSets: Number.isFinite(sets) && sets > 0 ? sets : 0, targetReps: reps, myoReps: myoReps || undefined });
         const key = exName.trim().toLowerCase();
         if (key) {
           const current = exerciseMeta.get(key) || {};
@@ -5238,7 +5355,20 @@ function BuilderPage({
                                   </option>
                                 ))}
                               </select>
-                              {/* reps/notes field removed per request */}
+                              <button
+                                onClick={() => handleExerciseChange(week.id, day.id, item.id, { myoReps: !item.myoReps })}
+                                style={{
+                                  ...SMALL_BTN_STYLE,
+                                  padding: '4px 8px',
+                                  fontSize: 11,
+                                  background: item.myoReps ? 'rgba(167, 139, 250, 0.15)' : 'var(--bg-card)',
+                                  borderColor: item.myoReps ? '#a78bfa' : 'var(--border-subtle)',
+                                  color: item.myoReps ? '#a78bfa' : 'var(--text-muted)',
+                                }}
+                                title="Myo-Rep Match"
+                              >
+                                MYO
+                              </button>
                               <button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} style={SMALL_BTN_STYLE}>
                                 Remove
                               </button>

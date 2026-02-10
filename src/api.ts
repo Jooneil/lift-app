@@ -1,7 +1,7 @@
 // api.ts – Supabase-backed API used by the app
 import { supabase } from './supabaseClient'
 
-export type ServerPlanItem = { id?: string; exerciseId?: string; exerciseName?: string; targetSets?: number; targetReps?: string };
+export type ServerPlanItem = { id?: string; exerciseId?: string; exerciseName?: string; targetSets?: number; targetReps?: string; myoReps?: boolean };
 export type ServerPlanDay = { id?: string; name?: string; items?: ServerPlanItem[] };
 export type ServerPlanWeek = { id?: string; name?: string; days?: ServerPlanDay[] };
 export type ServerPlanData = { weeks?: ServerPlanWeek[]; days?: ServerPlanDay[]; ghostMode?: 'default' | 'full-body' };
