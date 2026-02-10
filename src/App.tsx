@@ -914,7 +914,7 @@ function AuthedApp({
   const queuePlanSave = useCallback((planToSave: Plan) => {
     if (!planToSave?.serverId) return;
     try { if (planSaveDebounceRef.current) window.clearTimeout(planSaveDebounceRef.current); } catch {}
-    const payload = { weeks: planToSave.weeks };
+    const payload = { weeks: planToSave.weeks, ghostMode: planToSave.ghostMode };
     planSaveDebounceRef.current = window.setTimeout(() => {
       planApi.update(planToSave.serverId!, planToSave.name, payload).catch(() => void 0);
       planSaveDebounceRef.current = null;
@@ -966,6 +966,7 @@ function AuthedApp({
     predecessorPlanId: typeof row.predecessor_plan_id === "string" ? row.predecessor_plan_id : undefined,
     name: fixMojibake(row.name) || "Plan",
     weeks: mapRowToWeeks((row?.data ?? {}) as import("./api").ServerPlanData, { includeLegacyFlatDays: true }),
+    ghostMode: (row?.data as { ghostMode?: 'default' | 'full-body' } | undefined)?.ghostMode,
   });
 
   const handleDeleteArchivedPlan = async (plan: Plan) => {
@@ -1510,7 +1511,7 @@ function AuthedApp({
     try {
       let planToArchive = selectedPlan;
       let serverPlanId = selectedPlan.serverId;
-      const payload = { weeks: selectedPlan.weeks };
+      const payload = { weeks: selectedPlan.weeks, ghostMode: selectedPlan.ghostMode };
       if (serverPlanId) {
         await planApi.update(serverPlanId, selectedPlan.name, payload);
       } else {
@@ -2242,6 +2243,19 @@ function AuthedApp({
                   : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
               </p>
             </div>
+
+            <button
+              onClick={async () => {
+                if (!selectedPlan.serverId) return;
+                const payload = { weeks: selectedPlan.weeks, ghostMode: selectedPlan.ghostMode };
+                await planApi.update(selectedPlan.serverId, selectedPlan.name, payload);
+                setShowPlanSettings(false);
+                window.location.reload();
+              }}
+              style={{ ...BTN_STYLE, width: '100%', background: 'var(--accent-muted)', borderColor: 'var(--border-strong)' }}
+            >
+              Save & Apply
+            </button>
           </div>
         </div>
       )}
@@ -4512,7 +4526,7 @@ function BuilderPage({
     setSaving(true);
     setError(null);
     try {
-      const payload = { weeks: selectedPlan.weeks };
+      const payload = { weeks: selectedPlan.weeks, ghostMode: selectedPlan.ghostMode };
       if (selectedPlan.serverId) {
         await planApi.update(selectedPlan.serverId, selectedPlan.name, payload);
         // After update, pass through the same plan reference
@@ -4886,6 +4900,39 @@ function BuilderPage({
               onChange={(e) => handlePlanNameChange(e.target.value)}
               style={{ ...INPUT_STYLE, width: '100%' }}
             />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 14, color: 'var(--text-secondary)' }}>Plan Type</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'default' }))}
+                style={{
+                  ...BTN_STYLE,
+                  flex: 1,
+                  background: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--accent-muted)' : 'var(--bg-card)',
+                  borderColor: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--border-strong)' : 'var(--border-default)',
+                }}
+              >
+                Default
+              </button>
+              <button
+                onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'full-body' }))}
+                style={{
+                  ...BTN_STYLE,
+                  flex: 1,
+                  background: selectedPlan.ghostMode === 'full-body' ? 'var(--accent-muted)' : 'var(--bg-card)',
+                  borderColor: selectedPlan.ghostMode === 'full-body' ? 'var(--border-strong)' : 'var(--border-default)',
+                }}
+              >
+                Full Body
+              </button>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+              {(selectedPlan.ghostMode ?? 'default') === 'default'
+                ? 'Ghost shows your most recent performance regardless of day.'
+                : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
+            </p>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
