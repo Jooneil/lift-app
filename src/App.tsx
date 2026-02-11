@@ -2403,6 +2403,8 @@ function WorkoutPage({
   const historyCacheRef = useRef<SessionRow[] | null>(null);
   const historicalGhostRef = useRef<Map<string, Map<number, { weight: number; reps: number }>> | null>(null);
   const [openExerciseMenu, setOpenExerciseMenu] = useState<string | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editDraftSets, setEditDraftSets] = useState<SessionSet[]>([]);
   const [myoScopeEntry, setMyoScopeEntry] = useState<{ entryId: string; exerciseId?: string; exerciseName: string; currentValue: boolean } | null>(null);
 
   useEffect(() => {
@@ -3221,6 +3223,42 @@ function WorkoutPage({
 
   
 
+  const addDraftSet = () => {
+    setEditDraftSets(prev => [...prev, {
+      id: uuid(),
+      setIndex: prev.length,
+      weight: null,
+      reps: null,
+    }]);
+  };
+
+  const removeDraftSet = (setId: string) => {
+    setEditDraftSets(prev =>
+      prev.filter(s => s.id !== setId).map((s, i) => ({ ...s, setIndex: i }))
+    );
+  };
+
+  const saveEditSets = () => {
+    if (!editingEntryId) return;
+    setSession(s => {
+      if (!s) return s;
+      const nextEntries = s.entries.map(entry => {
+        if (entry.id !== editingEntryId) return entry;
+        return { ...entry, sets: editDraftSets };
+      });
+      const next: Session = { ...s, entries: nextEntries };
+      saveNow(next);
+      return next;
+    });
+    setEditingEntryId(null);
+    setEditDraftSets([]);
+  };
+
+  const cancelEdit = () => {
+    setEditingEntryId(null);
+    setEditDraftSets([]);
+  };
+
   const handleDone = async () => {
     markSessionCompleted(true);
     await onMarkDone();
@@ -3237,7 +3275,7 @@ function WorkoutPage({
       {session.entries.map((entry, entryIndex) => (
         <div key={entry.id} style={{
           background: 'var(--bg-elevated)',
-          border: '1px solid var(--border-default)',
+          border: editingEntryId === entry.id ? '1px solid var(--accent)' : '1px solid var(--border-default)',
           borderRadius: 14,
           padding: 16,
           marginBottom: 14,
@@ -3278,6 +3316,16 @@ function WorkoutPage({
                     zIndex: 20,
                     boxShadow: 'var(--shadow-lg)',
                   }}>
+                    <button
+                      onClick={() => {
+                        setOpenExerciseMenu(null);
+                        setEditingEntryId(entry.id);
+                        setEditDraftSets(entry.sets.map(s => ({ ...s })));
+                      }}
+                      style={{ ...SMALL_BTN_STYLE, width: '100%', textAlign: 'left', marginBottom: 4 }}
+                    >
+                      Edit Sets
+                    </button>
                     <button
                       onClick={() => { setOpenExerciseMenu(null); openReplaceSearch(entry, entryIndex); }}
                       style={{ ...SMALL_BTN_STYLE, width: '100%', textAlign: 'left', marginBottom: 4 }}
@@ -3357,40 +3405,36 @@ function WorkoutPage({
               </div>
             </div>
           ) : (
-            <>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '50px 1fr 1fr',
-                gap: 10,
-                marginBottom: 10,
-                padding: '0 4px',
-                color: 'var(--text-muted)',
-                fontSize: 12,
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                textAlign: 'center',
-              }}>
-                <div>Set</div>
-                <div>Weight</div>
-                <div style={{ color: entry.myoRepMatch ? '#a78bfa' : 'var(--text-muted)' }}>
-                  {entry.myoRepMatch ? 'Match' : 'Reps'}
+            editingEntryId === entry.id ? (
+              <>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '50px 1fr 1fr 36px',
+                  gap: 10,
+                  marginBottom: 10,
+                  padding: '0 4px',
+                  color: 'var(--text-muted)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  textAlign: 'center',
+                }}>
+                  <div>Set</div>
+                  <div>Weight</div>
+                  <div>Reps</div>
+                  <div></div>
                 </div>
-              </div>
 
-              {entry.sets.map((set, i) => {
-                const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
-                const hasValue = set.weight != null || set.reps != null;
-                return (
+                {editDraftSets.map((set, i) => (
                   <div key={set.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '50px 1fr 1fr',
+                    gridTemplateColumns: '50px 1fr 1fr 36px',
                     gap: 10,
                     marginBottom: 10,
                     padding: '4px',
                     borderRadius: 10,
-                    background: hasValue ? 'var(--accent-subtle)' : 'transparent',
-                    transition: 'background 0.15s ease',
+                    background: (set.weight != null || set.reps != null) ? 'var(--accent-subtle)' : 'transparent',
                   }}>
                     <div style={{
                       alignSelf: 'center',
@@ -3399,61 +3443,146 @@ function WorkoutPage({
                       color: 'var(--text-secondary)',
                       fontSize: 14,
                     }}>{i + 1}</div>
-                    <input
-                      type="number"
-                      step="any"
-                      inputMode="decimal"
-                      placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
-                      value={set.weight ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        const normalized = v.replace(',', '.');
-                        const num = normalized === '' ? null : Number(normalized);
-                        updateSet(entry.id, set.id, {
-                          weight: num !== null && Number.isNaN(num) ? null : num,
-                        });
-                      }}
+                    <div style={{
+                      alignSelf: 'center',
+                      textAlign: 'center',
+                      fontSize: 14,
+                      color: set.weight != null ? 'var(--text-primary)' : 'var(--text-muted)',
+                    }}>{set.weight ?? '—'}</div>
+                    <div style={{
+                      alignSelf: 'center',
+                      textAlign: 'center',
+                      fontSize: 14,
+                      color: set.reps != null ? 'var(--text-primary)' : 'var(--text-muted)',
+                    }}>{set.reps ?? '—'}</div>
+                    <button
+                      onClick={() => removeDraftSet(set.id)}
                       style={{
-                        ...INPUT_STYLE,
-                        width: '100%',
+                        ...SMALL_BTN_STYLE,
+                        padding: '2px 6px',
                         minWidth: 0,
-                        textAlign: 'center',
-                        fontWeight: set.weight != null ? 600 : 400,
+                        color: '#ef4444',
+                        borderColor: '#ef4444',
+                        fontSize: 14,
                       }}
-                    />
-                    <input
-                      inputMode="numeric"
-                      placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
-                      value={set.reps ?? ''}
-                      onChange={(e) => {
-                        const num = e.target.value === '' ? null : Number(e.target.value);
-                        const repsValue = num !== null && Number.isNaN(num) ? null : num;
-                        // Auto-populate weight from ghost if weight is empty and entering reps
-                        if (set.weight == null && repsValue != null && ghostSet.weight != null) {
-                          updateSet(entry.id, set.id, {
-                            reps: repsValue,
-                            weight: ghostSet.weight,
-                          });
-                        } else {
-                          updateSet(entry.id, set.id, {
-                            reps: repsValue,
-                          });
-                        }
-                      }}
-                      style={{
-                        ...INPUT_STYLE,
-                        width: '100%',
-                        minWidth: 0,
-                        textAlign: 'center',
-                        fontWeight: set.reps != null ? 600 : 400,
-                      }}
-                    />
+                      title="Remove set"
+                    >
+                      ✕
+                    </button>
                   </div>
-                );
-              })}
+                ))}
 
-              {entry.sets.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No sets yet.</div>}
-            </>
+                <button
+                  onClick={addDraftSet}
+                  style={{ ...SMALL_BTN_STYLE, width: '100%', marginBottom: 12 }}
+                >
+                  + Add Set
+                </button>
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button onClick={cancelEdit} style={SMALL_BTN_STYLE}>Cancel</button>
+                  <button onClick={saveEditSets} style={PRIMARY_BTN_STYLE}>Save</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '50px 1fr 1fr',
+                  gap: 10,
+                  marginBottom: 10,
+                  padding: '0 4px',
+                  color: 'var(--text-muted)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  textAlign: 'center',
+                }}>
+                  <div>Set</div>
+                  <div>Weight</div>
+                  <div style={{ color: entry.myoRepMatch ? '#a78bfa' : 'var(--text-muted)' }}>
+                    {entry.myoRepMatch ? 'Match' : 'Reps'}
+                  </div>
+                </div>
+
+                {entry.sets.map((set, i) => {
+                  const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
+                  const hasValue = set.weight != null || set.reps != null;
+                  return (
+                    <div key={set.id} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '50px 1fr 1fr',
+                      gap: 10,
+                      marginBottom: 10,
+                      padding: '4px',
+                      borderRadius: 10,
+                      background: hasValue ? 'var(--accent-subtle)' : 'transparent',
+                      transition: 'background 0.15s ease',
+                    }}>
+                      <div style={{
+                        alignSelf: 'center',
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        fontSize: 14,
+                      }}>{i + 1}</div>
+                      <input
+                        type="number"
+                        step="any"
+                        inputMode="decimal"
+                        placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
+                        value={set.weight ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const normalized = v.replace(',', '.');
+                          const num = normalized === '' ? null : Number(normalized);
+                          updateSet(entry.id, set.id, {
+                            weight: num !== null && Number.isNaN(num) ? null : num,
+                          });
+                        }}
+                        style={{
+                          ...INPUT_STYLE,
+                          width: '100%',
+                          minWidth: 0,
+                          textAlign: 'center',
+                          fontWeight: set.weight != null ? 600 : 400,
+                        }}
+                      />
+                      <input
+                        inputMode="numeric"
+                        placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
+                        value={set.reps ?? ''}
+                        onChange={(e) => {
+                          const num = e.target.value === '' ? null : Number(e.target.value);
+                          const repsValue = num !== null && Number.isNaN(num) ? null : num;
+                          // Auto-populate weight from ghost if weight is empty and entering reps
+                          if (set.weight == null && repsValue != null && ghostSet.weight != null) {
+                            updateSet(entry.id, set.id, {
+                              reps: repsValue,
+                              weight: ghostSet.weight,
+                            });
+                          } else {
+                            updateSet(entry.id, set.id, {
+                              reps: repsValue,
+                            });
+                          }
+                        }}
+                        style={{
+                          ...INPUT_STYLE,
+                          width: '100%',
+                          minWidth: 0,
+                          textAlign: 'center',
+                          fontWeight: set.reps != null ? 600 : 400,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+
+                {entry.sets.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No sets yet.</div>}
+              </>
+            )
           )}
         </div>
       ))}
