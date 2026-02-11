@@ -3740,9 +3740,9 @@ function WorkoutPage({
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12, minHeight: 280 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontWeight: 600 }}>Results</div>
                   <div style={{ color: '#777', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
@@ -3752,9 +3752,9 @@ function WorkoutPage({
                       setReplaceAddMovementOpen((prev) => !prev);
                       setReplaceAddMovementError(null);
                     }}
-                    style={SMALL_BTN_STYLE}
+                    style={{ ...SMALL_BTN_STYLE, fontSize: 12, padding: '4px 8px' }}
                   >
-                    Can't find a movement? Create a new one!
+                    Can't find it? Create one!
                   </button>
                 </div>
                 {replaceAddMovementOpen && (
@@ -3858,22 +3858,22 @@ function WorkoutPage({
                     </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '40vh', overflowY: 'auto' }}>
                   {replaceFilteredCatalog.length === 0 ? (
                     <div style={{ color: '#777' }}>No matches.</div>
                   ) : (
                     replaceFilteredCatalog.map((ex) => (
                       <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: '#777', fontSize: 12 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
+                          <div style={{ color: '#777', fontSize: 11 }}>
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => addReplaceQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => addReplaceQueue(ex)} style={{ ...SMALL_BTN_STYLE, fontSize: 12, padding: '3px 8px' }}>Add</button>
                           {ex.isCustom && (
-                            <button onClick={() => handleDeleteCustomFromReplace(ex)} style={SMALL_BTN_STYLE}>Delete</button>
+                            <button onClick={() => handleDeleteCustomFromReplace(ex)} style={{ ...SMALL_BTN_STYLE, fontSize: 12, padding: '3px 8px' }}>Del</button>
                           )}
                         </div>
                       </div>
@@ -3882,26 +3882,38 @@ function WorkoutPage({
                 </div>
               </div>
 
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
-                {replaceQueue.length === 0 ? (
-                  <div style={{ color: '#777' }}>No exercises selected.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {replaceQueue.map((q) => (
-                      <div key={q.name} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <div>{q.name}</div>
-                        <button onClick={() => removeReplaceQueue(q.name)} style={SMALL_BTN_STYLE}>Remove</button>
+              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Queue:</div>
+                  {replaceQueue.length === 0 ? (
+                    <div style={{ color: '#777', fontSize: 12 }}>None selected</div>
+                  ) : (
+                    replaceQueue.map((q) => (
+                      <div key={q.name} style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        background: 'var(--accent-subtle)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 6,
+                        padding: '2px 6px',
+                        fontSize: 12,
+                      }}>
+                        <span>{q.name}</span>
+                        <button
+                          onClick={() => removeReplaceQueue(q.name)}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1 }}
+                        >✕</button>
                       </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                  <button onClick={closeReplaceSearch} style={BTN_STYLE}>Cancel</button>
-                  <button onClick={() => applyReplaceQueue("today")} style={PRIMARY_BTN_STYLE} disabled={replaceQueue.length === 0}>
+                    ))
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                  <button onClick={closeReplaceSearch} style={{ ...BTN_STYLE, fontSize: 12, padding: '5px 10px' }}>Cancel</button>
+                  <button onClick={() => applyReplaceQueue("today")} style={{ ...PRIMARY_BTN_STYLE, fontSize: 12, padding: '5px 10px' }} disabled={replaceQueue.length === 0}>
                     Today Only
                   </button>
-                  <button onClick={() => applyReplaceQueue("remaining")} style={PRIMARY_BTN_STYLE} disabled={replaceQueue.length === 0}>
+                  <button onClick={() => applyReplaceQueue("remaining")} style={{ ...PRIMARY_BTN_STYLE, fontSize: 12, padding: '5px 10px' }} disabled={replaceQueue.length === 0}>
                     Rest of Meso
                   </button>
                 </div>
