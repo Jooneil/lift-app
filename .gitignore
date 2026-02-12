@@ -42,6 +42,9 @@ server/.env.*.local
 # Local backup/version snapshots (contain node_modules)
 Lift App Versions/
 
+# Admin tool (local only, never deploy)
+admin.html
+
 # Windows device-name artifact
 nul
 
