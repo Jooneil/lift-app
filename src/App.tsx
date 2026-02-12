@@ -2688,10 +2688,10 @@ function WorkoutPage({
 
     (async () => {
       try {
-        const ordered: Array<{ weekId: string; dayId: string; dayIndex: number }> = [];
+        const ordered: Array<{ weekId: string; dayId: string; dayIndex: number; dayName: string }> = [];
         for (const w of plan.weeks) {
           for (let di = 0; di < w.days.length; di++) {
-            ordered.push({ weekId: w.id, dayId: w.days[di].id, dayIndex: di });
+            ordered.push({ weekId: w.id, dayId: w.days[di].id, dayIndex: di, dayName: w.days[di].name.trim().toLowerCase() });
           }
         }
         const currentIdx = ordered.findIndex((d) => d.dayId === day.id && d.weekId === currentWeekId);
@@ -2713,10 +2713,14 @@ function WorkoutPage({
         const ghostMap: Record<string, { weight: number | null; reps: number | null }[]> = {};
         const notesMap: Record<string, string | null> = {};
         const remaining = new Set(targets.map((t) => exerciseKey(t)));
+        const ghostMode = plan.ghostMode ?? 'default';
+        const currentDayName = day.name.trim().toLowerCase();
 
         for (let idx = currentIdx - 1; idx >= 0; idx--) {
           if (remaining.size === 0) break;
           const prev = ordered[idx];
+          // In full-body mode, only look at days with the same name
+          if (ghostMode === 'full-body' && prev.dayName !== currentDayName) continue;
           const payload = await readSessionForDay(prev.weekId, prev.dayId);
           if (!payload || !payload.entries) continue;
 
