@@ -549,7 +549,8 @@ export default function App() {
     let pulling = false;
     let triggered = false;
     let currentProgress = 0;
-    const threshold = 90;
+    let wasReady = false;
+    const threshold = 100;
     let indicator: HTMLDivElement | null = null;
 
     // Inject keyframes once
@@ -565,22 +566,30 @@ export default function App() {
     const createIndicator = () => {
       const el = document.createElement('div');
       el.style.cssText = `
-        position: fixed; top: -44px; left: 50%; margin-left: -22px;
-        width: 44px; height: 44px; border-radius: 50%;
-        background: var(--bg-elevated); border: 1px solid var(--border-subtle);
-        box-shadow: 0 2px 12px rgba(0,0,0,0.35);
-        display: flex; align-items: center; justify-content: center;
+        position: fixed; top: 0; left: 0; right: 0;
+        display: flex; flex-direction: column; align-items: center;
         z-index: 9999; pointer-events: none;
-        transition: top 0.05s linear;
+        padding-top: 12px;
+        opacity: 0;
+        transform: translateY(-60px);
       `;
       el.innerHTML = `
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="12" stroke="var(--border-subtle)" stroke-width="2.5" data-bg="true"/>
-          <circle cx="14" cy="14" r="12" stroke="var(--text-muted)" stroke-width="2.5"
-            stroke-dasharray="75.4" stroke-dashoffset="75.4"
-            stroke-linecap="round" transform="rotate(-90 14 14)" data-ring="true"/>
-          <path d="M14 8 L14 18 M10 15 L14 19 L18 15" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-arrow="true"/>
-        </svg>
+        <div data-bubble style="
+          width: 40px; height: 40px; border-radius: 50%;
+          background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+          box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+          display: flex; align-items: center; justify-content: center;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        ">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" data-arrow-svg style="transition: transform 0.1s ease-out;">
+            <path d="M12 4v12M7 12l5 5 5-5" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-arrow/>
+          </svg>
+        </div>
+        <div data-label style="
+          font-size: 11px; color: var(--text-muted);
+          margin-top: 6px; opacity: 0;
+          transition: opacity 0.15s, color 0.15s;
+        "></div>
       `;
       document.body.appendChild(el);
       return el;
@@ -588,11 +597,11 @@ export default function App() {
 
     const removeIndicator = () => {
       if (!indicator) return;
-      indicator.style.transition = 'top 0.25s ease-in, opacity 0.25s ease-in';
-      indicator.style.top = '-44px';
+      indicator.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
       indicator.style.opacity = '0';
+      indicator.style.transform = 'translateY(-60px)';
       const ref = indicator;
-      setTimeout(() => { ref.remove(); }, 300);
+      setTimeout(() => { ref.remove(); }, 250);
       indicator = null;
     };
 
@@ -606,6 +615,7 @@ export default function App() {
         startY = e.touches[0].clientY;
         pulling = true;
         currentProgress = 0;
+        wasReady = false;
       }
     };
 
@@ -627,24 +637,45 @@ export default function App() {
       e.preventDefault();
 
       currentProgress = Math.min(pullDistance / threshold, 1);
-      const topPos = -44 + (64 * currentProgress);
-      indicator.style.top = `${topPos}px`;
+      const isReady = currentProgress >= 1;
 
-      const ring = indicator.querySelector('[data-ring]') as SVGCircleElement | null;
-      const arrowEl = indicator.querySelector('[data-arrow]') as SVGPathElement | null;
-      const svg = indicator.querySelector('svg') as SVGSVGElement | null;
+      // Slide indicator down with pull
+      const translateY = -60 + (72 * currentProgress);
+      indicator.style.transition = 'none';
+      indicator.style.opacity = String(Math.min(currentProgress * 2, 1));
+      indicator.style.transform = `translateY(${translateY}px)`;
 
-      if (ring) {
-        ring.style.strokeDashoffset = String(75.4 * (1 - currentProgress));
-        ring.style.stroke = currentProgress >= 1 ? '#4ade80' : 'var(--text-muted)';
+      const bubble = indicator.querySelector('[data-bubble]') as HTMLElement | null;
+      const arrowSvg = indicator.querySelector('[data-arrow-svg]') as SVGSVGElement | null;
+      const arrowPath = indicator.querySelector('[data-arrow]') as SVGPathElement | null;
+      const label = indicator.querySelector('[data-label]') as HTMLElement | null;
+
+      // Arrow rotates as you pull — flips up when ready to release
+      if (arrowSvg) {
+        arrowSvg.style.transform = `rotate(${isReady ? 180 : currentProgress * 180}deg)`;
       }
-      if (arrowEl) {
-        arrowEl.style.stroke = currentProgress >= 1 ? '#4ade80' : 'var(--text-secondary)';
+
+      // Color and glow when ready
+      if (arrowPath) {
+        arrowPath.style.stroke = isReady ? '#4ade80' : 'var(--text-muted)';
       }
-      if (svg) {
-        svg.style.transform = `rotate(${currentProgress * 180}deg)`;
+      if (bubble) {
+        bubble.style.borderColor = isReady ? '#4ade80' : 'var(--border-subtle)';
+        bubble.style.boxShadow = isReady
+          ? '0 0 12px rgba(74,222,128,0.3), 0 2px 12px rgba(0,0,0,0.4)'
+          : '0 2px 12px rgba(0,0,0,0.4)';
+        bubble.style.transform = isReady ? 'scale(1.15)' : `scale(${0.7 + 0.3 * currentProgress})`;
+        bubble.style.transition = isReady && !wasReady ? 'transform 0.15s cubic-bezier(0.34,1.56,0.64,1), border-color 0.15s, box-shadow 0.15s' : 'none';
       }
-      indicator.style.transform = currentProgress >= 1 ? 'scale(1.1)' : 'scale(1)';
+
+      // Label appears past 30% and changes at 100%
+      if (label) {
+        label.style.opacity = currentProgress > 0.3 ? '1' : '0';
+        label.textContent = isReady ? 'Release to refresh' : 'Pull to refresh';
+        label.style.color = isReady ? '#4ade80' : 'var(--text-muted)';
+      }
+
+      wasReady = isReady;
     };
 
     const handleTouchEnd = () => {
@@ -653,15 +684,23 @@ export default function App() {
 
       if (currentProgress >= 1 && indicator) {
         triggered = true;
-        indicator.style.transition = 'transform 0.2s';
-        indicator.style.transform = 'scale(1)';
-        indicator.innerHTML = `
-          <svg width="24" height="24" viewBox="0 0 28 28" style="animation: ptr-spin 0.5s linear infinite;">
-            <circle cx="14" cy="14" r="12" fill="none" stroke="#4ade80" stroke-width="2.5"
-              stroke-dasharray="55 20" stroke-linecap="round"/>
-          </svg>
-        `;
-        setTimeout(() => window.location.reload(), 500);
+        const bubble = indicator.querySelector('[data-bubble]') as HTMLElement | null;
+        const label = indicator.querySelector('[data-label]') as HTMLElement | null;
+        if (bubble) {
+          bubble.style.transition = 'transform 0.2s, border-color 0.2s';
+          bubble.style.transform = 'scale(1)';
+          bubble.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" style="animation: ptr-spin 0.6s linear infinite;">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="#4ade80" stroke-width="2.5"
+                stroke-dasharray="45 18" stroke-linecap="round"/>
+            </svg>
+          `;
+        }
+        if (label) {
+          label.textContent = 'Refreshing...';
+          label.style.color = '#4ade80';
+        }
+        setTimeout(() => window.location.reload(), 600);
       } else {
         removeIndicator();
       }
