@@ -548,6 +548,7 @@ export default function App() {
     let startY = 0;
     let pulling = false;
     let triggered = false;
+    let currentProgress = 0;
     const threshold = 90;
     let indicator: HTMLDivElement | null = null;
 
@@ -570,6 +571,7 @@ export default function App() {
         box-shadow: 0 2px 12px rgba(0,0,0,0.35);
         display: flex; align-items: center; justify-content: center;
         z-index: 9999; pointer-events: none;
+        transition: top 0.05s linear;
       `;
       el.innerHTML = `
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -584,6 +586,16 @@ export default function App() {
       return el;
     };
 
+    const removeIndicator = () => {
+      if (!indicator) return;
+      indicator.style.transition = 'top 0.25s ease-in, opacity 0.25s ease-in';
+      indicator.style.top = '-44px';
+      indicator.style.opacity = '0';
+      const ref = indicator;
+      setTimeout(() => { ref.remove(); }, 300);
+      indicator = null;
+    };
+
     const getScrollTop = () =>
       Math.max(0, window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
 
@@ -591,25 +603,29 @@ export default function App() {
       if (getScrollTop() <= 0 && !triggered) {
         startY = e.touches[0].clientY;
         pulling = true;
-        if (!indicator) indicator = createIndicator();
+        currentProgress = 0;
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!pulling || !indicator || triggered) return;
-      const pullDistance = Math.max(0, e.touches[0].clientY - startY);
+      if (!pulling || triggered) return;
+      const pullDistance = e.touches[0].clientY - startY;
       if (pullDistance <= 0 || getScrollTop() > 0) {
-        // User scrolled back up, cancel pull
-        if (getScrollTop() > 0) pulling = false;
+        if (getScrollTop() > 0) {
+          pulling = false;
+          removeIndicator();
+        }
         return;
       }
+
+      // Create indicator lazily — only once user actually pulls down
+      if (!indicator) indicator = createIndicator();
 
       // Prevent Safari's default overscroll/bounce in PWA mode
       e.preventDefault();
 
-      const progress = Math.min(pullDistance / threshold, 1);
-      // Position: slides from -44px (hidden) to ~20px below top
-      const topPos = -44 + (64 * progress);
+      currentProgress = Math.min(pullDistance / threshold, 1);
+      const topPos = -44 + (64 * currentProgress);
       indicator.style.top = `${topPos}px`;
 
       const ring = indicator.querySelector('[data-ring]') as SVGCircleElement | null;
@@ -617,30 +633,24 @@ export default function App() {
       const svg = indicator.querySelector('svg') as SVGSVGElement | null;
 
       if (ring) {
-        ring.style.strokeDashoffset = String(75.4 * (1 - progress));
-        ring.style.stroke = progress >= 1 ? '#4ade80' : 'var(--text-muted)';
+        ring.style.strokeDashoffset = String(75.4 * (1 - currentProgress));
+        ring.style.stroke = currentProgress >= 1 ? '#4ade80' : 'var(--text-muted)';
       }
       if (arrowEl) {
-        arrowEl.style.stroke = progress >= 1 ? '#4ade80' : 'var(--text-secondary)';
+        arrowEl.style.stroke = currentProgress >= 1 ? '#4ade80' : 'var(--text-secondary)';
       }
       if (svg) {
-        svg.style.transform = `rotate(${progress * 180}deg)`;
+        svg.style.transform = `rotate(${currentProgress * 180}deg)`;
       }
-      // Scale up slightly at full
-      indicator.style.transform = progress >= 1 ? 'scale(1.1)' : 'scale(1)';
+      indicator.style.transform = currentProgress >= 1 ? 'scale(1.1)' : 'scale(1)';
     };
 
     const handleTouchEnd = () => {
-      if (!pulling || !indicator || triggered) return;
+      if (!pulling || triggered) return;
       pulling = false;
 
-      const ring = indicator.querySelector('[data-ring]') as SVGCircleElement | null;
-      const offset = ring ? parseFloat(ring.style.strokeDashoffset || '75.4') : 75.4;
-      const progress = 1 - offset / 75.4;
-
-      if (progress >= 1) {
+      if (currentProgress >= 1 && indicator) {
         triggered = true;
-        // Show spinner
         indicator.style.transition = 'transform 0.2s';
         indicator.style.transform = 'scale(1)';
         indicator.innerHTML = `
@@ -651,19 +661,14 @@ export default function App() {
         `;
         setTimeout(() => window.location.reload(), 500);
       } else {
-        // Bounce back
-        indicator.style.transition = 'top 0.25s ease-in, opacity 0.25s ease-in';
-        indicator.style.top = '-44px';
-        indicator.style.opacity = '0';
-        setTimeout(() => {
-          indicator?.remove();
-          indicator = null;
-        }, 300);
+        removeIndicator();
       }
+      currentProgress = 0;
     };
 
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    // passive: false is required so preventDefault() works to block Safari overscroll bounce
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
