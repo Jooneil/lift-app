@@ -624,7 +624,6 @@ export default function App() {
 
     const handleTouchEnd = () => {
       if (!pulling || !indicator) return;
-      const opacity = parseFloat(indicator.style.opacity || '0');
       const ringOffset = ring ? parseFloat(ring.style.strokeDashoffset || String(RING_C)) : RING_C;
       const progress = 1 - ringOffset / RING_C;
 
