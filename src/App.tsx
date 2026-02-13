@@ -584,8 +584,11 @@ export default function App() {
       return el;
     };
 
+    const getScrollTop = () =>
+      Math.max(0, window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
+
     const handleTouchStart = (e: TouchEvent) => {
-      if (window.scrollY <= 0 && !triggered) {
+      if (getScrollTop() <= 0 && !triggered) {
         startY = e.touches[0].clientY;
         pulling = true;
         if (!indicator) indicator = createIndicator();
@@ -595,7 +598,14 @@ export default function App() {
     const handleTouchMove = (e: TouchEvent) => {
       if (!pulling || !indicator || triggered) return;
       const pullDistance = Math.max(0, e.touches[0].clientY - startY);
-      if (pullDistance <= 0 || window.scrollY > 0) return;
+      if (pullDistance <= 0 || getScrollTop() > 0) {
+        // User scrolled back up, cancel pull
+        if (getScrollTop() > 0) pulling = false;
+        return;
+      }
+
+      // Prevent Safari's default overscroll/bounce in PWA mode
+      e.preventDefault();
 
       const progress = Math.min(pullDistance / threshold, 1);
       // Position: slides from -44px (hidden) to ~20px below top
