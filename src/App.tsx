@@ -547,43 +547,45 @@ export default function App() {
   useEffect(() => {
     let startY = 0;
     let pulling = false;
-    const threshold = 80;
+    let triggered = false;
+    const threshold = 90;
     let indicator: HTMLDivElement | null = null;
-    let arrow: SVGSVGElement | null = null;
-    let ring: SVGCircleElement | null = null;
 
-    const RING_R = 11;
-    const RING_C = 2 * Math.PI * RING_R; // circumference
+    // Inject keyframes once
+    if (!document.getElementById('ptr-styles')) {
+      const s = document.createElement('style');
+      s.id = 'ptr-styles';
+      s.textContent = `
+        @keyframes ptr-spin { to { transform: rotate(360deg); } }
+      `;
+      document.head.appendChild(s);
+    }
 
     const createIndicator = () => {
       const el = document.createElement('div');
       el.style.cssText = `
-        position: fixed; top: 0; left: 50%; transform: translateX(-50%);
-        width: 36px; height: 36px; border-radius: 50%;
+        position: fixed; top: -44px; left: 50%; margin-left: -22px;
+        width: 44px; height: 44px; border-radius: 50%;
         background: var(--bg-elevated); border: 1px solid var(--border-subtle);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.35);
         display: flex; align-items: center; justify-content: center;
-        z-index: 9999; opacity: 0; transition: opacity 0.15s;
-        pointer-events: none;
+        z-index: 9999; pointer-events: none;
       `;
-      // SVG with circular progress ring + arrow
       el.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" style="transition: transform 0.1s ease-out;">
-          <circle cx="12" cy="12" r="${RING_R}" fill="none" stroke="var(--border-subtle)" stroke-width="2"/>
-          <circle cx="12" cy="12" r="${RING_R}" fill="none" stroke="var(--text-primary)" stroke-width="2"
-            stroke-dasharray="${RING_C}" stroke-dashoffset="${RING_C}"
-            stroke-linecap="round" transform="rotate(-90 12 12)" data-ring="true"/>
-          <path d="M12 6 L12 16 M8 13 L12 17 L16 13" fill="none" stroke="var(--text-secondary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="14" r="12" stroke="var(--border-subtle)" stroke-width="2.5" data-bg="true"/>
+          <circle cx="14" cy="14" r="12" stroke="var(--text-muted)" stroke-width="2.5"
+            stroke-dasharray="75.4" stroke-dashoffset="75.4"
+            stroke-linecap="round" transform="rotate(-90 14 14)" data-ring="true"/>
+          <path d="M14 8 L14 18 M10 15 L14 19 L18 15" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-arrow="true"/>
         </svg>
       `;
       document.body.appendChild(el);
-      arrow = el.querySelector('svg');
-      ring = el.querySelector('[data-ring]');
       return el;
     };
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (window.scrollY === 0) {
+      if (window.scrollY <= 0 && !triggered) {
         startY = e.touches[0].clientY;
         pulling = true;
         if (!indicator) indicator = createIndicator();
@@ -591,65 +593,63 @@ export default function App() {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!pulling || !indicator || !arrow || !ring) return;
-      const currentY = e.touches[0].clientY;
-      const pullDistance = Math.max(0, currentY - startY);
+      if (!pulling || !indicator || triggered) return;
+      const pullDistance = Math.max(0, e.touches[0].clientY - startY);
+      if (pullDistance <= 0 || window.scrollY > 0) return;
 
-      if (pullDistance > 0 && window.scrollY === 0) {
-        // Dampened pull: diminishing returns past threshold
-        const progress = Math.min(pullDistance / threshold, 1);
-        const dampened = progress < 1
-          ? pullDistance * 0.5
-          : threshold * 0.5 + (pullDistance - threshold) * 0.15;
-        const topPos = Math.min(dampened, 70);
+      const progress = Math.min(pullDistance / threshold, 1);
+      // Position: slides from -44px (hidden) to ~20px below top
+      const topPos = -44 + (64 * progress);
+      indicator.style.top = `${topPos}px`;
 
-        indicator.style.top = `${topPos}px`;
-        indicator.style.opacity = String(Math.min(progress * 2, 1));
+      const ring = indicator.querySelector('[data-ring]') as SVGCircleElement | null;
+      const arrowEl = indicator.querySelector('[data-arrow]') as SVGPathElement | null;
+      const svg = indicator.querySelector('svg') as SVGSVGElement | null;
 
-        // Ring fill
-        ring.style.strokeDashoffset = String(RING_C * (1 - progress));
-
-        // Arrow rotation: 0° → 180° as you pull
-        const rotation = progress * 180;
-        arrow.style.transform = `rotate(${rotation}deg)`;
-
-        // Color change at threshold
-        if (progress >= 1) {
-          ring.style.stroke = '#4ade80';
-        } else {
-          ring.style.stroke = 'var(--text-primary)';
-        }
+      if (ring) {
+        ring.style.strokeDashoffset = String(75.4 * (1 - progress));
+        ring.style.stroke = progress >= 1 ? '#4ade80' : 'var(--text-muted)';
       }
+      if (arrowEl) {
+        arrowEl.style.stroke = progress >= 1 ? '#4ade80' : 'var(--text-secondary)';
+      }
+      if (svg) {
+        svg.style.transform = `rotate(${progress * 180}deg)`;
+      }
+      // Scale up slightly at full
+      indicator.style.transform = progress >= 1 ? 'scale(1.1)' : 'scale(1)';
     };
 
     const handleTouchEnd = () => {
-      if (!pulling || !indicator) return;
-      const ringOffset = ring ? parseFloat(ring.style.strokeDashoffset || String(RING_C)) : RING_C;
-      const progress = 1 - ringOffset / RING_C;
+      if (!pulling || !indicator || triggered) return;
+      pulling = false;
+
+      const ring = indicator.querySelector('[data-ring]') as SVGCircleElement | null;
+      const offset = ring ? parseFloat(ring.style.strokeDashoffset || '75.4') : 75.4;
+      const progress = 1 - offset / 75.4;
 
       if (progress >= 1) {
-        // Trigger refresh: show spinner
+        triggered = true;
+        // Show spinner
+        indicator.style.transition = 'transform 0.2s';
+        indicator.style.transform = 'scale(1)';
         indicator.innerHTML = `
-          <svg width="20" height="20" viewBox="0 0 24 24" style="animation: ptr-spin 0.6s linear infinite;">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="#4ade80" stroke-width="2"
-              stroke-dasharray="50 20" stroke-linecap="round"/>
+          <svg width="24" height="24" viewBox="0 0 28 28" style="animation: ptr-spin 0.5s linear infinite;">
+            <circle cx="14" cy="14" r="12" fill="none" stroke="#4ade80" stroke-width="2.5"
+              stroke-dasharray="55 20" stroke-linecap="round"/>
           </svg>
         `;
-        if (!document.getElementById('ptr-spin-style')) {
-          const style = document.createElement('style');
-          style.id = 'ptr-spin-style';
-          style.textContent = '@keyframes ptr-spin { to { transform: rotate(360deg); } }';
-          document.head.appendChild(style);
-        }
-        setTimeout(() => window.location.reload(), 400);
+        setTimeout(() => window.location.reload(), 500);
       } else {
-        // Cancel: slide away
-        indicator.style.transition = 'opacity 0.2s, top 0.2s';
+        // Bounce back
+        indicator.style.transition = 'top 0.25s ease-in, opacity 0.25s ease-in';
+        indicator.style.top = '-44px';
         indicator.style.opacity = '0';
-        indicator.style.top = '0px';
-        setTimeout(() => { indicator?.remove(); indicator = null; arrow = null; ring = null; }, 250);
+        setTimeout(() => {
+          indicator?.remove();
+          indicator = null;
+        }, 300);
       }
-      pulling = false;
     };
 
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
