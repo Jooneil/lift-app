@@ -596,8 +596,10 @@ export default function App() {
       indicator = null;
     };
 
-    const getScrollTop = () =>
-      Math.max(0, window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
+    const getScrollTop = () => {
+      const el = document.scrollingElement || document.documentElement;
+      return Math.max(0, el.scrollTop);
+    };
 
     const handleTouchStart = (e: TouchEvent) => {
       if (getScrollTop() <= 0 && !triggered) {
