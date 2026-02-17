@@ -546,197 +546,154 @@ export default function App() {
   // Pull-to-refresh functionality
   useEffect(() => {
     let startY = 0;
-    let pulling = false;
-    let triggered = false;
-    let currentProgress = 0;
+    let active = false;       // true once we commit to a pull gesture
+    let triggered = false;    // true once threshold reached and reload queued
+    let progress = 0;
     let wasReady = false;
-    // Detect pull direction in first few pixels before committing
-    let decided = false;
-    let isScrollGesture = false;
-    const threshold = 80;
-    let indicator: HTMLDivElement | null = null;
+    const THRESHOLD = 80;     // px to pull before refresh triggers
+    let el: HTMLDivElement | null = null;
 
-    // Inject keyframes once
+    // Inject spinner keyframes
     if (!document.getElementById('ptr-styles')) {
       const s = document.createElement('style');
       s.id = 'ptr-styles';
-      s.textContent = `
-        @keyframes ptr-spin { to { transform: rotate(360deg); } }
-      `;
+      s.textContent = `@keyframes ptr-spin{to{transform:rotate(360deg)}}`;
       document.head.appendChild(s);
     }
 
-    const createIndicator = () => {
-      const el = document.createElement('div');
-      el.style.cssText = `
-        position: fixed; top: 0; left: 0; right: 0;
-        display: flex; flex-direction: column; align-items: center;
-        z-index: 9999; pointer-events: none;
-        padding-top: 12px;
-        opacity: 0;
-        transform: translateY(-60px);
-      `;
-      el.innerHTML = `
-        <div data-bubble style="
-          width: 40px; height: 40px; border-radius: 50%;
-          background: var(--bg-elevated); border: 1px solid var(--border-subtle);
-          box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-          display: flex; align-items: center; justify-content: center;
-        ">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" data-arrow-svg>
-            <path d="M12 4v12M7 12l5 5 5-5" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-arrow/>
+    const scrollY = () => window.scrollY ?? window.pageYOffset ?? 0;
+
+    // ── Create the indicator DOM ──
+    const mount = () => {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:fixed;top:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;z-index:9999;pointer-events:none;padding-top:14px;opacity:0;transform:translateY(-56px);';
+      d.innerHTML = `
+        <div data-bubble style="width:38px;height:38px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-subtle);box-shadow:0 2px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" data-svg>
+            <path d="M12 5v10M8 11l4 4 4-4" stroke="var(--text-muted)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" data-arrow/>
           </svg>
         </div>
-        <div data-label style="
-          font-size: 11px; color: var(--text-muted);
-          margin-top: 6px; opacity: 0;
-        "></div>
-      `;
-      document.body.appendChild(el);
-      return el;
+        <span data-label style="font-size:11px;margin-top:5px;opacity:0;color:var(--text-muted);white-space:nowrap;"></span>`;
+      document.body.appendChild(d);
+      return d;
     };
 
-    const removeIndicator = () => {
-      if (!indicator) return;
-      indicator.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
-      indicator.style.opacity = '0';
-      indicator.style.transform = 'translateY(-60px)';
-      const ref = indicator;
-      setTimeout(() => { ref.remove(); }, 250);
-      indicator = null;
+    const unmount = () => {
+      if (!el) return;
+      const ref = el;
+      ref.style.transition = 'opacity .2s,transform .2s';
+      ref.style.opacity = '0';
+      ref.style.transform = 'translateY(-56px)';
+      setTimeout(() => ref.remove(), 250);
+      el = null;
     };
 
-    // body is the scroll container (html is position:fixed)
-    const getScrollTop = () => Math.max(0, document.body.scrollTop);
-
-    const handleTouchStart = (e: TouchEvent) => {
+    // ── Touch handlers ──
+    const onStart = (e: TouchEvent) => {
       if (triggered) return;
       startY = e.touches[0].clientY;
-      // Always record the start; we'll decide in touchmove whether this is a pull or a scroll
-      pulling = false;
-      decided = false;
-      isScrollGesture = false;
-      currentProgress = 0;
+      active = false;
+      progress = 0;
       wasReady = false;
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
+    const onMove = (e: TouchEvent) => {
       if (triggered) return;
-      const currentY = e.touches[0].clientY;
-      const deltaY = currentY - startY;
 
-      // First significant movement: decide if this is a pull-to-refresh or normal scroll
-      if (!decided) {
-        if (Math.abs(deltaY) < 8) return; // dead zone — wait for clear intent
-        decided = true;
-        if (deltaY > 0 && getScrollTop() <= 1) {
-          // Pulling down while at the top → pull-to-refresh gesture
-          pulling = true;
+      const dy = e.touches[0].clientY - startY;
+
+      // Not yet committed to pull — check if we should start
+      if (!active) {
+        // Only activate when at the very top and pulling down
+        if (dy > 2 && scrollY() <= 0) {
+          active = true;
         } else {
-          // Scrolling normally — don't interfere
-          isScrollGesture = true;
-          return;
+          return; // normal scroll — bail immediately (keeps scrolling fast)
         }
       }
 
-      if (isScrollGesture || !pulling) return;
-
-      // If page has scrolled (e.g. momentum from prior gesture), cancel pull
-      if (getScrollTop() > 1) {
-        pulling = false;
-        removeIndicator();
+      // If somehow scrolled away from top, cancel
+      if (scrollY() > 0) {
+        active = false;
+        unmount();
         return;
       }
 
-      // Create indicator lazily
-      if (!indicator) indicator = createIndicator();
-
-      // Prevent native scroll/bounce
+      // We're in pull mode — prevent the native bounce
       e.preventDefault();
 
-      currentProgress = Math.min(Math.max(0, deltaY) / threshold, 1);
-      const isReady = currentProgress >= 1;
+      if (!el) el = mount();
 
-      // Slide indicator down with pull
-      const translateY = -60 + (72 * currentProgress);
-      indicator.style.transition = 'none';
-      indicator.style.opacity = String(Math.min(currentProgress * 2, 1));
-      indicator.style.transform = `translateY(${translateY}px)`;
+      // Use a rubber-band curve so it feels like you're pulling against resistance
+      const raw = Math.max(0, dy);
+      const dampened = raw < THRESHOLD ? raw : THRESHOLD + (raw - THRESHOLD) * 0.3;
+      progress = Math.min(raw / THRESHOLD, 1);
+      const ready = progress >= 1;
 
-      const bubble = indicator.querySelector('[data-bubble]') as HTMLElement | null;
-      const arrowSvg = indicator.querySelector('[data-arrow-svg]') as SVGSVGElement | null;
-      const arrowPath = indicator.querySelector('[data-arrow]') as SVGPathElement | null;
-      const label = indicator.querySelector('[data-label]') as HTMLElement | null;
+      // Position the whole indicator
+      const ty = -56 + (68 * Math.min(dampened / THRESHOLD, 1.3));
+      el.style.transition = 'none';
+      el.style.opacity = String(Math.min(progress * 2.5, 1));
+      el.style.transform = `translateY(${ty}px)`;
 
-      // Arrow rotates as you pull — flips up when ready to release
-      if (arrowSvg) {
-        arrowSvg.style.transform = `rotate(${currentProgress * 180}deg)`;
-      }
+      const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
+      const svg = el.querySelector('[data-svg]') as SVGElement | null;
+      const arrow = el.querySelector('[data-arrow]') as SVGElement | null;
+      const label = el.querySelector('[data-label]') as HTMLElement | null;
 
-      // Color and glow when ready
-      if (arrowPath) {
-        arrowPath.style.stroke = isReady ? '#4ade80' : 'var(--text-muted)';
-      }
+      if (svg) svg.style.transform = `rotate(${progress * 180}deg)`;
+      if (arrow) arrow.style.stroke = ready ? '#4ade80' : 'var(--text-muted)';
+
       if (bubble) {
-        bubble.style.borderColor = isReady ? '#4ade80' : 'var(--border-subtle)';
-        bubble.style.boxShadow = isReady
-          ? '0 0 12px rgba(74,222,128,0.3), 0 2px 12px rgba(0,0,0,0.4)'
-          : '0 2px 12px rgba(0,0,0,0.4)';
-        bubble.style.transform = isReady ? 'scale(1.15)' : `scale(${0.7 + 0.3 * currentProgress})`;
-        // Spring pop when first reaching ready state
-        bubble.style.transition = isReady && !wasReady ? 'transform 0.15s cubic-bezier(0.34,1.56,0.64,1), border-color 0.15s, box-shadow 0.15s' : 'none';
+        bubble.style.borderColor = ready ? '#4ade80' : 'var(--border-subtle)';
+        bubble.style.boxShadow = ready ? '0 0 10px rgba(74,222,128,0.35),0 2px 10px rgba(0,0,0,0.4)' : '0 2px 10px rgba(0,0,0,0.4)';
+        if (ready && !wasReady) {
+          bubble.style.transition = 'transform .15s cubic-bezier(.34,1.56,.64,1),border-color .15s,box-shadow .15s';
+          bubble.style.transform = 'scale(1.18)';
+        } else if (!ready) {
+          bubble.style.transition = 'none';
+          bubble.style.transform = `scale(${0.75 + 0.25 * progress})`;
+        }
       }
 
       if (label) {
-        label.style.opacity = currentProgress > 0.25 ? '1' : '0';
-        label.textContent = isReady ? 'Release to refresh' : 'Pull to refresh';
-        label.style.color = isReady ? '#4ade80' : 'var(--text-muted)';
+        label.style.opacity = progress > 0.2 ? '1' : '0';
+        label.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
+        label.style.color = ready ? '#4ade80' : 'var(--text-muted)';
       }
 
-      wasReady = isReady;
+      wasReady = ready;
     };
 
-    const handleTouchEnd = () => {
-      if (triggered) return;
-      if (!pulling) { decided = false; return; }
-      pulling = false;
-      decided = false;
+    const onEnd = () => {
+      if (triggered || !active) { active = false; return; }
+      active = false;
 
-      if (currentProgress >= 1 && indicator) {
+      if (progress >= 1 && el) {
         triggered = true;
-        const bubble = indicator.querySelector('[data-bubble]') as HTMLElement | null;
-        const label = indicator.querySelector('[data-label]') as HTMLElement | null;
+        const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
+        const label = el.querySelector('[data-label]') as HTMLElement | null;
         if (bubble) {
-          bubble.style.transition = 'transform 0.2s, border-color 0.2s';
+          bubble.style.transition = 'transform .2s';
           bubble.style.transform = 'scale(1)';
-          bubble.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" style="animation: ptr-spin 0.6s linear infinite;">
-              <circle cx="12" cy="12" r="10" fill="none" stroke="#4ade80" stroke-width="2.5"
-                stroke-dasharray="45 18" stroke-linecap="round"/>
-            </svg>
-          `;
+          bubble.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" style="animation:ptr-spin .6s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="45 18" stroke-linecap="round"/></svg>';
         }
-        if (label) {
-          label.textContent = 'Refreshing...';
-          label.style.color = '#4ade80';
-        }
-        setTimeout(() => window.location.reload(), 600);
+        if (label) { label.textContent = 'Refreshing...'; label.style.color = '#4ade80'; }
+        setTimeout(() => window.location.reload(), 500);
       } else {
-        removeIndicator();
+        unmount();
       }
-      currentProgress = 0;
+      progress = 0;
     };
 
-    document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    // passive: false is required so preventDefault() works to block Safari overscroll bounce
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd, { passive: true });
-
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd, { passive: true });
     return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-      indicator?.remove();
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+      el?.remove();
     };
   }, []);
 
