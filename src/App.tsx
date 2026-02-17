@@ -552,6 +552,7 @@ export default function App() {
     let wasReady = false;
     const THRESHOLD = 80;
     let el: HTMLDivElement | null = null;
+    const rootEl = document.getElementById('root');
 
     if (!document.getElementById('ptr-styles')) {
       const s = document.createElement('style');
@@ -583,6 +584,11 @@ export default function App() {
       ref.style.transform = 'translateX(-50%) scale(0.4)';
       setTimeout(() => ref.remove(), 250);
       el = null;
+      // Snap page back up
+      if (rootEl) {
+        rootEl.style.transition = 'transform .25s ease-out';
+        rootEl.style.transform = '';
+      }
     };
 
     // ── Touch handlers ──
@@ -622,6 +628,13 @@ export default function App() {
       el.style.transition = 'none';
       el.style.opacity = String(Math.min(progress * 3, 1));   // fully opaque by ~33%
       el.style.transform = `translateX(-50%) scale(${ready ? 1.1 : scale})`;
+
+      // Slide page content down so indicator sits in the gap
+      if (rootEl) {
+        const nudge = Math.min(raw * 0.4, 60);
+        rootEl.style.transition = 'none';
+        rootEl.style.transform = `translateY(${nudge}px)`;
+      }
 
       const arrow = el.querySelector('[data-arrow]') as HTMLElement | null;
       const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
