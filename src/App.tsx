@@ -550,7 +550,10 @@ export default function App() {
     let triggered = false;
     let currentProgress = 0;
     let wasReady = false;
-    const threshold = 100;
+    // Detect pull direction in first few pixels before committing
+    let decided = false;
+    let isScrollGesture = false;
+    const threshold = 80;
     let indicator: HTMLDivElement | null = null;
 
     // Inject keyframes once
@@ -579,16 +582,14 @@ export default function App() {
           background: var(--bg-elevated); border: 1px solid var(--border-subtle);
           box-shadow: 0 2px 12px rgba(0,0,0,0.4);
           display: flex; align-items: center; justify-content: center;
-          transition: border-color 0.15s, box-shadow 0.15s;
         ">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" data-arrow-svg style="transition: transform 0.1s ease-out;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" data-arrow-svg>
             <path d="M12 4v12M7 12l5 5 5-5" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-arrow/>
           </svg>
         </div>
         <div data-label style="
           font-size: 11px; color: var(--text-muted);
           margin-top: 6px; opacity: 0;
-          transition: opacity 0.15s, color 0.15s;
         "></div>
       `;
       document.body.appendChild(el);
@@ -605,38 +606,55 @@ export default function App() {
       indicator = null;
     };
 
-    const getScrollTop = () => {
-      const el = document.scrollingElement || document.documentElement;
-      return Math.max(0, el.scrollTop);
-    };
+    // body is the scroll container (html is position:fixed)
+    const getScrollTop = () => Math.max(0, document.body.scrollTop);
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (getScrollTop() <= 0 && !triggered) {
-        startY = e.touches[0].clientY;
-        pulling = true;
-        currentProgress = 0;
-        wasReady = false;
-      }
+      if (triggered) return;
+      startY = e.touches[0].clientY;
+      // Always record the start; we'll decide in touchmove whether this is a pull or a scroll
+      pulling = false;
+      decided = false;
+      isScrollGesture = false;
+      currentProgress = 0;
+      wasReady = false;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!pulling || triggered) return;
-      const pullDistance = e.touches[0].clientY - startY;
-      if (pullDistance <= 0 || getScrollTop() > 0) {
-        if (getScrollTop() > 0) {
-          pulling = false;
-          removeIndicator();
+      if (triggered) return;
+      const currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY;
+
+      // First significant movement: decide if this is a pull-to-refresh or normal scroll
+      if (!decided) {
+        if (Math.abs(deltaY) < 8) return; // dead zone — wait for clear intent
+        decided = true;
+        if (deltaY > 0 && getScrollTop() <= 1) {
+          // Pulling down while at the top → pull-to-refresh gesture
+          pulling = true;
+        } else {
+          // Scrolling normally — don't interfere
+          isScrollGesture = true;
+          return;
         }
+      }
+
+      if (isScrollGesture || !pulling) return;
+
+      // If page has scrolled (e.g. momentum from prior gesture), cancel pull
+      if (getScrollTop() > 1) {
+        pulling = false;
+        removeIndicator();
         return;
       }
 
-      // Create indicator lazily — only once user actually pulls down
+      // Create indicator lazily
       if (!indicator) indicator = createIndicator();
 
-      // Prevent Safari's default overscroll/bounce in PWA mode
+      // Prevent native scroll/bounce
       e.preventDefault();
 
-      currentProgress = Math.min(pullDistance / threshold, 1);
+      currentProgress = Math.min(Math.max(0, deltaY) / threshold, 1);
       const isReady = currentProgress >= 1;
 
       // Slide indicator down with pull
@@ -652,7 +670,7 @@ export default function App() {
 
       // Arrow rotates as you pull — flips up when ready to release
       if (arrowSvg) {
-        arrowSvg.style.transform = `rotate(${isReady ? 180 : currentProgress * 180}deg)`;
+        arrowSvg.style.transform = `rotate(${currentProgress * 180}deg)`;
       }
 
       // Color and glow when ready
@@ -665,12 +683,12 @@ export default function App() {
           ? '0 0 12px rgba(74,222,128,0.3), 0 2px 12px rgba(0,0,0,0.4)'
           : '0 2px 12px rgba(0,0,0,0.4)';
         bubble.style.transform = isReady ? 'scale(1.15)' : `scale(${0.7 + 0.3 * currentProgress})`;
+        // Spring pop when first reaching ready state
         bubble.style.transition = isReady && !wasReady ? 'transform 0.15s cubic-bezier(0.34,1.56,0.64,1), border-color 0.15s, box-shadow 0.15s' : 'none';
       }
 
-      // Label appears past 30% and changes at 100%
       if (label) {
-        label.style.opacity = currentProgress > 0.3 ? '1' : '0';
+        label.style.opacity = currentProgress > 0.25 ? '1' : '0';
         label.textContent = isReady ? 'Release to refresh' : 'Pull to refresh';
         label.style.color = isReady ? '#4ade80' : 'var(--text-muted)';
       }
@@ -679,8 +697,10 @@ export default function App() {
     };
 
     const handleTouchEnd = () => {
-      if (!pulling || triggered) return;
+      if (triggered) return;
+      if (!pulling) { decided = false; return; }
       pulling = false;
+      decided = false;
 
       if (currentProgress >= 1 && indicator) {
         triggered = true;
