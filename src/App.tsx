@@ -543,15 +543,17 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [forcePasswordReset, setForcePasswordReset] = useState(false);
 
-  // Pull-to-refresh functionality
+  // Pull-to-refresh: ALL passive listeners — never fights Safari's touch system.
+  // We just observe touch coordinates and show a visual overlay.
+  // overscroll-behavior-y:none in CSS handles bounce prevention.
   useEffect(() => {
     let startY = 0;
     let active = false;
     let triggered = false;
     let progress = 0;
     let wasReady = false;
-    const THRESHOLD = 80;
-    let el: HTMLDivElement | null = null;
+    const THRESHOLD = 90;
+    const rootEl = document.getElementById('root');
 
     if (!document.getElementById('ptr-styles')) {
       const s = document.createElement('style');
@@ -560,32 +562,46 @@ export default function App() {
       document.head.appendChild(s);
     }
 
+    // Persistent indicator element — always in DOM, hidden by default
+    const indicator = document.createElement('div');
+    indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;display:flex;justify-content:center;z-index:9999;pointer-events:none;';
+    indicator.innerHTML = `
+      <div data-wrap style="display:flex;flex-direction:column;align-items:center;padding-top:12px;opacity:0;transform:scale(0.3);will-change:transform,opacity;">
+        <div data-bubble style="width:36px;height:36px;border-radius:50%;background:#181818;border:2px solid #333;box-shadow:0 2px 10px rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;">
+          <div data-arrow style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #888;"></div>
+        </div>
+        <div data-label style="font-size:10px;margin-top:4px;color:#555;white-space:nowrap;opacity:0;"></div>
+      </div>`;
+    document.body.appendChild(indicator);
+
+    const wrap = indicator.querySelector('[data-wrap]') as HTMLElement;
+    const bubble = indicator.querySelector('[data-bubble]') as HTMLElement;
+    const arrowEl = indicator.querySelector('[data-arrow]') as HTMLElement;
+    const label = indicator.querySelector('[data-label]') as HTMLElement;
+
     const atTop = () => (window.scrollY ?? window.pageYOffset ?? 0) <= 0;
 
-    // ── Indicator ──
-    const mount = () => {
-      const d = document.createElement('div');
-      d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) scale(0.4);z-index:9999;pointer-events:none;opacity:0;display:flex;flex-direction:column;align-items:center;';
-      d.innerHTML = `
-        <div data-bubble style="width:40px;height:40px;border-radius:50%;background:#1a1a1a;border:2px solid #333;box-shadow:0 2px 12px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
-          <span data-arrow style="display:block;font-size:18px;line-height:1;color:#888;transition:color .15s;">↓</span>
-        </div>
-        <span data-label style="font-size:11px;margin-top:6px;color:#666;white-space:nowrap;opacity:0;"></span>`;
-      document.body.appendChild(d);
-      return d;
+    const resetVisual = () => {
+      wrap.style.transition = 'opacity .2s,transform .2s';
+      wrap.style.opacity = '0';
+      wrap.style.transform = 'scale(0.3)';
+      arrowEl.style.borderTopColor = '#888';
+      arrowEl.style.transform = '';
+      bubble.style.borderColor = '#333';
+      bubble.style.boxShadow = '0 2px 10px rgba(0,0,0,0.6)';
+      // Restore arrow if it was replaced with spinner
+      if (!arrowEl.parentElement) {
+        bubble.innerHTML = '';
+        bubble.appendChild(arrowEl);
+      }
+      label.style.opacity = '0';
+      label.textContent = '';
+      if (rootEl) {
+        rootEl.style.transition = 'transform .25s ease-out';
+        rootEl.style.transform = '';
+      }
     };
 
-    const unmount = () => {
-      if (!el) return;
-      const ref = el;
-      ref.style.transition = 'opacity .2s, transform .2s';
-      ref.style.opacity = '0';
-      ref.style.transform = 'translateX(-50%) scale(0.4)';
-      setTimeout(() => ref.remove(), 250);
-      el = null;
-    };
-
-    // ── Touch handlers ──
     const onStart = (e: TouchEvent) => {
       if (triggered) return;
       startY = e.touches[0].clientY;
@@ -598,60 +614,45 @@ export default function App() {
       if (triggered) return;
       const dy = e.touches[0].clientY - startY;
 
-      // Decide once: is this a pull-to-refresh?
       if (!active) {
-        if (dy > 0 && atTop()) {
+        if (dy > 5 && atTop()) {
           active = true;
         } else {
           return;
         }
       }
 
-      // Once active, stay active — don't cancel on transient scrollY glitches.
-      // Just block native bounce and track the finger.
-      e.preventDefault();
-
-      if (!el) el = mount();
-
       const raw = Math.max(0, dy);
       progress = Math.min(raw / THRESHOLD, 1);
       const ready = progress >= 1;
 
-      // Scale: 0.4 → 1.0 as progress goes 0 → 1 (immediately visible)
-      const scale = 0.4 + 0.6 * progress;
-      el.style.transition = 'none';
-      el.style.opacity = String(Math.min(progress * 3, 1));   // fully opaque by ~33%
-      el.style.transform = `translateX(-50%) scale(${ready ? 1.1 : scale})`;
+      // Scale bubble from 0.3 → 1.0 — visible almost immediately
+      const s = 0.3 + 0.7 * progress;
+      wrap.style.transition = 'none';
+      wrap.style.opacity = String(Math.min(progress * 2.5, 1));
+      wrap.style.transform = `scale(${ready ? 1.12 : s})`;
 
-      const arrow = el.querySelector('[data-arrow]') as HTMLElement | null;
-      const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
-      const label = el.querySelector('[data-label]') as HTMLElement | null;
-
-      // Arrow: ↓ rotates to ↑ as you pull
-      if (arrow) {
-        arrow.style.display = 'block';
-        arrow.style.transform = `rotate(${progress * 180}deg)`;
-        arrow.style.color = ready ? '#4ade80' : '#888';
+      // Nudge page content down to create space for the indicator
+      if (rootEl) {
+        const nudge = Math.min(raw * 0.3, 45);
+        rootEl.style.transition = 'none';
+        rootEl.style.transform = `translateY(${nudge}px)`;
       }
 
-      if (bubble) {
-        bubble.style.borderColor = ready ? '#4ade80' : '#333';
-        bubble.style.boxShadow = ready
-          ? '0 0 14px rgba(74,222,128,0.4), 0 2px 12px rgba(0,0,0,0.5)'
-          : '0 2px 12px rgba(0,0,0,0.5)';
-        // Spring pop on first reaching ready
-        if (ready && !wasReady) {
-          bubble.style.transition = 'border-color .15s, box-shadow .15s';
-        } else {
-          bubble.style.transition = 'none';
-        }
-      }
+      // Arrow: CSS triangle rotates (down → up)
+      arrowEl.style.transform = `rotate(${progress * 180}deg)`;
+      arrowEl.style.borderTopColor = ready ? '#4ade80' : '#888';
 
-      if (label) {
-        label.style.opacity = progress > 0.3 ? '1' : '0';
-        label.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
-        label.style.color = ready ? '#4ade80' : '#666';
-      }
+      // Bubble border + glow
+      bubble.style.borderColor = ready ? '#4ade80' : '#333';
+      bubble.style.boxShadow = ready
+        ? '0 0 12px rgba(74,222,128,0.4),0 2px 10px rgba(0,0,0,0.6)'
+        : '0 2px 10px rgba(0,0,0,0.6)';
+
+      // Label
+      label.style.opacity = progress > 0.35 ? '1' : '0';
+      label.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
+      label.style.color = ready ? '#4ade80' : '#555';
 
       wasReady = ready;
     };
@@ -660,34 +661,30 @@ export default function App() {
       if (triggered || !active) { active = false; return; }
       active = false;
 
-      if (progress >= 1 && el) {
+      if (progress >= 1) {
         triggered = true;
-        const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
-        const label = el.querySelector('[data-label]') as HTMLElement | null;
-        // Settle to scale(1)
-        if (el) {
-          el.style.transition = 'transform .2s';
-          el.style.transform = 'translateX(-50%) scale(1)';
-        }
-        if (bubble) {
-          bubble.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" style="animation:ptr-spin .6s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="45 18" stroke-linecap="round"/></svg>';
-        }
-        if (label) { label.textContent = 'Refreshing...'; label.style.color = '#4ade80'; }
+        wrap.style.transition = 'transform .2s';
+        wrap.style.transform = 'scale(1)';
+        bubble.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" style="animation:ptr-spin .6s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="45 18" stroke-linecap="round"/></svg>';
+        label.textContent = 'Refreshing...';
+        label.style.color = '#4ade80';
+        label.style.opacity = '1';
         setTimeout(() => window.location.reload(), 500);
       } else {
-        unmount();
+        resetVisual();
       }
       progress = 0;
     };
 
+    // ALL passive — we observe touches, never block them
     document.addEventListener('touchstart', onStart, { passive: true });
-    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchmove', onMove, { passive: true });
     document.addEventListener('touchend', onEnd, { passive: true });
     return () => {
       document.removeEventListener('touchstart', onStart);
       document.removeEventListener('touchmove', onMove);
       document.removeEventListener('touchend', onEnd);
-      el?.remove();
+      indicator.remove();
     };
   }, []);
 
