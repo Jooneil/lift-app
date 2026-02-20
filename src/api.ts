@@ -1,6 +1,40 @@
 // api.ts – Supabase-backed API used by the app
 import { supabase } from './supabaseClient'
 
+// ── Stale-while-revalidate cache ──
+// Returns cached data instantly if available, then refreshes in the background.
+function cachedFetch<T>(key: string, fetcher: () => Promise<T>, ttlMs: number): Promise<T> {
+  const raw = localStorage.getItem(key);
+  if (raw) {
+    try {
+      const { data, ts } = JSON.parse(raw);
+      if (Date.now() - ts < ttlMs) {
+        // Serve cached, refresh in background
+        fetcher().then(fresh => {
+          try { localStorage.setItem(key, JSON.stringify({ data: fresh, ts: Date.now() })); } catch { /* quota */ }
+        }).catch(() => {});
+        return Promise.resolve(data as T);
+      }
+    } catch { /* corrupt cache, fall through */ }
+  }
+  return fetcher().then(data => {
+    try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
+    return data;
+  });
+}
+
+function invalidateCache(...keys: string[]) {
+  for (const k of keys) localStorage.removeItem(k);
+}
+
+export const CACHE_KEYS = {
+  plans: 'cache:plans',
+  exercises: 'cache:exercises',
+  customExercises: 'cache:custom_exercises',
+  catalog: 'cache:exercise_catalog',
+  userPrefs: 'cache:user_prefs',
+} as const;
+
 export type ServerPlanItem = { id?: string; exerciseId?: string; exerciseName?: string; targetSets?: number; targetReps?: string; myoReps?: boolean };
 export type ServerPlanDay = { id?: string; name?: string; items?: ServerPlanItem[] };
 export type ServerPlanWeek = { id?: string; name?: string; days?: ServerPlanDay[] };
@@ -61,14 +95,31 @@ const isMissingTableError = (error: { code?: string; message?: string } | null |
   return code === '42P01' || message.includes('does not exist') || message.includes('not found');
 };
 
+const _fetchExercises = async (): Promise<ExerciseRow[]> => {
+  const { data, error } = await supabase.from('exercises').select('id,name').order('name', { ascending: true });
+  if (error) {
+    if (isMissingTableError(error as { code?: string; message?: string })) return [];
+    throw error;
+  }
+  return (data ?? []) as ExerciseRow[];
+};
+
+const _fetchCustomExercises = async (): Promise<CustomExerciseRow[]> => {
+  const { data, error } = await supabase
+    .from('exercises')
+    .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles,is_custom')
+    .eq('is_custom', true)
+    .order('name', { ascending: true });
+  if (error) {
+    if (isMissingTableError(error as { code?: string; message?: string })) return [];
+    throw error;
+  }
+  return (data ?? []) as CustomExerciseRow[];
+};
+
 export const exerciseApi = {
   async list(): Promise<ExerciseRow[]> {
-    const { data, error } = await supabase.from('exercises').select('id,name').order('name', { ascending: true });
-    if (error) {
-      if (isMissingTableError(error as { code?: string; message?: string })) return [];
-      throw error;
-    }
-    return (data ?? []) as ExerciseRow[];
+    return cachedFetch(CACHE_KEYS.exercises, _fetchExercises, 12 * 60 * 60 * 1000);
   },
   async findByName(name: string): Promise<ExerciseRow | null> {
     const clean = name.trim();
@@ -104,19 +155,11 @@ export const exerciseApi = {
       }
       throw error;
     }
+    invalidateCache(CACHE_KEYS.exercises, CACHE_KEYS.customExercises);
     return (data as ExerciseRow | null) ?? null;
   },
   async listCustom(): Promise<CustomExerciseRow[]> {
-    const { data, error } = await supabase
-      .from('exercises')
-      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles,is_custom')
-      .eq('is_custom', true)
-      .order('name', { ascending: true });
-    if (error) {
-      if (isMissingTableError(error as { code?: string; message?: string })) return [];
-      throw error;
-    }
-    return (data ?? []) as CustomExerciseRow[];
+    return cachedFetch(CACHE_KEYS.customExercises, _fetchCustomExercises, 12 * 60 * 60 * 1000);
   },
   async createCustom(input: {
     name: string;
@@ -165,10 +208,12 @@ export const exerciseApi = {
           .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles,is_custom')
           .maybeSingle();
         if (retry.error) throw retry.error;
+        invalidateCache(CACHE_KEYS.exercises, CACHE_KEYS.customExercises);
         return (retry.data as CustomExerciseRow | null) ?? null;
       }
       throw error;
     }
+    invalidateCache(CACHE_KEYS.exercises, CACHE_KEYS.customExercises);
     return (data as CustomExerciseRow | null) ?? null;
   },
   async deleteCustom(id: string | number): Promise<boolean> {
@@ -188,47 +233,56 @@ export const exerciseApi = {
       if (isMissingTableError(error as { code?: string; message?: string })) return false;
       throw error;
     }
+    if (data) invalidateCache(CACHE_KEYS.exercises, CACHE_KEYS.customExercises);
     return !!data;
   },
 };
 
+const _fetchCatalog = async (): Promise<ExerciseCatalogRow[]> => {
+  const { data, error } = await supabase
+    .from('exercise_catalog')
+    .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles')
+    .order('primary_muscle', { ascending: true })
+    .order('name', { ascending: true });
+  if (error) {
+    if (isMissingTableError(error as { code?: string; message?: string })) return [];
+    throw error;
+  }
+  return (data ?? []) as ExerciseCatalogRow[];
+};
+
 export const exerciseCatalogApi = {
   async list(): Promise<ExerciseCatalogRow[]> {
-    const { data, error } = await supabase
-      .from('exercise_catalog')
-      .select('id,name,primary_muscle,machine,free_weight,cable,body_weight,is_compound,secondary_muscles')
-      .order('primary_muscle', { ascending: true })
-      .order('name', { ascending: true });
-    if (error) {
-      if (isMissingTableError(error as { code?: string; message?: string })) return [];
-      throw error;
-    }
-    return (data ?? []) as ExerciseCatalogRow[];
+    return cachedFetch(CACHE_KEYS.catalog, _fetchCatalog, 24 * 60 * 60 * 1000);
   },
+};
+
+const _fetchPlans = async (): Promise<ServerPlanRow[]> => {
+  const { data, error } = await supabase.from('plans').select('id,name,data,archived,predecessor_plan_id').eq('archived', 0).order('id', { ascending: false });
+  if (error) throw error; return (data ?? []) as unknown as ServerPlanRow[];
 };
 
 export const planApi = {
   async list(): Promise<ServerPlanRow[]> {
-    const { data, error } = await supabase.from('plans').select('id,name,data,archived,predecessor_plan_id').eq('archived', 0).order('id', { ascending: false });
-    if (error) throw error; return (data ?? []) as unknown as ServerPlanRow[];
+    return cachedFetch(CACHE_KEYS.plans, _fetchPlans, 60 * 60 * 1000);
   },
   async create(name: string, data: ServerPlanData): Promise<ServerPlanRow> {
     const { data: row, error } = await supabase.from('plans').insert([{ name, data, archived: 0 }]).select('id,name,data,archived,predecessor_plan_id').single();
-    if (error) throw error; return row as unknown as ServerPlanRow;
+    if (error) throw error; invalidateCache(CACHE_KEYS.plans); return row as unknown as ServerPlanRow;
   },
   async update(id: string, name: string, data: ServerPlanData): Promise<ServerPlanRow> {
     const { data: row, error } = await supabase.from('plans').update({ name, data }).eq('id', id).select('id,name,data,archived,predecessor_plan_id').single();
-    if (error) throw error; return row as unknown as ServerPlanRow;
+    if (error) throw error; invalidateCache(CACHE_KEYS.plans); return row as unknown as ServerPlanRow;
   },
-  async remove(id: string): Promise<{ ok: true }> { const { error } = await supabase.from('plans').delete().eq('id', id); if (error) throw error; return { ok: true }; },
-  async archive(id: string): Promise<{ ok: true; id: string }> { const { error } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
-  async unarchive(id: string): Promise<{ ok: true; id: string }> { const { error } = await supabase.from('plans').update({ archived: 0 }).eq('id', id); if (error) throw error; return { ok: true, id }; },
+  async remove(id: string): Promise<{ ok: true }> { const { error } = await supabase.from('plans').delete().eq('id', id); if (error) throw error; invalidateCache(CACHE_KEYS.plans); return { ok: true }; },
+  async archive(id: string): Promise<{ ok: true; id: string }> { const { error } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (error) throw error; invalidateCache(CACHE_KEYS.plans); return { ok: true, id }; },
+  async unarchive(id: string): Promise<{ ok: true; id: string }> { const { error } = await supabase.from('plans').update({ archived: 0 }).eq('id', id); if (error) throw error; invalidateCache(CACHE_KEYS.plans); return { ok: true, id }; },
   async listArchived(): Promise<ServerPlanRow[]> { const { data, error } = await supabase.from('plans').select('id,name,data,archived,predecessor_plan_id').eq('archived', 1).order('id', { ascending: false }); if (error) throw error; return (data ?? []) as unknown as ServerPlanRow[]; },
   async rollover(id: string): Promise<ServerPlanRow> {
     const { data: plan, error: e1 } = await supabase.from('plans').select('id,name,data').eq('id', id).single(); if (e1) throw e1;
     const currentName = String((plan as { name?: string } | null)?.name || 'Plan'); const match = currentName.match(/\(#(\d+)\)\s*$/); const nextN = match ? Number(match[1]) + 1 : 2; const base = match ? currentName.replace(/\(#\d+\)\s*$/, '').trim() : currentName.trim(); const newName = `${base} (#${nextN})`;
     const { error: e2 } = await supabase.from('plans').update({ archived: 1 }).eq('id', id); if (e2) throw e2;
-    const { data: newRow, error: e3 } = await supabase.from('plans').insert([{ name: newName, data: (plan as { data?: ServerPlanData } | null)?.data ?? {}, archived: 0, predecessor_plan_id: id }]).select('id,name,data,archived,predecessor_plan_id').single(); if (e3) throw e3; return newRow as unknown as ServerPlanRow;
+    const { data: newRow, error: e3 } = await supabase.from('plans').insert([{ name: newName, data: (plan as { data?: ServerPlanData } | null)?.data ?? {}, archived: 0, predecessor_plan_id: id }]).select('id,name,data,archived,predecessor_plan_id').single(); if (e3) throw e3; invalidateCache(CACHE_KEYS.plans); return newRow as unknown as ServerPlanRow;
   },
 };
 

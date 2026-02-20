@@ -1,4 +1,24 @@
 import { supabase } from '../supabaseClient'
+import { CACHE_KEYS } from '../api'
+
+function cachedFetch<T>(key: string, fetcher: () => Promise<T>, ttlMs: number): Promise<T> {
+  const raw = localStorage.getItem(key);
+  if (raw) {
+    try {
+      const { data, ts } = JSON.parse(raw);
+      if (Date.now() - ts < ttlMs) {
+        fetcher().then(fresh => {
+          try { localStorage.setItem(key, JSON.stringify({ data: fresh, ts: Date.now() })); } catch { /* quota */ }
+        }).catch(() => {});
+        return Promise.resolve(data as T);
+      }
+    } catch { /* corrupt cache, fall through */ }
+  }
+  return fetcher().then(data => {
+    try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
+    return data;
+  });
+}
 
 // Streak types
 export type StreakScheduleMode = 'daily' | 'rolling' | 'weekly'
@@ -35,7 +55,7 @@ export type UserPrefs = {
   prefs?: UserPrefsData | null
 }
 
-export async function getUserPrefs() {
+async function _fetchUserPrefs(): Promise<UserPrefs | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
 
@@ -47,6 +67,10 @@ export async function getUserPrefs() {
 
   if (error) throw error
   return (data as UserPrefs) || null
+}
+
+export function getUserPrefs(): Promise<UserPrefs | null> {
+  return cachedFetch(CACHE_KEYS.userPrefs, _fetchUserPrefs, 30 * 60 * 1000);
 }
 
 export async function upsertUserPrefs(partial: {
@@ -93,7 +117,7 @@ export async function upsertUserPrefs(partial: {
     // unexpected error
     throw upd.error
   }
-  if (upd.data) return upd.data as UserPrefs
+  if (upd.data) { localStorage.removeItem(CACHE_KEYS.userPrefs); return upd.data as UserPrefs; }
 
   // No row updated; insert one
   const ins = await supabase
@@ -112,9 +136,10 @@ export async function upsertUserPrefs(partial: {
         .select()
         .maybeSingle()
       if (retry.error) throw retry.error
-      if (retry.data) return retry.data as UserPrefs
+      if (retry.data) { localStorage.removeItem(CACHE_KEYS.userPrefs); return retry.data as UserPrefs; }
     }
     throw ins.error
   }
+  localStorage.removeItem(CACHE_KEYS.userPrefs);
   return ins.data as UserPrefs
 }
