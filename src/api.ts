@@ -1,39 +1,8 @@
 // api.ts – Supabase-backed API used by the app
 import { supabase } from './supabaseClient'
+import { cachedFetch, invalidateCache, CACHE_KEYS } from './cacheUtils'
 
-// ── Stale-while-revalidate cache ──
-// Returns cached data instantly if available, then refreshes in the background.
-function cachedFetch<T>(key: string, fetcher: () => Promise<T>, ttlMs: number): Promise<T> {
-  const raw = localStorage.getItem(key);
-  if (raw) {
-    try {
-      const { data, ts } = JSON.parse(raw);
-      if (Date.now() - ts < ttlMs) {
-        // Serve cached, refresh in background
-        fetcher().then(fresh => {
-          try { localStorage.setItem(key, JSON.stringify({ data: fresh, ts: Date.now() })); } catch { /* quota */ }
-        }).catch(() => {});
-        return Promise.resolve(data as T);
-      }
-    } catch { /* corrupt cache, fall through */ }
-  }
-  return fetcher().then(data => {
-    try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
-    return data;
-  });
-}
-
-function invalidateCache(...keys: string[]) {
-  for (const k of keys) localStorage.removeItem(k);
-}
-
-export const CACHE_KEYS = {
-  plans: 'cache:plans',
-  exercises: 'cache:exercises',
-  customExercises: 'cache:custom_exercises',
-  catalog: 'cache:exercise_catalog',
-  userPrefs: 'cache:user_prefs',
-} as const;
+export { CACHE_KEYS } from './cacheUtils'
 
 export type ServerPlanItem = { id?: string; exerciseId?: string; exerciseName?: string; targetSets?: number; targetReps?: string; myoReps?: boolean };
 export type ServerPlanDay = { id?: string; name?: string; items?: ServerPlanItem[] };

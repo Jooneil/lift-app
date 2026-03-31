@@ -284,7 +284,7 @@ const buildCatalogByName = (catalog: CatalogExercise[]) => {
 
 const parseBool = (value: string) => /^(true|1|yes|y)$/i.test(String(value || '').trim());
 
-function planToCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>): string {
+function planToCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>, exerciseNotes?: Record<string, string>): string {
   const header = [
     'planName',
     'weekName',
@@ -307,14 +307,8 @@ function planToCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>): st
       const dy = wk.days[di];
       const dayName = dy.name || '';
       if (!dy.items || dy.items.length === 0) continue;
-      let seed: Record<string, string> = {};
-      try {
-        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dy.id}`;
-        const raw = localStorage.getItem(seedKey);
-        if (raw) seed = JSON.parse(raw) || {};
-      } catch { /* ignore */ }
       for (const it of dy.items) {
-        const note = seed[it.exerciseName || ''] || '';
+        const note = exerciseNotes?.[normalizeExerciseName(it.exerciseName || '').toLowerCase()] || '';
         const exerciseName = it.exerciseName || '';
         const key = exerciseName.trim().toLowerCase();
         const meta = key && catalogByName ? catalogByName.get(key) : undefined;
@@ -370,8 +364,14 @@ function downloadCSV(filename: string, csv: string) {
   }
 }
 
-function exportPlanCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>) {
-  const csv = planToCSV(plan, catalogByName);
+async function exportPlanCSV(plan: Plan, catalogByName?: Map<string, CatalogExercise>) {
+  let notes: Record<string, string> = {};
+  try {
+    const up = await getUserPrefs().catch(() => null);
+    const p = (up?.prefs as UserPrefsData | null) || null;
+    if (p?.exercise_notes) notes = p.exercise_notes;
+  } catch { /* ignore */ }
+  const csv = planToCSV(plan, catalogByName, notes);
   downloadCSV(`${plan.name || 'plan'}.csv`, csv);
 }
 
@@ -1046,7 +1046,7 @@ function AuthedApp({
     try {
       await upsertUserPrefs({ streak_state: newState });
     } catch (err) {
-      console.error('Failed to save streak:', err);
+      if (import.meta.env.DEV) console.error('Failed to save streak:', err);
     }
   }, [streakConfig, streakState]);
 
@@ -1157,6 +1157,56 @@ function AuthedApp({
           }
         }
 
+        // One-time migration: pull notes from all sessions into global exercise_notes
+        if (!localStorage.getItem('exercise_notes_migrated')) {
+          (async () => {
+            try {
+              const allSessions = await sessionApi.listAll();
+              const merged: Record<string, string> = {};
+              // Collect from Supabase sessions (newest first, so oldest wins = first note set sticks)
+              for (const row of allSessions) {
+                const payload = (row as any).data as SessionPayload | null;
+                if (!payload?.entries) continue;
+                for (const entry of payload.entries) {
+                  const note = (entry as any).note;
+                  if (!note || String(note).trim() === '') continue;
+                  const nameKey = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+                  if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
+                }
+              }
+              // Collect from noteSeed localStorage keys
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key || !key.startsWith('noteSeed:')) continue;
+                try {
+                  const seed = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, string>;
+                  for (const [ex, note] of Object.entries(seed)) {
+                    if (!note || String(note).trim() === '') continue;
+                    const nameKey = normalizeExerciseName(ex).toLowerCase();
+                    if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
+                  }
+                } catch { /* ignore */ }
+              }
+              if (Object.keys(merged).length > 0) {
+                // Merge with any existing global notes (don't overwrite newer ones)
+                const existing = p?.exercise_notes || {};
+                const final = { ...merged, ...existing };
+                await upsertUserPrefs({ exercise_notes: final });
+              }
+              localStorage.setItem('exercise_notes_migrated', '1');
+              // Clean up old noteSeed keys
+              const toRemove: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key?.startsWith('noteSeed:')) toRemove.push(key);
+              }
+              for (const key of toRemove) localStorage.removeItem(key);
+            } catch {
+              // Don't block app — migration will retry next load
+            }
+          })();
+        }
+
         let plan = prefs.lastPlanServerId
           ? loaded.find((p) => String(p.serverId ?? '') === String(prefs.lastPlanServerId)) || null
           : null;
@@ -1200,7 +1250,7 @@ function AuthedApp({
         selectionOriginRef.current = "auto";
         setShouldAutoNavigate(false);
       } catch (err) {
-        console.error("Failed to load plans/prefs", err);
+        if (import.meta.env.DEV) console.error("Failed to load plans/prefs", err);
       }
     })();
   }, []);
@@ -2486,7 +2536,8 @@ function WorkoutPage({
   const [replaceAddMovementSecondary, setReplaceAddMovementSecondary] = useState("");
   const [replaceAddMovementError, setReplaceAddMovementError] = useState<string | null>(null);
   const [ghost, setGhost] = useState<Record<string, { weight: number | null; reps: number | null }[]>>({});
-  const [prevNotes, setPrevNotes] = useState<Record<string, string | null>>({});
+  const exerciseNotesRef = useRef<Record<string, string>>({});
+  const exerciseNotesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -2506,6 +2557,19 @@ function WorkoutPage({
     historyCacheRef.current = null;
     historicalGhostRef.current = null;
   }, [plan.serverId, plan.ghostMode]);
+
+  // Load global exercise notes from user prefs
+  useEffect(() => {
+    let cancelled = false;
+    getUserPrefs().then((up) => {
+      if (cancelled) return;
+      const p = (up?.prefs as UserPrefsData | null) || null;
+      if (p?.exercise_notes) {
+        exerciseNotesRef.current = { ...p.exercise_notes };
+      }
+    }).catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const currentWeek = useMemo(
     () => plan.weeks.find((w) => w.days.some((d) => d.id === day.id)) || null,
@@ -2733,7 +2797,6 @@ function WorkoutPage({
     const serverId = plan.serverId;
     if (!currentWeekId) {
       setGhost({});
-      setPrevNotes({});
       return;
     }
 
@@ -2791,7 +2854,6 @@ function WorkoutPage({
         }
         const currentIdx = ordered.findIndex((d) => d.dayId === day.id && d.weekId === currentWeekId);
         if (currentIdx <= 0) {
-          setPrevNotes({});
           return;
         }
 
@@ -2801,12 +2863,10 @@ function WorkoutPage({
         }));
         if (targets.length === 0) {
           setGhost({});
-          setPrevNotes({});
           return;
         }
 
         const ghostMap: Record<string, { weight: number | null; reps: number | null }[]> = {};
-        const notesMap: Record<string, string | null> = {};
         const remaining = new Set(targets.map((t) => exerciseKey(t)));
         const ghostMode = plan.ghostMode ?? 'default';
         const currentDayName = day.name.trim().toLowerCase();
@@ -2833,10 +2893,6 @@ function WorkoutPage({
               const nameKey = `name:${normalizeExerciseName(target.exerciseName).toLowerCase()}`;
               if (nameKey && !ghostMap[nameKey]) ghostMap[nameKey] = sets;
 
-              const noteVal = (entry as any).note ?? null;
-              notesMap[targetKey] = noteVal;
-              if (nameKey && !notesMap[nameKey]) notesMap[nameKey] = noteVal;
-
               remaining.delete(targetKey);
             }
           }
@@ -2848,26 +2904,10 @@ function WorkoutPage({
 
           // Load historical ghost data for sets that might not have regular ghost
           void loadHistoricalGhost(targets);
-
-          try {
-            const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${day.id}`;
-            const raw = localStorage.getItem(seedKey);
-            if (raw) {
-              const seed = JSON.parse(raw) as Record<string, string>;
-              for (const [ex, note] of Object.entries(seed)) {
-                const nameKey = `name:${normalizeExerciseName(ex).toLowerCase()}`;
-                if (!notesMap[nameKey] || String(notesMap[nameKey]).trim() === '') {
-                  notesMap[nameKey] = note;
-                }
-              }
-            }
-          } catch { /* ignore */ }
-          setPrevNotes(notesMap);
         }
       } catch {
         if (!cancelled) {
           setGhost({});
-          setPrevNotes({});
         }
       }
     })();
@@ -2877,15 +2917,17 @@ function WorkoutPage({
     };
   }, [plan.serverId, currentWeekId, plan.weeks, day.id, plan.id]);
 
-  // Seed notes from previous week where notes are missing
+  // Populate notes from global exercise notes
   useEffect(() => {
     if (!session || session.planDayId !== day.id) return;
-    if (!prevNotes) return;
+    const notes = exerciseNotesRef.current;
+    if (!notes || Object.keys(notes).length === 0) return;
     const nextEntries = session.entries.map((e) => {
       const hasNote = !!(e.note && String(e.note).trim() !== "");
-      const key = exerciseKey(e);
-      const suggested = prevNotes[key] ?? prevNotes[`name:${normalizeExerciseName(e.exerciseName).toLowerCase()}`];
-      if (hasNote || !suggested || String(suggested).trim() === "") return e;
+      if (hasNote) return e;
+      const nameKey = normalizeExerciseName(e.exerciseName || '').toLowerCase();
+      const suggested = notes[nameKey];
+      if (!suggested || String(suggested).trim() === "") return e;
       return { ...e, note: suggested };
     });
     const changed = nextEntries.some((e, i) => e.note !== session.entries[i].note);
@@ -2902,7 +2944,7 @@ function WorkoutPage({
         sessionApi.save(plan.serverId, next.planWeekId, next.planDayId, next).catch(() => void 0);
       }
     }
-  }, [prevNotes, session, day.id]);
+  }, [session, day.id]);
 
   // Merge session with updated plan day (preserve existing weights/reps)
   useEffect(() => {
@@ -3258,26 +3300,26 @@ function WorkoutPage({
   setSession((s) => {
     if (!s) return s;
     const entry = s.entries.find((e) => e.id === entryId) || null;
+    const trimmed = noteText.trim();
     const next: Session = {
       ...s,
       entries: s.entries.map((e) =>
-        e.id === entryId ? { ...e, note: noteText.trim() === '' ? null : noteText } : e
+        e.id === entryId ? { ...e, note: trimmed === '' ? null : trimmed } : e
       ),
     };
-    try {
-      if (entry) {
-        const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${day.id}`;
-        let seed: Record<string, string> = {};
-        try {
-          const raw = localStorage.getItem(seedKey);
-          if (raw) seed = JSON.parse(raw) || {};
-        } catch { /* ignore */ }
-        const name = entry.exerciseName || '';
-        const trimmed = noteText.trim();
-        if (trimmed) seed[name] = trimmed; else delete seed[name];
-        try { localStorage.setItem(seedKey, JSON.stringify(seed)); } catch { /* ignore */ }
+    // Save note globally by exercise name
+    if (entry) {
+      const nameKey = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+      if (nameKey) {
+        if (trimmed) exerciseNotesRef.current[nameKey] = trimmed;
+        else delete exerciseNotesRef.current[nameKey];
+        // Debounced save to Supabase
+        if (exerciseNotesSaveTimer.current) clearTimeout(exerciseNotesSaveTimer.current);
+        exerciseNotesSaveTimer.current = setTimeout(() => {
+          upsertUserPrefs({ exercise_notes: { ...exerciseNotesRef.current } }).catch(() => { /* ignore */ });
+        }, 1200);
       }
-    } catch { /* ignore */ }
+    }
     saveNow(next);
     return next;
   });
@@ -4894,7 +4936,7 @@ function BuilderPage({
       try {
         await planApi.remove(plan.serverId);
       } catch (err) {
-        console.error('Failed to delete plan', err);
+        if (import.meta.env.DEV) console.error('Failed to delete plan', err);
       }
     }
 
@@ -5201,22 +5243,18 @@ function BuilderPage({
               note: header.indexOf('note'),
             } as const;
             if (idx.weekName >= 0 && idx.dayName >= 0 && idx.exerciseName >= 0 && idx.note >= 0) {
+              const importedNotes: Record<string, string> = {};
               for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 if (!row || row.length === 0) continue;
-                const wName = row[idx.weekName] || '';
-                const dName = row[idx.dayName] || '';
                 const exName = row[idx.exerciseName] || '';
                 const note = (row[idx.note] || '').trim();
                 if (!exName || !note) continue;
-                const week = plan.weeks.find((w) => (w.name || '') === wName) || null;
-                const dayIdx = week ? week.days.findIndex((d) => (d.name || '') === dName) : -1;
-                if (dayIdx < 0) continue;
-                const seedKey = `noteSeed:${plan.serverId ?? plan.id}:${dayIdx}`;
-                let seed: Record<string, string> = {};
-                try { const raw = localStorage.getItem(seedKey); if (raw) seed = JSON.parse(raw) || {}; } catch { /* ignore */ }
-                seed[exName] = note;
-                try { localStorage.setItem(seedKey, JSON.stringify(seed)); } catch { /* ignore */ }
+                const nameKey = normalizeExerciseName(exName).toLowerCase();
+                if (nameKey) importedNotes[nameKey] = note;
+              }
+              if (Object.keys(importedNotes).length > 0) {
+                upsertUserPrefs({ exercise_notes: importedNotes }).catch(() => { /* ignore */ });
               }
             }
           }

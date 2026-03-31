@@ -1,24 +1,5 @@
 import { supabase } from '../supabaseClient'
-import { CACHE_KEYS } from '../api'
-
-function cachedFetch<T>(key: string, fetcher: () => Promise<T>, ttlMs: number): Promise<T> {
-  const raw = localStorage.getItem(key);
-  if (raw) {
-    try {
-      const { data, ts } = JSON.parse(raw);
-      if (Date.now() - ts < ttlMs) {
-        fetcher().then(fresh => {
-          try { localStorage.setItem(key, JSON.stringify({ data: fresh, ts: Date.now() })); } catch { /* quota */ }
-        }).catch(() => {});
-        return Promise.resolve(data as T);
-      }
-    } catch { /* corrupt cache, fall through */ }
-  }
-  return fetcher().then(data => {
-    try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
-    return data;
-  });
-}
+import { cachedFetch, CACHE_KEYS } from '../cacheUtils'
 
 // Streak types
 export type StreakScheduleMode = 'daily' | 'rolling' | 'weekly'
@@ -45,6 +26,7 @@ export type UserPrefsData = {
   last_day_id?: string | null
   streak_config?: StreakConfig | null
   streak_state?: StreakState | null
+  exercise_notes?: Record<string, string> | null
 }
 
 export type UserPrefs = {
@@ -79,6 +61,7 @@ export async function upsertUserPrefs(partial: {
   last_day_id?: string | null
   streak_config?: StreakConfig | null
   streak_state?: StreakState | null
+  exercise_notes?: Record<string, string> | null
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
@@ -104,6 +87,7 @@ export async function upsertUserPrefs(partial: {
     ...(partial.last_day_id !== undefined && { last_day_id: partial.last_day_id }),
     ...(partial.streak_config !== undefined && { streak_config: partial.streak_config }),
     ...(partial.streak_state !== undefined && { streak_state: partial.streak_state }),
+    ...(partial.exercise_notes !== undefined && { exercise_notes: partial.exercise_notes }),
   }
 
   // Try update-first: if a row exists for this user, update it; otherwise insert.
