@@ -1157,61 +1157,80 @@ function AuthedApp({
           }
         }
 
-        // One-time migration v2: pull notes from all sessions into global exercise_notes
-        if (localStorage.getItem('exercise_notes_migrated') !== '2') {
+        // One-time migration v3: pull notes from all sessions into global exercise_notes
+        // Fetches ALL session rows (paginated) and scans entries for note fields
+        if (localStorage.getItem('exercise_notes_migrated') !== '3') {
           (async () => {
             try {
-              const allSessions = await sessionApi.listAll();
               const merged: Record<string, string> = {};
-              // Collect from Supabase sessions — newest first so most recent note for each exercise wins
-              for (const row of allSessions) {
-                const d = (row as any).data;
-                // Session data may be the payload directly or wrapped
-                const entries: any[] = d?.entries ?? [];
-                for (const entry of entries) {
-                  const note = entry?.note;
-                  if (!note || String(note).trim() === '') continue;
-                  const exName = entry?.exerciseName || entry?.exercise_name || '';
-                  const nameKey = normalizeExerciseName(exName).toLowerCase();
-                  if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
+
+              // Paginated fetch of ALL sessions from Supabase
+              const PAGE_SIZE = 1000;
+              let offset = 0;
+              let hasMore = true;
+              while (hasMore) {
+                const { data: page, error } = await supabase
+                  .from('sessions')
+                  .select('data')
+                  .order('updated_at', { ascending: false })
+                  .range(offset, offset + PAGE_SIZE - 1);
+                if (error) throw error;
+                const rows = page ?? [];
+                for (const row of rows) {
+                  const d = (row as any).data;
+                  if (!d) continue;
+                  const entries: any[] = Array.isArray(d.entries) ? d.entries : [];
+                  for (const entry of entries) {
+                    if (!entry) continue;
+                    const note = entry.note;
+                    if (!note || String(note).trim() === '') continue;
+                    const exName = String(entry.exerciseName || entry.exercise_name || '');
+                    const nameKey = normalizeExerciseName(exName).toLowerCase();
+                    if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
+                  }
                 }
+                hasMore = rows.length === PAGE_SIZE;
+                offset += PAGE_SIZE;
               }
-              // Also scan localStorage session keys for notes (local-only sessions)
+
+              // Also scan localStorage for any local-only session data
               for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (!key) continue;
-                if (key.startsWith('session:')) {
+                if (key.startsWith('session:') || key.startsWith('noteSeed:')) {
                   try {
-                    const sess = JSON.parse(localStorage.getItem(key) || '{}');
-                    const entries: any[] = sess?.entries ?? [];
-                    for (const entry of entries) {
-                      const note = entry?.note;
-                      if (!note || String(note).trim() === '') continue;
-                      const exName = entry?.exerciseName || entry?.exercise_name || '';
-                      const nameKey = normalizeExerciseName(exName).toLowerCase();
-                      if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
-                    }
-                  } catch { /* ignore */ }
-                }
-                // Collect from old noteSeed localStorage keys
-                if (key.startsWith('noteSeed:')) {
-                  try {
-                    const seed = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, string>;
-                    for (const [ex, note] of Object.entries(seed)) {
-                      if (!note || String(note).trim() === '') continue;
-                      const nameKey = normalizeExerciseName(ex).toLowerCase();
-                      if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
+                    const raw = localStorage.getItem(key) || '{}';
+                    const parsed = JSON.parse(raw);
+                    if (key.startsWith('session:')) {
+                      const entries: any[] = Array.isArray(parsed?.entries) ? parsed.entries : [];
+                      for (const entry of entries) {
+                        if (!entry) continue;
+                        const note = entry.note;
+                        if (!note || String(note).trim() === '') continue;
+                        const exName = String(entry.exerciseName || entry.exercise_name || '');
+                        const nameKey = normalizeExerciseName(exName).toLowerCase();
+                        if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
+                      }
+                    } else {
+                      // noteSeed key
+                      for (const [ex, note] of Object.entries(parsed as Record<string, string>)) {
+                        if (!note || String(note).trim() === '') continue;
+                        const nameKey = normalizeExerciseName(ex).toLowerCase();
+                        if (nameKey && !merged[nameKey]) merged[nameKey] = String(note).trim();
+                      }
                     }
                   } catch { /* ignore */ }
                 }
               }
+
+              console.log('[notes migration v3]', Object.keys(merged).length, 'notes found:', merged);
+
               if (Object.keys(merged).length > 0) {
-                // Merge with any existing global notes (existing take priority)
                 const existing = p?.exercise_notes || {};
                 const final = { ...merged, ...existing };
                 await upsertUserPrefs({ exercise_notes: final });
               }
-              localStorage.setItem('exercise_notes_migrated', '2');
+              localStorage.setItem('exercise_notes_migrated', '3');
               // Clean up old noteSeed keys
               const toRemove: string[] = [];
               for (let i = 0; i < localStorage.length; i++) {
@@ -1219,8 +1238,9 @@ function AuthedApp({
                 if (key?.startsWith('noteSeed:')) toRemove.push(key);
               }
               for (const key of toRemove) localStorage.removeItem(key);
-            } catch {
-              // Don't block app — migration will retry next load
+            } catch (err) {
+              console.error('[notes migration v3] failed:', err);
+              // Will retry next load
             }
           })();
         }
