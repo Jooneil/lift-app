@@ -2609,6 +2609,12 @@ function WorkoutPage({
     return () => { cancelled = true; };
   }, []);
 
+  const catalogByNameMap = useMemo(() => {
+    const m = new Map<string, CatalogExercise>();
+    for (const ex of catalogExercises) m.set(ex.name.trim().toLowerCase(), ex);
+    return m;
+  }, [catalogExercises]);
+
   const currentWeek = useMemo(
     () => plan.weeks.find((w) => w.days.some((d) => d.id === day.id)) || null,
     [plan.weeks, day.id]
@@ -3463,12 +3469,22 @@ function WorkoutPage({
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-                {entry.exerciseName}
-                {entry.myoRepMatch && (
-                  <span style={{ marginLeft: 8, fontSize: 11, color: '#a78bfa', fontWeight: 500 }}>MYO</span>
-                )}
-              </h3>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+                  {entry.exerciseName}
+                  {entry.myoRepMatch && (
+                    <span style={{ marginLeft: 8, fontSize: 11, color: '#a78bfa', fontWeight: 500 }}>MYO</span>
+                  )}
+                </h3>
+                {(() => {
+                  const cat = catalogByNameMap.get(normalizeExerciseName(entry.exerciseName || '').toLowerCase());
+                  if (!cat?.primaryMuscle) return null;
+                  const label = cat.secondaryMuscles?.length
+                    ? `${cat.primaryMuscle} · ${cat.secondaryMuscles[0]}`
+                    : cat.primaryMuscle;
+                  return <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontWeight: 400 }}>{label}</div>;
+                })()}
+              </div>
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
