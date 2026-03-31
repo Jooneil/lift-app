@@ -404,6 +404,7 @@ function generateAIPrompt(prefs: {
   beginnerRandom: boolean;
   daysPerWeek: number;
   sessionMinutes: string;
+  trainingGoal: string;
   injuries: string;
   priorityMuscles: string[];
   deprioritizedMuscles: string[];
@@ -422,15 +423,54 @@ function generateAIPrompt(prefs: {
     .join('\n');
 
   const isBeginnerRandom = prefs.experience === 'beginner' && prefs.beginnerRandom;
+  const days = prefs.daysPerWeek;
+
+  // Build split recommendation based on experience + days
+  let splitGuidance: string;
+  if (prefs.experience === 'beginner') {
+    if (days <= 3) {
+      splitGuidance = `Full Body split (${days}x/week). Beginners benefit most from full body training — hit each muscle group every session with compound movements. Keep it simple: 1-2 compound lifts per major muscle group, 2-3 sets each.`;
+    } else {
+      splitGuidance = `Upper/Lower split (${days}x/week). Alternate upper and lower body days. Focus on fundamental compound movements with moderate volume.`;
+    }
+  } else if (prefs.experience === 'intermediate') {
+    if (days <= 3) {
+      splitGuidance = `Full Body split (${days}x/week). Vary exercise selection across days (e.g., squat Day 1, leg press Day 2). Moderate volume with some isolation work.`;
+    } else if (days === 4) {
+      splitGuidance = `Upper/Lower split (${days}x/week). Two upper days and two lower days with different exercise variations on each. Include both compound and isolation work.`;
+    } else {
+      splitGuidance = `Push/Pull/Legs split (${days}x/week). Group muscles by movement pattern. Include compound and isolation exercises with progressive volume.`;
+    }
+  } else {
+    // advanced
+    if (days <= 3) {
+      splitGuidance = `Full Body split (${days}x/week). Higher intensity per session, vary rep ranges across days (strength day, hypertrophy day, etc.). Include compound and isolation work.`;
+    } else if (days === 4) {
+      splitGuidance = `Upper/Lower split (${days}x/week). Higher volume per session with strategic exercise selection. Vary rep ranges between the two upper and two lower days.`;
+    } else {
+      splitGuidance = `Push/Pull/Legs or similar specialization split (${days}x/week). Higher volume and exercise variety. Can include dedicated arm/shoulder days if 6 days.`;
+    }
+  }
+
+  // Training goal guidance
+  let goalGuidance: string;
+  if (prefs.trainingGoal === 'strength') {
+    goalGuidance = `The user is training for STRENGTH. Prioritize heavy compound movements with lower rep ranges (3-6 reps) and longer rest periods. Include some hypertrophy work (8-12 reps) as accessory movements.`;
+  } else if (prefs.trainingGoal === 'hypertrophy') {
+    goalGuidance = `The user is training for HYPERTROPHY (muscle size). Use moderate rep ranges (8-15 reps) with controlled tempos. Include a mix of compound and isolation movements with higher total volume.`;
+  } else {
+    goalGuidance = `The user wants a balanced program for both STRENGTH and SIZE. Use a mix of heavier compound work (5-8 reps) and moderate hypertrophy work (8-12 reps) with some higher rep isolation (12-15 reps).`;
+  }
 
   let prefsSection = `- Experience level: ${prefs.experience}
-- Training days per week: ${prefs.daysPerWeek}
+- Training goal: ${prefs.trainingGoal === 'strength' ? 'Strength' : prefs.trainingGoal === 'hypertrophy' ? 'Hypertrophy (size)' : 'Both strength and size'}
+- Training days per week: ${days}
 - Session duration: ${prefs.sessionMinutes} minutes`;
 
   if (isBeginnerRandom) {
-    prefsSection += `\n- The user is a beginner who wants a simple, well-rounded starter program. Keep it straightforward with basic compound movements and simple progression.`;
+    prefsSection += `\n- The user is a beginner who wants a simple, well-rounded starter program. Keep it straightforward with basic compound movements and simple progression. Stick to well-known, beginner-friendly exercises.`;
   } else {
-    if (prefs.injuries.trim()) prefsSection += `\n- Injuries/limitations: ${prefs.injuries.trim()}`;
+    if (prefs.injuries.trim()) prefsSection += `\n- Injuries/limitations: ${prefs.injuries.trim()} — AVOID exercises that would aggravate these. Suggest safe alternatives in the note column.`;
     if (prefs.priorityMuscles.length) prefsSection += `\n- Muscles to PRIORITIZE (add extra volume): ${prefs.priorityMuscles.join(', ')}`;
     if (prefs.deprioritizedMuscles.length) prefsSection += `\n- Muscles to DE-PRIORITIZE (reduce volume): ${prefs.deprioritizedMuscles.join(', ')}`;
   }
@@ -441,25 +481,33 @@ function generateAIPrompt(prefs: {
     prefsSection += `\n- Do NOT use myo-rep sets (leave the myoReps column empty for all exercises).`;
   }
 
-  return `You are an expert strength training program designer. Create a training program based on the preferences below and output it as a CSV that can be directly imported into a workout tracking app.
+  return `You are an expert strength training program designer. Create a training program based on the preferences below and provide it as a downloadable CSV file.
 
 ## User Preferences
 ${prefsSection}
 
-## Output Format — CSV (13 columns, this exact order)
+## Training Approach
+${goalGuidance}
+
+## Split Design
+${splitGuidance}
+
+## Output Format
+Provide the program as a **downloadable CSV file** (not raw text). The file must have exactly these 13 columns in this order:
+
 planName,weekName,dayName,exerciseName,targetSets,targetReps,myoReps,note,isCustom,primaryMuscle,equipment,isCompound,secondaryMuscles
 
 ### Column Definitions
-- planName: A name for the program (e.g., "Upper/Lower 4-Day", "PPL Hypertrophy"). Use the same name for every row.
+- planName: A name for the program (e.g., "Upper/Lower 4-Day", "Full Body Strength"). Use the same name for every row.
 - weekName: Week label (e.g., "Week 1", "Week 2"). Create at least 1 week; up to 4 for periodization.
-- dayName: Day label (e.g., "Push", "Pull", "Upper A", "Lower B", "Full Body").
+- dayName: Day label (e.g., "Push", "Pull", "Upper A", "Lower B", "Full Body A").
 - exerciseName: The exercise name — MUST exactly match one from the exercise list below.
 - targetSets: Number of working sets (integer, typically 2–5).
 - targetReps: Rep range as text (e.g., "6-8", "8-12", "12-15").
 - myoReps: Set to "true" ONLY if this should be a myo-rep set. Otherwise leave empty.
-- note: Optional short coaching cue (e.g., "pause at bottom", "control the negative"). Can be left empty.
-- isCustom: "false" for all catalog exercises. Only "true" for user-created exercises.
-- primaryMuscle: The primary muscle group (must match the exercise list).
+- note: Short coaching cue for the exercise. Include form tips, tempo guidance, or safety notes (e.g., "pause at bottom", "control the eccentric", "keep back neutral"). Add a note for EVERY exercise — especially for beginners.
+- isCustom: "false" for all exercises from the provided list.
+- primaryMuscle: The primary muscle group (must match the exercise list exactly).
 - equipment: One of: machine, free_weight, cable, body_weight
 - isCompound: "true" or "false" (must match the exercise list).
 - secondaryMuscles: Semicolon-separated (e.g., "Tricep;Front Delt"). Must match the exercise list.
@@ -467,24 +515,21 @@ planName,weekName,dayName,exerciseName,targetSets,targetReps,myoReps,note,isCust
 ## Rules
 1. ONLY use exercises from the "Available Exercises" list below. Do not invent exercises.
 2. Every field that contains commas or quotes must be wrapped in double quotes with internal quotes escaped as "".
-3. Output ONLY the raw CSV text. No markdown code fences, no explanation, no commentary before or after.
-4. The first row must be the header row exactly as shown above.
-5. Design an appropriate training split for ${prefs.daysPerWeek} day(s) per week:
-   - 2-3 days → Full Body
-   - 4 days → Upper/Lower or Push/Pull
-   - 5-6 days → Push/Pull/Legs or similar
-   - Adjust as appropriate for the user's experience level.
+3. Provide the output as a **downloadable .csv file**. Do not paste the raw CSV as text in your response.
+4. The first row of the CSV must be the header row exactly as shown above.
+5. Use the split design guidance above for structuring training days.
 6. Total working sets per session should fit within ~${prefs.sessionMinutes} minutes (roughly 1 set per 2-3 minutes including rest).
-7. Order exercises: compound movements first, then isolation.
-8. For the exerciseName, primaryMuscle, equipment, isCompound, and secondaryMuscles columns, copy the values exactly as they appear in the exercise list.
+7. Order exercises within each day: compound movements first, then isolation.
+8. For the exerciseName, primaryMuscle, equipment, isCompound, and secondaryMuscles columns, copy the values EXACTLY as they appear in the exercise list.
 9. Ensure balanced programming — don't neglect any major muscle group unless the user specifically asked to de-prioritize it.
+10. Include a helpful coaching note for every exercise in the "note" column — form cues, breathing tips, or things to watch out for.
 
 ## Available Exercises
 ${exerciseSummary}
 
-The full exercise catalog with all metadata columns is provided as a separate CSV attachment. Use the exerciseName values EXACTLY as they appear in that list.
+The full exercise catalog with all metadata columns is attached as a CSV file. Use the exerciseName values EXACTLY as they appear in that list.
 
-OUTPUT ONLY THE RAW CSV BELOW THIS LINE:`;
+Generate the program CSV file now.`;
 }
 
 // Fix common mojibake (UTF‑8 shown as Windows‑1252/Latin‑1) when reading data.
@@ -4403,6 +4448,7 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
   const [step, setStep] = useState<'form' | 'result'>('form');
   const [experience, setExperience] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [beginnerRandom, setBeginnerRandom] = useState(false);
+  const [trainingGoal, setTrainingGoal] = useState<'strength' | 'hypertrophy' | 'both'>('both');
   const [daysPerWeek, setDaysPerWeek] = useState(4);
   const [sessionMinutes, setSessionMinutes] = useState('60');
   const [injuries, setInjuries] = useState('');
@@ -4421,9 +4467,9 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
   };
 
   const promptText = useMemo(() => generateAIPrompt(
-    { experience, beginnerRandom, daysPerWeek, sessionMinutes, injuries, priorityMuscles, deprioritizedMuscles, knowsMyoReps },
+    { experience, beginnerRandom, trainingGoal, daysPerWeek, sessionMinutes, injuries, priorityMuscles, deprioritizedMuscles, knowsMyoReps },
     catalogExercises
-  ), [experience, beginnerRandom, daysPerWeek, sessionMinutes, injuries, priorityMuscles, deprioritizedMuscles, knowsMyoReps, catalogExercises]);
+  ), [experience, beginnerRandom, trainingGoal, daysPerWeek, sessionMinutes, injuries, priorityMuscles, deprioritizedMuscles, knowsMyoReps, catalogExercises]);
 
   const handleCopy = async () => {
     try {
@@ -4471,6 +4517,16 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
                     {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Training goal */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Training Goal</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <button onClick={() => setTrainingGoal('strength')} style={pillStyle(trainingGoal === 'strength')}>Strength</button>
+                <button onClick={() => setTrainingGoal('hypertrophy')} style={pillStyle(trainingGoal === 'hypertrophy')}>Size (Hypertrophy)</button>
+                <button onClick={() => setTrainingGoal('both')} style={pillStyle(trainingGoal === 'both')}>Both</button>
               </div>
             </div>
 
@@ -4558,6 +4614,11 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
               </>
             )}
 
+            {/* Disclaimer */}
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
+              Disclaimer: Programs generated by AI are not reviewed by a certified trainer. Neither the AI, this app, nor its creator are liable for any injuries resulting from following a generated program. Consult a medical professional before starting any exercise program, especially if you have existing injuries or health conditions.
+            </div>
+
             {/* Generate */}
             <button onClick={() => setStep('result')} style={{ ...PRIMARY_BTN_STYLE, width: '100%', textAlign: 'center' }} disabled={catalogExercises.length === 0}>
               {catalogExercises.length === 0 ? 'Loading exercises...' : 'Generate AI Prompt'}
@@ -4565,8 +4626,14 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Copy the prompt below and paste it into ChatGPT, Claude, or any AI. Then attach the exercise list CSV for best results. The AI will output a CSV you can import with "Import Plan (CSV)".
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--text-primary)' }}>How to use:</strong><br/>
+              1. Copy the prompt below<br/>
+              2. Download the exercise list CSV<br/>
+              3. Paste the prompt into ChatGPT, Claude, or any AI<br/>
+              4. Attach the exercise list CSV to the same message<br/>
+              5. The AI will give you a CSV file to download<br/>
+              6. Import that file here with "Import Plan (CSV)"
             </div>
 
             <textarea
