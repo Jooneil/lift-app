@@ -1,9 +1,9 @@
 // Vercel Serverless Function: POST /api/ai/generate-program
-import { createClient } from "@supabase/supabase-js";
+const { createClient } = require("@supabase/supabase-js");
 
 const AI_FREE_LIMIT = 3;
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -111,4 +111,4 @@ export default async function handler(req, res) {
     console.error("[AI] Generation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-}
+};
