@@ -124,6 +124,13 @@ db.serialize(() => {
     completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, plan_id, week_id, day_id)
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS ai_generations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    used_own_key INTEGER DEFAULT 0
+  )`);
 });
 
 // ---- Auth helpers
@@ -503,6 +510,100 @@ app.get("/api/completed/all", requireAuth, (req, res) => {
       res.json(out);
     }
   );
+});
+
+// ---- AI Program Builder ----
+const AI_FREE_LIMIT = 3;
+
+app.get("/api/ai/generations-remaining", requireAuth, (req, res) => {
+  db.get(
+    "SELECT COUNT(*) as cnt FROM ai_generations WHERE user_id=? AND used_own_key=0",
+    [req.session.user.id],
+    (err, row) => {
+      if (err) return res.status(500).json({ error: "Failed to check generations" });
+      const used = row?.cnt || 0;
+      res.json({ used, limit: AI_FREE_LIMIT, remaining: Math.max(0, AI_FREE_LIMIT - used) });
+    }
+  );
+});
+
+app.post("/api/ai/generate-program", requireAuth, async (req, res) => {
+  try {
+    const { prompt, apiKey } = req.body;
+    if (!prompt || typeof prompt !== "string") return res.status(400).json({ error: "Missing prompt" });
+
+    const userKey = apiKey && typeof apiKey === "string" ? apiKey.trim() : "";
+    const serverKey = process.env.ANTHROPIC_API_KEY || "";
+    const usingOwnKey = !!userKey;
+
+    // Rate limit check for free tier
+    if (!usingOwnKey) {
+      if (!serverKey) return res.status(503).json({ error: "AI generation is not configured on this server. Please provide your own Anthropic API key." });
+      const row = await new Promise((resolve, reject) => {
+        db.get(
+          "SELECT COUNT(*) as cnt FROM ai_generations WHERE user_id=? AND used_own_key=0",
+          [req.session.user.id],
+          (err, r) => (err ? reject(err) : resolve(r))
+        );
+      });
+      const used = row?.cnt || 0;
+      if (used >= AI_FREE_LIMIT) {
+        return res.status(429).json({
+          error: `You've used all ${AI_FREE_LIMIT} free generations. Add your own Anthropic API key to generate more programs.`,
+          limitReached: true,
+        });
+      }
+    }
+
+    const activeKey = usingOwnKey ? userKey : serverKey;
+
+    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": activeKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 8192,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!anthropicRes.ok) {
+      const errBody = await anthropicRes.text().catch(() => "");
+      if (anthropicRes.status === 401) {
+        return res.status(401).json({ error: usingOwnKey ? "Invalid API key. Please check your Anthropic API key." : "Server API key is invalid." });
+      }
+      console.error("Anthropic API error:", anthropicRes.status, errBody);
+      return res.status(502).json({ error: "AI service error. Please try again." });
+    }
+
+    const result = await anthropicRes.json();
+    let csv = (result?.content?.[0]?.text || "").trim();
+
+    // Strip markdown code fences if present
+    csv = csv.replace(/^```(?:csv)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
+    if (!csv || !csv.includes("planName")) {
+      return res.status(502).json({ error: "AI did not return a valid program CSV. Please try again." });
+    }
+
+    // Record generation
+    await new Promise((resolve) => {
+      db.run(
+        "INSERT INTO ai_generations (user_id, used_own_key) VALUES (?, ?)",
+        [req.session.user.id, usingOwnKey ? 1 : 0],
+        () => resolve()
+      );
+    });
+
+    res.json({ csv });
+  } catch (err) {
+    console.error("AI generation error:", err);
+    res.status(500).json({ error: "Failed to generate program. Please try again." });
+  }
 });
 
 // ---- Start server

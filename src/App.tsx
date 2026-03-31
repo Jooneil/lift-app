@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
-import { api, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
+import { api, aiApi, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
 import { getUserPrefs, upsertUserPrefs, type StreakConfig, type StreakState, type StreakScheduleMode, type UserPrefsData } from './api/userPrefs';
 import { supabase } from "./supabaseClient";
 import type {
@@ -4444,8 +4444,12 @@ function calculateWeekSetsPerMuscle(
   return calculateSetsPerMuscle(allItems, catalogExercises);
 }
 
-function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: CatalogExercise[]; onClose: () => void }) {
-  const [step, setStep] = useState<'form' | 'result'>('form');
+function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
+  catalogExercises: CatalogExercise[];
+  onClose: () => void;
+  onImportCSV: (csv: string) => void;
+}) {
+  const [step, setStep] = useState<'form' | 'generating' | 'result' | 'manual'>('form');
   const [experience, setExperience] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [beginnerRandom, setBeginnerRandom] = useState(false);
   const [trainingGoal, setTrainingGoal] = useState<'strength' | 'hypertrophy' | 'both'>('both');
@@ -4456,6 +4460,16 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
   const [deprioritizedMuscles, setDeprioritizedMuscles] = useState<string[]>([]);
   const [knowsMyoReps, setKnowsMyoReps] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [limitReached, setLimitReached] = useState(false);
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('anthropic_api_key') || '');
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [remaining, setRemaining] = useState<{ used: number; limit: number; remaining: number } | null>(null);
+
+  // Load remaining generations on mount
+  useEffect(() => {
+    aiApi.remaining().then(setRemaining).catch(() => {});
+  }, []);
 
   const togglePriority = (m: string) => {
     setPriorityMuscles(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
@@ -4471,13 +4485,33 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
     catalogExercises
   ), [experience, beginnerRandom, trainingGoal, daysPerWeek, sessionMinutes, injuries, priorityMuscles, deprioritizedMuscles, knowsMyoReps, catalogExercises]);
 
+  const handleGenerate = async () => {
+    setStep('generating');
+    setGenError(null);
+    setLimitReached(false);
+    try {
+      const catalogCSV = generateExerciseCatalogCSV(catalogExercises);
+      const fullPrompt = promptText + '\n\n--- EXERCISE CATALOG CSV ---\n' + catalogCSV;
+      const key = userApiKey.trim() || undefined;
+      const { csv } = await aiApi.generate(fullPrompt, key);
+      onImportCSV(csv);
+      onClose();
+    } catch (err: any) {
+      if (err.limitReached) {
+        setLimitReached(true);
+        setShowKeyInput(true);
+      }
+      setGenError(err.message || 'Generation failed. Please try again.');
+      setStep('form');
+    }
+  };
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(promptText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback: select the textarea
       const ta = document.querySelector<HTMLTextAreaElement>('[data-prompt-output]');
       if (ta) { ta.select(); document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 2000); }
     }
@@ -4486,6 +4520,12 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
   const handleDownloadCatalog = () => {
     const csv = generateExerciseCatalogCSV(catalogExercises);
     downloadCSV('exercise_catalog.csv', csv);
+  };
+
+  const saveApiKey = (key: string) => {
+    setUserApiKey(key);
+    if (key.trim()) localStorage.setItem('anthropic_api_key', key.trim());
+    else localStorage.removeItem('anthropic_api_key');
   };
 
   const showDetails = !(experience === 'beginner' && beginnerRandom);
@@ -4614,17 +4654,70 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
               </>
             )}
 
+            {/* Error message */}
+            {genError && (
+              <div style={{ fontSize: 12, color: '#f88', padding: '10px 12px', background: 'rgba(255,136,136,0.1)', border: '1px solid rgba(255,136,136,0.3)', borderRadius: 10 }}>
+                {genError}
+              </div>
+            )}
+
+            {/* API Key section */}
+            {(limitReached || showKeyInput) && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>
+                  Anthropic API Key {limitReached && <span style={{ color: '#f88', fontWeight: 400 }}>(free generations used up)</span>}
+                </div>
+                <input
+                  type="password"
+                  value={userApiKey}
+                  onChange={e => saveApiKey(e.target.value)}
+                  placeholder="sk-ant-..."
+                  style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: 12 }}
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Get a key at console.anthropic.com. Stored locally in your browser only.
+                </div>
+              </div>
+            )}
+
+            {!showKeyInput && !limitReached && (
+              <button onClick={() => setShowKeyInput(true)} style={{ ...SMALL_BTN_STYLE, alignSelf: 'flex-start', fontSize: 11 }}>
+                Use your own API key
+              </button>
+            )}
+
+            {/* Remaining count */}
+            {remaining && !userApiKey.trim() && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {remaining.remaining} of {remaining.limit} free generation{remaining.limit !== 1 ? 's' : ''} remaining
+              </div>
+            )}
+
             {/* Disclaimer */}
             <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
               Disclaimer: Programs generated by AI are not reviewed by a certified trainer. Neither the AI, this app, nor its creator are liable for any injuries resulting from following a generated program. Consult a medical professional before starting any exercise program, especially if you have existing injuries or health conditions.
             </div>
 
             {/* Generate */}
-            <button onClick={() => setStep('result')} style={{ ...PRIMARY_BTN_STYLE, width: '100%', textAlign: 'center' }} disabled={catalogExercises.length === 0}>
-              {catalogExercises.length === 0 ? 'Loading exercises...' : 'Generate AI Prompt'}
+            <button
+              onClick={handleGenerate}
+              style={{ ...PRIMARY_BTN_STYLE, width: '100%', textAlign: 'center' }}
+              disabled={catalogExercises.length === 0 || (limitReached && !userApiKey.trim())}
+            >
+              {catalogExercises.length === 0 ? 'Loading exercises...' : 'Generate Program'}
+            </button>
+
+            <button onClick={() => setStep('manual')} style={{ ...SMALL_BTN_STYLE, alignSelf: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+              Or copy prompt manually for any AI
             </button>
           </div>
-        ) : (
+        ) : step === 'generating' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '40px 0' }}>
+            <div style={{ width: 40, height: 40, border: '3px solid var(--border-subtle)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'ptr-spin 0.8s linear infinite' }} />
+            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Generating your program...</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>This usually takes 15-30 seconds</div>
+          </div>
+        ) : step === 'manual' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               <strong style={{ color: 'var(--text-primary)' }}>How to use:</strong><br/>
@@ -4653,10 +4746,10 @@ function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: Cat
             </div>
 
             <button onClick={() => setStep('form')} style={{ ...SMALL_BTN_STYLE, alignSelf: 'flex-start' }}>
-              ← Back to Options
+              ← Back
             </button>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -5716,7 +5809,66 @@ function BuilderPage({
     reader.readAsText(file);
   };
 
-  
+  const handleImportCSVText = async (text: string) => {
+    try {
+      const result = csvToPlan('AI Generated Plan', text);
+      if (!result) { alert('Failed to parse the generated program.'); return; }
+      const { plan, exerciseMeta } = result;
+      try {
+        const existingByName = buildCatalogByName(catalogExercises);
+        const createdNames = new Set<string>();
+        for (const week of plan.weeks) {
+          for (const day of week.days) {
+            for (const item of day.items) {
+              const name = item.exerciseName || '';
+              const key = name.trim().toLowerCase();
+              if (!key || existingByName.has(key) || createdNames.has(key)) continue;
+              createdNames.add(key);
+              if (!onCreateCustomExercise) continue;
+              const meta = exerciseMeta.get(key) || {};
+              try {
+                await onCreateCustomExercise({
+                  name,
+                  primaryMuscle: meta.primaryMuscle?.trim() || 'Other',
+                  equipment: meta.equipment ?? 'body_weight',
+                  isCompound: meta.isCompound ?? false,
+                  secondaryMuscles: (meta.isCompound ?? false) ? (meta.secondaryMuscles ?? []) : [],
+                });
+              } catch { /* ignore */ }
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      // Seed notes from the CSV
+      try {
+        const rows = parseCSV(text);
+        if (rows.length > 0) {
+          const header = rows[0].map((h) => h.trim().toLowerCase());
+          const nIdx = { exerciseName: header.indexOf('exercisename'), note: header.indexOf('note') };
+          if (nIdx.exerciseName >= 0 && nIdx.note >= 0) {
+            const importedNotes: Record<string, string> = {};
+            for (let r = 1; r < rows.length; r++) {
+              const row = rows[r];
+              if (!row || row.length === 0) continue;
+              const exName = row[nIdx.exerciseName] || '';
+              const note = (row[nIdx.note] || '').trim();
+              if (!exName || !note) continue;
+              const nameKey = normalizeExerciseName(exName).toLowerCase();
+              if (nameKey) importedNotes[nameKey] = note;
+            }
+            if (Object.keys(importedNotes).length > 0) {
+              upsertUserPrefs({ exercise_notes: importedNotes }).catch(() => {});
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      setPlans((prev) => [...prev, plan]);
+      onSelectPlan(plan.id, plan);
+      setShowPlanList(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   return (
     <div style={CARD_STYLE}>
@@ -6267,7 +6419,7 @@ function BuilderPage({
       )}
 
       {showAIProgramBuilder && (
-        <AIProgramBuilder catalogExercises={catalogExercises} onClose={() => setShowAIProgramBuilder(false)} />
+        <AIProgramBuilder catalogExercises={catalogExercises} onClose={() => setShowAIProgramBuilder(false)} onImportCSV={handleImportCSVText} />
       )}
 
       {searchOpen && (

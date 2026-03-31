@@ -333,6 +333,42 @@ export const sessionApi = {
   },
 };
 
+// --- AI Program Builder API (calls Express server) ---
+const AI_SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:5174';
+
+async function aiAuthHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token || '';
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+export const aiApi = {
+  async remaining(): Promise<{ used: number; limit: number; remaining: number }> {
+    const headers = await aiAuthHeaders();
+    const res = await fetch(`${AI_SERVER_URL}/api/ai/generations-remaining`, { headers });
+    if (!res.ok) throw new Error('Failed to check generations');
+    return res.json();
+  },
+  async generate(prompt: string, apiKey?: string): Promise<{ csv: string }> {
+    const headers = await aiAuthHeaders();
+    const res = await fetch(`${AI_SERVER_URL}/api/ai/generate-program`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ prompt, ...(apiKey ? { apiKey } : {}) }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Generation failed' }));
+      const err = new Error(body.error || 'Generation failed') as Error & { limitReached?: boolean };
+      if (body.limitReached) err.limitReached = true;
+      throw err;
+    }
+    return res.json();
+  },
+};
+
 export type ServerTemplateRow = ServerPlanRow;
 export const templateApi = {
   async list(): Promise<ServerTemplateRow[]> { const { data, error } = await supabase.from('templates').select('id,name,data').order('id', { ascending: false }); if (error) throw error; return (data ?? []) as unknown as ServerTemplateRow[]; },
