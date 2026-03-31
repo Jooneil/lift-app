@@ -112,6 +112,18 @@ create policy exercise_catalog_read on public.exercise_catalog for select using 
 create unique index if not exists idx_exercise_catalog_lower_name on public.exercise_catalog(lower(name));
 grant select on public.exercise_catalog to anon, authenticated;
 
+-- ai_generations (rate limiting for AI program builder)
+create table if not exists public.ai_generations (
+  id bigserial primary key,
+  user_id uuid not null default auth.uid(),
+  used_own_key boolean default false,
+  created_at timestamptz default now()
+);
+alter table public.ai_generations enable row level security;
+drop policy if exists ai_generations_isolation on public.ai_generations;
+create policy ai_generations_isolation on public.ai_generations for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create index if not exists idx_ai_generations_user on public.ai_generations(user_id);
+
 with catalog_seed as (
   select *
   from (values

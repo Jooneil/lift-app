@@ -333,8 +333,8 @@ export const sessionApi = {
   },
 };
 
-// --- AI Program Builder API (calls Express server) ---
-const AI_SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:5174';
+// --- AI Program Builder API (Vercel serverless in prod, Express locally) ---
+const AI_SERVER_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5174' : '');
 
 async function aiAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();

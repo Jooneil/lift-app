@@ -529,12 +529,15 @@ app.get("/api/ai/generations-remaining", requireAuth, (req, res) => {
 
 app.post("/api/ai/generate-program", requireAuth, async (req, res) => {
   try {
+    console.log("[AI] generate-program called by user:", req.session.user?.id);
     const { prompt, apiKey } = req.body;
-    if (!prompt || typeof prompt !== "string") return res.status(400).json({ error: "Missing prompt" });
+    if (!prompt || typeof prompt !== "string") { console.log("[AI] Missing prompt"); return res.status(400).json({ error: "Missing prompt" }); }
+    console.log("[AI] Prompt length:", prompt.length);
 
     const userKey = apiKey && typeof apiKey === "string" ? apiKey.trim() : "";
     const serverKey = process.env.ANTHROPIC_API_KEY || "";
     const usingOwnKey = !!userKey;
+    console.log("[AI] Using own key:", usingOwnKey, "| Server key exists:", !!serverKey);
 
     // Rate limit check for free tier
     if (!usingOwnKey) {
@@ -556,6 +559,7 @@ app.post("/api/ai/generate-program", requireAuth, async (req, res) => {
     }
 
     const activeKey = usingOwnKey ? userKey : serverKey;
+    console.log("[AI] Calling Anthropic API...");
 
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -571,17 +575,19 @@ app.post("/api/ai/generate-program", requireAuth, async (req, res) => {
       }),
     });
 
+    console.log("[AI] Anthropic response status:", anthropicRes.status);
     if (!anthropicRes.ok) {
       const errBody = await anthropicRes.text().catch(() => "");
+      console.error("[AI] Anthropic API error:", anthropicRes.status, errBody);
       if (anthropicRes.status === 401) {
         return res.status(401).json({ error: usingOwnKey ? "Invalid API key. Please check your Anthropic API key." : "Server API key is invalid." });
       }
-      console.error("Anthropic API error:", anthropicRes.status, errBody);
       return res.status(502).json({ error: "AI service error. Please try again." });
     }
 
     const result = await anthropicRes.json();
     let csv = (result?.content?.[0]?.text || "").trim();
+    console.log("[AI] CSV length:", csv.length, "| starts with planName:", csv.startsWith("planName"));
 
     // Strip markdown code fences if present
     csv = csv.replace(/^```(?:csv)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
