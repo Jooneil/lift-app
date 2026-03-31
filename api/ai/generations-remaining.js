@@ -1,9 +1,9 @@
 // Vercel Serverless Function: GET /api/ai/generations-remaining
-const { createClient } = require("@supabase/supabase-js");
+import { createClient } from "@supabase/supabase-js";
 
 const AI_FREE_LIMIT = 3;
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -47,4 +47,4 @@ module.exports = async function handler(req, res) {
     console.error("Generations remaining error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-};
+}
