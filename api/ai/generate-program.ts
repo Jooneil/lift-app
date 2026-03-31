@@ -1,10 +1,9 @@
-// Vercel Serverless Function: POST /api/ai/generate-program
-const { createClient } = require("@supabase/supabase-js");
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { createClient } from "@supabase/supabase-js";
 
 const AI_FREE_LIMIT = 3;
 
-module.exports = async function handler(req, res) {
-  // CORS
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -12,16 +11,14 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    // Auth: verify Supabase JWT
     const auth = req.headers["authorization"] || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    const token = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : "";
     if (!token) return res.status(401).json({ error: "Not logged in" });
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
     if (!supabaseUrl || !supabaseAnon) return res.status(500).json({ error: "Server missing Supabase config" });
 
-    // Verify the user token
     const userRes = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnon },
     });
@@ -37,11 +34,9 @@ module.exports = async function handler(req, res) {
     const serverKey = process.env.ANTHROPIC_API_KEY || "";
     const usingOwnKey = !!userKey;
 
-    // Initialize Supabase service client for rate limiting
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnon);
 
-    // Rate limit check for free tier
     if (!usingOwnKey) {
       if (!serverKey) return res.status(503).json({ error: "AI generation is not configured. Please provide your own Anthropic API key." });
 
@@ -91,24 +86,20 @@ module.exports = async function handler(req, res) {
 
     const result = await anthropicRes.json();
     let csv = (result?.content?.[0]?.text || "").trim();
-
-    // Strip markdown code fences if present
     csv = csv.replace(/^```(?:csv)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
 
     if (!csv || !csv.includes("planName")) {
       return res.status(502).json({ error: "AI did not return a valid program CSV. Please try again." });
     }
 
-    // Record generation in Supabase
     const { error: insertErr } = await supabase
       .from("ai_generations")
       .insert({ user_id: userId, used_own_key: usingOwnKey });
-
     if (insertErr) console.error("[AI] Failed to record generation:", insertErr);
 
-    res.json({ csv });
+    return res.json({ csv });
   } catch (err) {
     console.error("[AI] Generation error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
-};
+}

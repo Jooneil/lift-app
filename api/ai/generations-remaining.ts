@@ -1,10 +1,9 @@
-// Vercel Serverless Function: GET /api/ai/generations-remaining
-const { createClient } = require("@supabase/supabase-js");
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { createClient } from "@supabase/supabase-js";
 
 const AI_FREE_LIMIT = 3;
 
-module.exports = async function handler(req, res) {
-  // CORS
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -12,16 +11,14 @@ module.exports = async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    // Auth: verify Supabase JWT
     const auth = req.headers["authorization"] || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    const token = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : "";
     if (!token) return res.status(401).json({ error: "Not logged in" });
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
     if (!supabaseUrl || !supabaseAnon) return res.status(500).json({ error: "Server missing Supabase config" });
 
-    // Verify the user token
     const userRes = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnon },
     });
@@ -30,7 +27,7 @@ module.exports = async function handler(req, res) {
     const userId = user?.id;
     if (!userId) return res.status(401).json({ error: "Invalid user" });
 
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnon);
 
     const { count, error } = await supabase
@@ -42,9 +39,9 @@ module.exports = async function handler(req, res) {
     if (error) console.error("Count error:", error);
     const used = count || 0;
 
-    res.json({ used, limit: AI_FREE_LIMIT, remaining: Math.max(0, AI_FREE_LIMIT - used) });
+    return res.json({ used, limit: AI_FREE_LIMIT, remaining: Math.max(0, AI_FREE_LIMIT - used) });
   } catch (err) {
     console.error("Generations remaining error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
-};
+}
