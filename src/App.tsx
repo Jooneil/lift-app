@@ -66,6 +66,12 @@ type SearchSource = "all" | "defaults" | "home_made";
 
 const SET_COUNT_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
+const MUSCLE_GROUPS = [
+  'Quads','Hamstrings','Glutes','Calves','Chest','Front Delt',
+  'Side Delt','Rear Delt','Lats','Upper Back','Traps',
+  'Bicep','Tricep','Abs','Lower Back','Forearm',
+] as const;
+
 const uuid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -373,6 +379,112 @@ async function exportPlanCSV(plan: Plan, catalogByName?: Map<string, CatalogExer
   } catch { /* ignore */ }
   const csv = planToCSV(plan, catalogByName, notes);
   downloadCSV(`${plan.name || 'plan'}.csv`, csv);
+}
+
+function generateExerciseCatalogCSV(exercises: CatalogExercise[]): string {
+  const header = ['exerciseName','primaryMuscle','equipment','isCompound','secondaryMuscles','isCustom'];
+  const rows: string[] = [header.join(',')];
+  const sorted = [...exercises].sort((a, b) => a.name.localeCompare(b.name));
+  for (const ex of sorted) {
+    const equipment = ex.machine ? 'machine' : ex.freeWeight ? 'free_weight' : ex.cable ? 'cable' : ex.bodyWeight ? 'body_weight' : '';
+    rows.push([
+      csvEscape(ex.name),
+      csvEscape(ex.primaryMuscle),
+      csvEscape(equipment),
+      csvEscape(ex.isCompound ? 'true' : 'false'),
+      csvEscape(ex.secondaryMuscles?.join(';') || ''),
+      csvEscape(ex.isCustom ? 'true' : 'false'),
+    ].join(','));
+  }
+  return rows.join('\n');
+}
+
+function generateAIPrompt(prefs: {
+  experience: string;
+  beginnerRandom: boolean;
+  daysPerWeek: number;
+  sessionMinutes: string;
+  injuries: string;
+  priorityMuscles: string[];
+  deprioritizedMuscles: string[];
+  knowsMyoReps: boolean;
+}, exercises: CatalogExercise[]): string {
+  // Build exercise summary grouped by muscle
+  const byMuscle = new Map<string, string[]>();
+  for (const ex of exercises) {
+    const m = ex.primaryMuscle || 'Other';
+    if (!byMuscle.has(m)) byMuscle.set(m, []);
+    byMuscle.get(m)!.push(ex.name);
+  }
+  const exerciseSummary = Array.from(byMuscle.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([muscle, names]) => `${muscle}: ${names.join(', ')}`)
+    .join('\n');
+
+  const isBeginnerRandom = prefs.experience === 'beginner' && prefs.beginnerRandom;
+
+  let prefsSection = `- Experience level: ${prefs.experience}
+- Training days per week: ${prefs.daysPerWeek}
+- Session duration: ${prefs.sessionMinutes} minutes`;
+
+  if (isBeginnerRandom) {
+    prefsSection += `\n- The user is a beginner who wants a simple, well-rounded starter program. Keep it straightforward with basic compound movements and simple progression.`;
+  } else {
+    if (prefs.injuries.trim()) prefsSection += `\n- Injuries/limitations: ${prefs.injuries.trim()}`;
+    if (prefs.priorityMuscles.length) prefsSection += `\n- Muscles to PRIORITIZE (add extra volume): ${prefs.priorityMuscles.join(', ')}`;
+    if (prefs.deprioritizedMuscles.length) prefsSection += `\n- Muscles to DE-PRIORITIZE (reduce volume): ${prefs.deprioritizedMuscles.join(', ')}`;
+  }
+
+  if (prefs.knowsMyoReps) {
+    prefsSection += `\n- The user is familiar with myo-rep sets. You may include them where appropriate for isolation exercises (set the myoReps column to "true").`;
+  } else {
+    prefsSection += `\n- Do NOT use myo-rep sets (leave the myoReps column empty for all exercises).`;
+  }
+
+  return `You are an expert strength training program designer. Create a training program based on the preferences below and output it as a CSV that can be directly imported into a workout tracking app.
+
+## User Preferences
+${prefsSection}
+
+## Output Format — CSV (13 columns, this exact order)
+planName,weekName,dayName,exerciseName,targetSets,targetReps,myoReps,note,isCustom,primaryMuscle,equipment,isCompound,secondaryMuscles
+
+### Column Definitions
+- planName: A name for the program (e.g., "Upper/Lower 4-Day", "PPL Hypertrophy"). Use the same name for every row.
+- weekName: Week label (e.g., "Week 1", "Week 2"). Create at least 1 week; up to 4 for periodization.
+- dayName: Day label (e.g., "Push", "Pull", "Upper A", "Lower B", "Full Body").
+- exerciseName: The exercise name — MUST exactly match one from the exercise list below.
+- targetSets: Number of working sets (integer, typically 2–5).
+- targetReps: Rep range as text (e.g., "6-8", "8-12", "12-15").
+- myoReps: Set to "true" ONLY if this should be a myo-rep set. Otherwise leave empty.
+- note: Optional short coaching cue (e.g., "pause at bottom", "control the negative"). Can be left empty.
+- isCustom: "false" for all catalog exercises. Only "true" for user-created exercises.
+- primaryMuscle: The primary muscle group (must match the exercise list).
+- equipment: One of: machine, free_weight, cable, body_weight
+- isCompound: "true" or "false" (must match the exercise list).
+- secondaryMuscles: Semicolon-separated (e.g., "Tricep;Front Delt"). Must match the exercise list.
+
+## Rules
+1. ONLY use exercises from the "Available Exercises" list below. Do not invent exercises.
+2. Every field that contains commas or quotes must be wrapped in double quotes with internal quotes escaped as "".
+3. Output ONLY the raw CSV text. No markdown code fences, no explanation, no commentary before or after.
+4. The first row must be the header row exactly as shown above.
+5. Design an appropriate training split for ${prefs.daysPerWeek} day(s) per week:
+   - 2-3 days → Full Body
+   - 4 days → Upper/Lower or Push/Pull
+   - 5-6 days → Push/Pull/Legs or similar
+   - Adjust as appropriate for the user's experience level.
+6. Total working sets per session should fit within ~${prefs.sessionMinutes} minutes (roughly 1 set per 2-3 minutes including rest).
+7. Order exercises: compound movements first, then isolation.
+8. For the exerciseName, primaryMuscle, equipment, isCompound, and secondaryMuscles columns, copy the values exactly as they appear in the exercise list.
+9. Ensure balanced programming — don't neglect any major muscle group unless the user specifically asked to de-prioritize it.
+
+## Available Exercises
+${exerciseSummary}
+
+The full exercise catalog with all metadata columns is provided as a separate CSV attachment. Use the exerciseName values EXACTLY as they appear in that list.
+
+OUTPUT ONLY THE RAW CSV BELOW THIS LINE:`;
 }
 
 // Fix common mojibake (UTF‑8 shown as Windows‑1252/Latin‑1) when reading data.
@@ -4287,6 +4399,202 @@ function calculateWeekSetsPerMuscle(
   return calculateSetsPerMuscle(allItems, catalogExercises);
 }
 
+function AIProgramBuilder({ catalogExercises, onClose }: { catalogExercises: CatalogExercise[]; onClose: () => void }) {
+  const [step, setStep] = useState<'form' | 'result'>('form');
+  const [experience, setExperience] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
+  const [beginnerRandom, setBeginnerRandom] = useState(false);
+  const [daysPerWeek, setDaysPerWeek] = useState(4);
+  const [sessionMinutes, setSessionMinutes] = useState('60');
+  const [injuries, setInjuries] = useState('');
+  const [priorityMuscles, setPriorityMuscles] = useState<string[]>([]);
+  const [deprioritizedMuscles, setDeprioritizedMuscles] = useState<string[]>([]);
+  const [knowsMyoReps, setKnowsMyoReps] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const togglePriority = (m: string) => {
+    setPriorityMuscles(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+    setDeprioritizedMuscles(prev => prev.filter(x => x !== m));
+  };
+  const toggleDepriority = (m: string) => {
+    setDeprioritizedMuscles(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+    setPriorityMuscles(prev => prev.filter(x => x !== m));
+  };
+
+  const promptText = useMemo(() => generateAIPrompt(
+    { experience, beginnerRandom, daysPerWeek, sessionMinutes, injuries, priorityMuscles, deprioritizedMuscles, knowsMyoReps },
+    catalogExercises
+  ), [experience, beginnerRandom, daysPerWeek, sessionMinutes, injuries, priorityMuscles, deprioritizedMuscles, knowsMyoReps, catalogExercises]);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(promptText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback: select the textarea
+      const ta = document.querySelector<HTMLTextAreaElement>('[data-prompt-output]');
+      if (ta) { ta.select(); document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    }
+  };
+
+  const handleDownloadCatalog = () => {
+    const csv = generateExerciseCatalogCSV(catalogExercises);
+    downloadCSV('exercise_catalog.csv', csv);
+  };
+
+  const showDetails = !(experience === 'beginner' && beginnerRandom);
+
+  const pillStyle = (active: boolean): React.CSSProperties => ({
+    ...FILTER_TOGGLE_STYLE,
+    cursor: 'pointer',
+    background: active ? 'var(--accent-muted)' : 'var(--bg-elevated)',
+    borderColor: active ? 'var(--border-strong)' : 'var(--border-subtle)',
+    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+  });
+
+  return (
+    <div style={{ ...MODAL_OVERLAY_STYLE, zIndex: 35 }}>
+      <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 540, width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 18 }}>AI Program Builder</h3>
+          <button onClick={onClose} style={BTN_STYLE}>Close</button>
+        </div>
+
+        {step === 'form' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* Experience */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Experience Level</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => (
+                  <button key={lvl} onClick={() => { setExperience(lvl); if (lvl !== 'beginner') setBeginnerRandom(false); }} style={pillStyle(experience === lvl)}>
+                    {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Beginner: random or personalized */}
+            {experience === 'beginner' && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Plan Type</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <button onClick={() => setBeginnerRandom(false)} style={pillStyle(!beginnerRandom)}>Personalized Plan</button>
+                  <button onClick={() => setBeginnerRandom(true)} style={pillStyle(beginnerRandom)}>Random Starter Plan</button>
+                </div>
+              </div>
+            )}
+
+            {/* Days per week */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Days Per Week</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[1,2,3,4,5,6,7].map(d => (
+                  <button key={d} onClick={() => setDaysPerWeek(d)} style={{ ...pillStyle(daysPerWeek === d), minWidth: 36, justifyContent: 'center' }}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Session duration */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Session Duration</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {['30','45','60','75','90+'].map(t => (
+                  <button key={t} onClick={() => setSessionMinutes(t)} style={pillStyle(sessionMinutes === t)}>
+                    {t} min
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Detailed options (hidden for beginner random) */}
+            {showDetails && (
+              <>
+                {/* Injuries */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Injuries or Limitations (optional)</div>
+                  <textarea
+                    value={injuries}
+                    onChange={e => setInjuries(e.target.value)}
+                    placeholder="e.g., bad left shoulder, lower back issues"
+                    style={{ ...INPUT_STYLE, width: '100%', minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {/* Priority muscles */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Muscles to Prioritize</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {MUSCLE_GROUPS.map(m => (
+                      <button key={m} onClick={() => togglePriority(m)} style={pillStyle(priorityMuscles.includes(m))}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* De-priority muscles */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Muscles to De-prioritize</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {MUSCLE_GROUPS.map(m => (
+                      <button key={m} onClick={() => toggleDepriority(m)} style={pillStyle(deprioritizedMuscles.includes(m))}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Myo reps */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Do you know what myo-rep sets are?</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setKnowsMyoReps(true)} style={pillStyle(knowsMyoReps)}>Yes</button>
+                    <button onClick={() => setKnowsMyoReps(false)} style={pillStyle(!knowsMyoReps)}>No</button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Generate */}
+            <button onClick={() => setStep('result')} style={{ ...PRIMARY_BTN_STYLE, width: '100%', textAlign: 'center' }} disabled={catalogExercises.length === 0}>
+              {catalogExercises.length === 0 ? 'Loading exercises...' : 'Generate AI Prompt'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              Copy the prompt below and paste it into ChatGPT, Claude, or any AI. Then attach the exercise list CSV for best results. The AI will output a CSV you can import with "Import Plan (CSV)".
+            </div>
+
+            <textarea
+              data-prompt-output=""
+              readOnly
+              value={promptText}
+              style={{ ...INPUT_STYLE, width: '100%', minHeight: 200, resize: 'vertical', fontFamily: 'monospace', fontSize: 11, boxSizing: 'border-box' }}
+            />
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button onClick={handleCopy} style={{ ...PRIMARY_BTN_STYLE, flex: 1, textAlign: 'center', minWidth: 140 }}>
+                {copied ? 'Copied!' : 'Copy Prompt'}
+              </button>
+              <button onClick={handleDownloadCatalog} style={{ ...BTN_STYLE, flex: 1, textAlign: 'center', minWidth: 140 }}>
+                Download Exercise List
+              </button>
+            </div>
+
+            <button onClick={() => setStep('form')} style={{ ...SMALL_BTN_STYLE, alignSelf: 'flex-start' }}>
+              ← Back to Options
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BuilderPage({
   plans,
   setPlans,
@@ -4337,6 +4645,7 @@ function BuilderPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manageTab, setManageTab] = useState<"plans" | "templates">("plans");
+  const [showAIProgramBuilder, setShowAIProgramBuilder] = useState(false);
   const [templates, setTemplates] = useState<Plan[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -5784,7 +6093,8 @@ function BuilderPage({
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {manageTab === 'plans' && (
                   <>
-                    <button onClick={handleClickImportPlan} style={SMALL_BTN_STYLE}>Import Plan (CSV)</button>
+                    <button onClick={() => setShowAIProgramBuilder(true)} style={SMALL_BTN_STYLE}>AI Program Builder</button>
+                    <button onClick={handleClickImportPlan} style={SMALL_BTN_STYLE}>Import (CSV)</button>
                     <input ref={importInputRef} type="file" accept=".csv" onChange={handleImportPlanFile} style={{ display: 'none' }} />
                   </>
                 )}
@@ -5887,6 +6197,10 @@ function BuilderPage({
             )}
           </div>
         </div>
+      )}
+
+      {showAIProgramBuilder && (
+        <AIProgramBuilder catalogExercises={catalogExercises} onClose={() => setShowAIProgramBuilder(false)} />
       )}
 
       {searchOpen && (
