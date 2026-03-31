@@ -592,10 +592,16 @@ export default function App() {
     };
 
     // ── Touch handlers ──
+    let startX = 0;
+    let decided = false;   // true once we've committed to pull-to-refresh or rejected it
+    const ACTIVATE_Y = 15; // min vertical px before we decide this is a pull gesture
+
     const onStart = (e: TouchEvent) => {
       if (triggered) return;
       startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
       active = false;
+      decided = false;
       progress = 0;
       wasReady = false;
     };
@@ -603,12 +609,22 @@ export default function App() {
     const onMove = (e: TouchEvent) => {
       if (triggered) return;
       const dy = e.touches[0].clientY - startY;
+      const dx = e.touches[0].clientX - startX;
 
       // Decide once: is this a pull-to-refresh?
       if (!active) {
-        if (dy > 0 && atTop()) {
+        if (decided) return; // already rejected this gesture
+        // Wait until the finger has moved enough to decide direction
+        if (Math.abs(dy) < ACTIVATE_Y && Math.abs(dx) < ACTIVATE_Y) return;
+        // Must be mostly vertical (downward), page at top, and not inside a scrollable sub-container
+        const isVertical = Math.abs(dy) > Math.abs(dx) * 1.5;
+        if (dy > 0 && isVertical && atTop()) {
+          // Check the touch didn't start inside a scrollable child (modals, menus, etc.)
+          const target = e.target as HTMLElement | null;
+          if (target?.closest?.('[data-no-ptr]')) { decided = true; return; }
           active = true;
         } else {
+          decided = true; // not a pull-to-refresh — ignore rest of this gesture
           return;
         }
       }
