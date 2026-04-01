@@ -87,7 +87,7 @@ const exerciseKey = (entry: { exerciseId?: string; exerciseName?: string | null 
 
 const BTN_STYLE = {
   padding: "10px 14px",
-  borderRadius: 10,
+  borderRadius: 12,
   border: "1px solid var(--border-default)",
   background: "var(--bg-card)",
   color: "var(--text-primary)",
@@ -98,7 +98,7 @@ const BTN_STYLE = {
 
 const PRIMARY_BTN_STYLE = {
   padding: "12px 16px",
-  borderRadius: 10,
+  borderRadius: 12,
   border: "1px solid rgba(255, 255, 255, 0.2)",
   background: "linear-gradient(180deg, #f0f0f2 0%, #d8d8e0 100%)",
   color: "#0a0a0c",
@@ -114,21 +114,26 @@ const SMALL_BTN_STYLE = {
   border: "1px solid var(--border-subtle)",
   background: "var(--bg-elevated)",
   color: "var(--text-secondary)",
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 500,
   letterSpacing: "-0.005em",
   transition: "all var(--transition-fast)",
 } as const;
 
+const XS_BTN_STYLE = {
+  ...SMALL_BTN_STYLE,
+  padding: "4px 8px",
+} as const;
+
 const FILTER_TOGGLE_STYLE = {
   display: "inline-flex",
   alignItems: "center",
-  gap: 6,
+  gap: 8,
   padding: "8px 12px",
   borderRadius: 999,
   border: "1px solid var(--border-subtle)",
   background: "var(--bg-elevated)",
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 500,
   letterSpacing: "-0.005em",
   transition: "all var(--transition-fast)",
@@ -137,7 +142,7 @@ const FILTER_TOGGLE_STYLE = {
 const CARD_STYLE = {
   background: "var(--bg-card)",
   border: "1px solid var(--border-subtle)",
-  borderRadius: 14,
+  borderRadius: 12,
   padding: 16,
   boxShadow: "var(--shadow-card)",
 } as const;
@@ -167,7 +172,7 @@ const MODAL_CONTENT_STYLE = {
 
 const INPUT_STYLE = {
   padding: "10px 12px",
-  borderRadius: 10,
+  borderRadius: 12,
   border: "1px solid var(--border-default)",
   background: "var(--bg-input)",
   color: "var(--text-primary)",
@@ -919,7 +924,7 @@ export default function App() {
   return (
     <div>
       {checking ? (
-        <div style={{ padding: 20 }}>Loading...</div>
+        <div style={{ padding: 24 }}>Loading...</div>
       ) : forcePasswordReset ? (
         <Auth
           onAuthed={setUser}
@@ -1959,7 +1964,7 @@ function AuthedApp({
   })();
   
   return (
-    <div style={{ maxWidth: 680, width: "100%", margin: "0 auto", padding: 20 }}>
+    <div style={{ maxWidth: 680, width: "100%", margin: "0 auto", padding: 24 }}>
       <div style={{
         display: "flex",
         justifyContent: "space-between",
@@ -2026,7 +2031,7 @@ function AuthedApp({
               zIndex: 30,
               boxShadow: 'var(--shadow-lg)'
             }}>
-              <div style={{ padding: '4px 8px', color: 'var(--text-muted)', fontSize: 12, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logged in as</div>
+              <div style={{ padding: '4px 8px', color: 'var(--text-muted)', fontSize: 13, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logged in as</div>
               <div
                 style={{ padding: '4px 8px 12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220, color: 'var(--text-primary)' }}
                 title={user.username}
@@ -2096,9 +2101,9 @@ function AuthedApp({
 
       {mode === "workout" && (
         <div style={CARD_STYLE}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Plan:</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 15 }}>Plan:</label>
               <select
                 value={selectedPlanId ?? ''}
                 onChange={(e) => {
@@ -2142,8 +2147,8 @@ function AuthedApp({
             </div>
 
             {selectedPlan && (
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Week:</label>
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 15 }}>Week:</label>
                 <select
                   value={selectedWeekId ?? ''}
                   onChange={(e) => {
@@ -2163,7 +2168,7 @@ function AuthedApp({
                   ))}
                 </select>
 
-                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 14 }}>Day:</label>
+                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 15 }}>Day:</label>
                 <select
                   value={selectedDayId ?? ''}
                   onChange={(e) => {
@@ -2255,31 +2260,31 @@ function AuthedApp({
             </div>
             {archivedError && <div style={{ color: 'var(--error)', padding: '8px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{archivedError}</div>}
             {archivedLoading ? (
-              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading archived plans...</div>
+              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Loading archived plans...</div>
             ) : archivedPlans.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>No archived plans yet.</div>
+              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No archived plans yet.</div>
             ) : (
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {archivedPlans.map((plan) => (
                     <div
                       key={plan.id}
                       style={{
                         background: viewArchivedPlan?.id === plan.id ? 'var(--accent-muted)' : 'var(--bg-card)',
                         border: `1px solid ${viewArchivedPlan?.id === plan.id ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
-                        borderRadius: 10,
+                        borderRadius: 12,
                         padding: 12,
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: 10,
+                        gap: 12,
                         transition: 'all 0.15s ease',
                       }}
                     >
                       <button onClick={() => openArchivedPlan(plan)} style={{ ...BTN_STYLE, flex: 1, textAlign: 'left' }}>
                         {plan.name}
                       </button>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => handleDeleteArchivedPlan(plan)} style={SMALL_BTN_STYLE}>Delete</button>
                         <button onClick={() => exportPlanCSV(plan, buildCatalogByName(searchCatalogExercises))} style={SMALL_BTN_STYLE}>Export</button>
                       </div>
@@ -2297,9 +2302,9 @@ function AuthedApp({
                   overflowY: 'auto'
                 }}>
                   {!viewArchivedPlan ? (
-                    <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Select an archived plan to view details.</div>
+                    <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Select an archived plan to view details.</div>
                   ) : viewArchivedLoading ? (
-                    <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading sessions...</div>
+                    <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Loading sessions...</div>
                   ) : (
                     <div>
                       <h3 style={{ marginTop: 0 }}>{viewArchivedPlan.name}</h3>
@@ -2331,11 +2336,11 @@ function AuthedApp({
                                           <div key={item.id} style={{
                                             background: 'var(--bg-elevated)',
                                             border: '1px solid var(--border-subtle)',
-                                            borderRadius: 10,
+                                            borderRadius: 12,
                                             padding: 12
                                           }}>
-                                            <div style={{ fontWeight: 600, fontSize: 14 }}>{item.exerciseName}</div>
-                                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                                            <div style={{ fontWeight: 600, fontSize: 15 }}>{item.exerciseName}</div>
+                                            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
                                               Target: {item.targetSets} set{item.targetSets === 1 ? '' : 's'}
                                               {item.targetReps ? ` - ${item.targetReps}` : ''}
                                             </div>
@@ -2388,7 +2393,7 @@ function AuthedApp({
       {showStreakSettings && (
         <div style={MODAL_OVERLAY_STYLE}>
           <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 420 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h3 style={{ margin: 0, fontSize: 18 }}>Streak Settings</h3>
               <button onClick={() => setShowStreakSettings(false)} style={BTN_STYLE}>Close</button>
             </div>
@@ -2400,16 +2405,16 @@ function AuthedApp({
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 12,
                 padding: 16,
-                marginBottom: 20,
+                marginBottom: 24,
                 textAlign: 'center'
               }}>
                 <div style={{ fontSize: 48, marginBottom: 8 }}>🔥</div>
-                <div style={{ fontSize: 32, fontWeight: 700 }}>{currentStreak}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+                <div style={{ fontSize: 28, fontWeight: 700 }}>{currentStreak}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 15 }}>
                   {currentStreak === 1 ? 'day streak' : 'day streak'}
                 </div>
                 {streakState?.longestStreak != null && streakState.longestStreak > 0 && (
-                  <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 8 }}>
                     Longest: {streakState.longestStreak} days
                   </div>
                 )}
@@ -2515,7 +2520,7 @@ function AuthedApp({
                             setStreakConfig(updated);
                             upsertUserPrefs({ streak_config: updated });
                           }}
-                          style={{ width: '100%', padding: '10px 12px' }}
+                          style={{ ...INPUT_STYLE, width: '100%' }}
                         />
                       </div>
                       <div style={{ flex: 1 }}>
@@ -2531,7 +2536,7 @@ function AuthedApp({
                             setStreakConfig(updated);
                             upsertUserPrefs({ streak_config: updated });
                           }}
-                          style={{ width: '100%', padding: '10px 12px' }}
+                          style={{ ...INPUT_STYLE, width: '100%' }}
                         />
                       </div>
                     </div>
@@ -2545,7 +2550,7 @@ function AuthedApp({
                 {streakConfig.scheduleMode === 'weekly' && (
                   <div style={{ marginTop: 16 }}>
                     <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>Workout Days</label>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, idx) => {
                         const selected = streakConfig.weeklyDays?.includes(idx) ?? false;
                         return (
@@ -2604,13 +2609,13 @@ function AuthedApp({
       {showPlanSettings && selectedPlan && (
         <div style={MODAL_OVERLAY_STYLE}>
           <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 360 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h3 style={{ margin: 0, fontSize: 18 }}>Plan Settings</h3>
               <button onClick={() => setShowPlanSettings(false)} style={BTN_STYLE}>Close</button>
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: 'var(--text-secondary)', fontSize: 14 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: 'var(--text-secondary)', fontSize: 15 }}>
                 Plan Type
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -2637,7 +2642,7 @@ function AuthedApp({
                   Full Body
                 </button>
               </div>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
                 {(selectedPlan.ghostMode ?? 'default') === 'default'
                   ? 'Ghost shows your most recent performance regardless of day.'
                   : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
@@ -2665,8 +2670,8 @@ function AuthedApp({
         <div style={MODAL_OVERLAY_STYLE}>
           <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 360, textAlign: 'center' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 20 }}>Plan Complete!</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Plan Complete!</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
               Great work finishing your plan. Would you like to update your streak schedule?
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -3674,19 +3679,19 @@ function WorkoutPage({
         <div key={entry.id} style={{
           background: 'var(--bg-elevated)',
           border: editingEntryId === entry.id ? '1px solid var(--accent)' : '1px solid var(--border-default)',
-          borderRadius: 14,
+          borderRadius: 12,
           padding: 16,
-          marginBottom: 14,
+          marginBottom: 12,
           boxShadow: 'var(--shadow-card)',
           transition: 'all 0.15s ease',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
                   {entry.exerciseName}
                   {entry.myoRepMatch && (
-                    <span style={{ marginLeft: 8, fontSize: 11, color: '#a78bfa', fontWeight: 500 }}>MYO</span>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent-purple)', fontWeight: 500 }}>MYO</span>
                   )}
                 </h3>
                 {(() => {
@@ -3717,7 +3722,7 @@ function WorkoutPage({
                     left: 0,
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border-default)',
-                    borderRadius: 10,
+                    borderRadius: 12,
                     padding: 8,
                     marginTop: 4,
                     minWidth: 160,
@@ -3752,9 +3757,9 @@ function WorkoutPage({
                         ...SMALL_BTN_STYLE,
                         width: '100%',
                         textAlign: 'left',
-                        background: entry.myoRepMatch ? 'rgba(167, 139, 250, 0.15)' : 'var(--bg-card)',
-                        borderColor: entry.myoRepMatch ? '#a78bfa' : 'var(--border-subtle)',
-                        color: entry.myoRepMatch ? '#a78bfa' : 'var(--text-primary)',
+                        background: entry.myoRepMatch ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
+                        borderColor: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--border-subtle)',
+                        color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-primary)',
                       }}
                     >
                       Myo-Rep Match {entry.myoRepMatch ? '✓' : ''}
@@ -3763,7 +3768,7 @@ function WorkoutPage({
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => {
                   if (openInstructions[entry.id]) {
@@ -3877,11 +3882,11 @@ function WorkoutPage({
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: '50px 1fr 1fr 36px',
-                  gap: 10,
-                  marginBottom: 10,
+                  gap: 12,
+                  marginBottom: 12,
                   padding: '0 4px',
                   color: 'var(--text-muted)',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 600,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
@@ -3897,10 +3902,10 @@ function WorkoutPage({
                   <div key={set.id} style={{
                     display: 'grid',
                     gridTemplateColumns: '50px 1fr 1fr 36px',
-                    gap: 10,
-                    marginBottom: 10,
+                    gap: 12,
+                    marginBottom: 12,
                     padding: '4px',
-                    borderRadius: 10,
+                    borderRadius: 12,
                     background: (set.weight != null || set.reps != null) ? 'var(--accent-subtle)' : 'transparent',
                   }}>
                     <div style={{
@@ -3908,18 +3913,18 @@ function WorkoutPage({
                       textAlign: 'center',
                       fontWeight: 600,
                       color: 'var(--text-secondary)',
-                      fontSize: 14,
+                      fontSize: 15,
                     }}>{i + 1}</div>
                     <div style={{
                       alignSelf: 'center',
                       textAlign: 'center',
-                      fontSize: 14,
+                      fontSize: 15,
                       color: set.weight != null ? 'var(--text-primary)' : 'var(--text-muted)',
                     }}>{set.weight ?? '—'}</div>
                     <div style={{
                       alignSelf: 'center',
                       textAlign: 'center',
-                      fontSize: 14,
+                      fontSize: 15,
                       color: set.reps != null ? 'var(--text-primary)' : 'var(--text-muted)',
                     }}>{set.reps ?? '—'}</div>
                     <button
@@ -3930,7 +3935,7 @@ function WorkoutPage({
                         minWidth: 0,
                         color: 'var(--error)',
                         borderColor: 'var(--error)',
-                        fontSize: 14,
+                        fontSize: 15,
                       }}
                       title="Remove set"
                     >
@@ -3956,11 +3961,11 @@ function WorkoutPage({
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: '50px 1fr 1fr',
-                  gap: 10,
-                  marginBottom: 10,
+                  gap: 12,
+                  marginBottom: 12,
                   padding: '0 4px',
                   color: 'var(--text-muted)',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 600,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
@@ -3968,7 +3973,7 @@ function WorkoutPage({
                 }}>
                   <div>Set</div>
                   <div>Weight</div>
-                  <div style={{ color: entry.myoRepMatch ? '#a78bfa' : 'var(--text-muted)' }}>
+                  <div style={{ color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-muted)' }}>
                     {entry.myoRepMatch ? 'Match' : 'Reps'}
                   </div>
                 </div>
@@ -3980,10 +3985,10 @@ function WorkoutPage({
                     <div key={set.id} style={{
                       display: 'grid',
                       gridTemplateColumns: '50px 1fr 1fr',
-                      gap: 10,
-                      marginBottom: 10,
+                      gap: 12,
+                      marginBottom: 12,
                       padding: '4px',
-                      borderRadius: 10,
+                      borderRadius: 12,
                       background: hasValue ? 'var(--accent-subtle)' : 'transparent',
                       transition: 'background 0.15s ease',
                     }}>
@@ -3992,7 +3997,7 @@ function WorkoutPage({
                         textAlign: 'center',
                         fontWeight: 600,
                         color: 'var(--text-secondary)',
-                        fontSize: 14,
+                        fontSize: 15,
                       }}>{i + 1}</div>
                       <input
                         type="number"
@@ -4069,10 +4074,10 @@ function WorkoutPage({
         <label style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
+          gap: 12,
           cursor: 'pointer',
           padding: '8px 12px',
-          borderRadius: 10,
+          borderRadius: 12,
           background: completed ? 'var(--success-muted)' : 'transparent',
           border: `1px solid ${completed ? 'var(--success)' : 'var(--border-subtle)'}`,
           transition: 'all 0.15s ease',
@@ -4091,7 +4096,7 @@ function WorkoutPage({
           </span>
         </label>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {isLastDay && onFinishPlan && (
             <button onClick={onFinishPlan} style={PRIMARY_BTN_STYLE} disabled={finishingPlan}>
               {finishingPlan ? 'Finishing...' : 'Finish & Archive'}
@@ -4116,7 +4121,7 @@ function WorkoutPage({
               <button onClick={closeReplaceSearch} style={BTN_STYLE}>Cancel</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
               <input
                 value={replaceSearchText}
                 onChange={(e) => setReplaceSearchText(e.target.value)}
@@ -4208,18 +4213,18 @@ function WorkoutPage({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: 10, padding: 12 }}>
+              <div style={{ border: '1px solid var(--border-default)', borderRadius: 12, padding: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontWeight: 600 }}>Results</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{replaceFilteredCatalog.length} found</div>
                 </div>
                   <button
                     onClick={() => {
                       setReplaceAddMovementOpen((prev) => !prev);
                       setReplaceAddMovementError(null);
                     }}
-                    style={{ ...SMALL_BTN_STYLE, fontSize: 12, padding: '4px 8px' }}
+                    style={{ ...XS_BTN_STYLE }}
                   >
                     Can't find it? Create one!
                   </button>
@@ -4230,20 +4235,20 @@ function WorkoutPage({
                       value={replaceAddMovementName}
                       onChange={(e) => setReplaceAddMovementName(e.target.value)}
                       placeholder="Movement name"
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
+                      style={INPUT_STYLE}
                     />
                     <select
                       value={replaceAddMovementPrimary}
                       onChange={(e) => setReplaceAddMovementPrimary(e.target.value)}
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
+                      style={SELECT_STYLE}
                     >
                       <option value="">Primary muscle</option>
                       {replacePrimaryMuscles.map((m) => (
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4252,7 +4257,7 @@ function WorkoutPage({
                         />
                         Machine
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4261,7 +4266,7 @@ function WorkoutPage({
                         />
                         Free weight
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4270,7 +4275,7 @@ function WorkoutPage({
                         />
                         Cable
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4280,7 +4285,7 @@ function WorkoutPage({
                         Bodyweight
                       </label>
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         type="checkbox"
                         checked={replaceAddMovementCompound}
@@ -4296,7 +4301,7 @@ function WorkoutPage({
                       <select
                         value={replaceAddMovementSecondary}
                         onChange={(e) => setReplaceAddMovementSecondary(e.target.value)}
-                        style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
+                        style={SELECT_STYLE}
                       >
                         <option value="">Secondary muscle</option>
                         {replacePrimaryMuscles
@@ -4307,7 +4312,7 @@ function WorkoutPage({
                       </select>
                     )}
                     {replaceAddMovementError && (
-                      <div style={{ color: 'var(--error)', fontSize: 12 }}>{replaceAddMovementError}</div>
+                      <div style={{ color: 'var(--error)', fontSize: 13 }}>{replaceAddMovementError}</div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                       <button
@@ -4332,15 +4337,15 @@ function WorkoutPage({
                     replaceFilteredCatalog.map((ex) => (
                       <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
+                          <div style={{ fontWeight: 600, fontSize: 15 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          <button onClick={() => addReplaceQueue(ex)} style={{ ...SMALL_BTN_STYLE, fontSize: 12, padding: '3px 8px' }}>Add</button>
+                        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                          <button onClick={() => addReplaceQueue(ex)} style={{ ...XS_BTN_STYLE }}>Add</button>
                           {ex.isCustom && (
-                            <button onClick={() => handleDeleteCustomFromReplace(ex)} style={{ ...SMALL_BTN_STYLE, fontSize: 12, padding: '3px 8px' }}>Del</button>
+                            <button onClick={() => handleDeleteCustomFromReplace(ex)} style={{ ...XS_BTN_STYLE }}>Del</button>
                           )}
                         </div>
                       </div>
@@ -4349,11 +4354,11 @@ function WorkoutPage({
                 </div>
               </div>
 
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: 10, padding: 10 }}>
+              <div style={{ border: '1px solid var(--border-default)', borderRadius: 12, padding: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>Queue:</div>
                   {replaceQueue.length === 0 ? (
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>None selected</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>None selected</div>
                   ) : (
                     replaceQueue.map((q) => (
                       <div key={q.name} style={{
@@ -4362,9 +4367,9 @@ function WorkoutPage({
                         gap: 4,
                         background: 'var(--accent-subtle)',
                         border: '1px solid var(--border-subtle)',
-                        borderRadius: 6,
+                        borderRadius: 8,
                         padding: '2px 6px',
-                        fontSize: 12,
+                        fontSize: 13,
                       }}>
                         <span>{q.name}</span>
                         <button
@@ -4375,18 +4380,18 @@ function WorkoutPage({
                     ))
                   )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                  <button onClick={closeReplaceSearch} style={{ ...BTN_STYLE, fontSize: 12, padding: '5px 10px' }}>Cancel</button>
-                  <button onClick={() => applyReplaceQueue("today")} style={{ ...PRIMARY_BTN_STYLE, fontSize: 12, padding: '5px 10px' }} disabled={replaceQueue.length === 0}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button onClick={closeReplaceSearch} style={{ ...BTN_STYLE, fontSize: 13, padding: '6px 10px' }}>Cancel</button>
+                  <button onClick={() => applyReplaceQueue("today")} style={{ ...PRIMARY_BTN_STYLE, fontSize: 13, padding: '6px 10px' }} disabled={replaceQueue.length === 0}>
                     Today Only
                   </button>
-                  <button onClick={() => applyReplaceQueue("remaining")} style={{ ...PRIMARY_BTN_STYLE, fontSize: 12, padding: '5px 10px' }} disabled={replaceQueue.length === 0}>
+                  <button onClick={() => applyReplaceQueue("remaining")} style={{ ...PRIMARY_BTN_STYLE, fontSize: 13, padding: '6px 10px' }} disabled={replaceQueue.length === 0}>
                     Rest of Meso
                   </button>
                 </div>
               </div>
             </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'left' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'left' }}>
               * = self made movement
             </div>
           </div>
@@ -4397,7 +4402,7 @@ function WorkoutPage({
         <div style={MODAL_OVERLAY_STYLE}>
           <div style={{ ...MODAL_CONTENT_STYLE, maxWidth: 320, textAlign: 'center' }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Myo-Rep Match</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 15, marginBottom: 24 }}>
               {myoScopeEntry.currentValue ? 'Turn off' : 'Turn on'} Myo-Rep Match for <strong>{myoScopeEntry.exerciseName}</strong>?
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -4412,9 +4417,9 @@ function WorkoutPage({
                 style={{
                   ...BTN_STYLE,
                   width: '100%',
-                  background: 'rgba(167, 139, 250, 0.15)',
-                  borderColor: '#a78bfa',
-                  color: '#a78bfa',
+                  background: 'var(--accent-purple-muted)',
+                  borderColor: 'var(--accent-purple)',
+                  color: 'var(--accent-purple)',
                 }}
               >
                 {plan.ghostMode === 'full-body' ? 'All ' + day.name + ' Days' : 'Entire Plan'}
@@ -4447,11 +4452,11 @@ function WorkoutPage({
             </div>
 
             {historyLoading ? (
-              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading history...</div>
+              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Loading history...</div>
             ) : historyError ? (
               <div style={{ color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{historyError}</div>
             ) : !historyPr && historyItems.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>No recorded sets yet.</div>
+              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No recorded sets yet.</div>
             ) : (
               <>
                 {historyPr && (
@@ -4465,13 +4470,13 @@ function WorkoutPage({
                     <div style={{
                       fontWeight: 600,
                       color: 'var(--success)',
-                      fontSize: 12,
+                      fontSize: 13,
                       marginBottom: 8,
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                     }}>Personal Best</div>
                     <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
-                      {historyPr.weight} <span style={{ color: 'var(--text-muted)', fontSize: 16, fontWeight: 400 }}>×</span> {historyPr.reps}
+                      {historyPr.weight} <span style={{ color: 'var(--text-muted)', fontSize: 15, fontWeight: 400 }}>×</span> {historyPr.reps}
                     </div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6 }}>{formatHistoryDate(historyPr.date)}</div>
                   </div>
@@ -4481,9 +4486,9 @@ function WorkoutPage({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                     <div style={{
                       fontWeight: 600,
-                      fontSize: 12,
+                      fontSize: 13,
                       color: 'var(--text-muted)',
-                      marginBottom: 10,
+                      marginBottom: 12,
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                     }}>Progression</div>
@@ -4648,7 +4653,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
         </div>
 
         {step === 'form' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Experience */}
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Experience Level</div>
@@ -4685,7 +4690,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
             {/* Days per week */}
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Days Per Week</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {[1,2,3,4,5,6,7].map(d => (
                   <button key={d} onClick={() => setDaysPerWeek(d)} style={{ ...pillStyle(daysPerWeek === d), minWidth: 36, justifyContent: 'center' }}>
                     {d}
@@ -4726,13 +4731,13 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
                 <div>
                   <button
                     onClick={() => setShowPrioMuscles(p => !p)}
-                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: priorityMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: priorityMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
                   >
-                    <span style={{ fontSize: 10, transition: 'transform 0.15s', transform: showPrioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                    <span style={{ fontSize: 11, transition: 'transform 0.15s', transform: showPrioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
                     Muscles to Prioritize{priorityMuscles.length > 0 && ` (${priorityMuscles.length})`}
                   </button>
                   {showPrioMuscles && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                       {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
                         <button key={m} onClick={() => togglePriority(m)} style={pillStyle(priorityMuscles.includes(m))}>
                           {m}
@@ -4746,13 +4751,13 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
                 <div>
                   <button
                     onClick={() => setShowDeprioMuscles(p => !p)}
-                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: deprioritizedMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: deprioritizedMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
                   >
-                    <span style={{ fontSize: 10, transition: 'transform 0.15s', transform: showDeprioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                    <span style={{ fontSize: 11, transition: 'transform 0.15s', transform: showDeprioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
                     Muscles to De-prioritize{deprioritizedMuscles.length > 0 && ` (${deprioritizedMuscles.length})`}
                   </button>
                   {showDeprioMuscles && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                       {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
                         <button key={m} onClick={() => toggleDepriority(m)} style={pillStyle(deprioritizedMuscles.includes(m))}>
                           {m}
@@ -4775,7 +4780,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
 
             {/* Error message */}
             {genError && (
-              <div style={{ fontSize: 12, color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', border: '1px solid var(--error)', borderRadius: 10 }}>
+              <div style={{ fontSize: 13, color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', border: '1px solid var(--error)', borderRadius: 12 }}>
                 {genError}
               </div>
             )}
@@ -4791,7 +4796,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
                   value={userApiKey}
                   onChange={e => saveApiKey(e.target.value)}
                   placeholder="sk-ant-..."
-                  style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: 12 }}
+                  style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: 13 }}
                 />
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                   Get a key at console.anthropic.com. Stored locally in your browser only.
@@ -4813,7 +4818,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
             )}
 
             {/* Disclaimer */}
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
               Disclaimer: Programs generated by AI are not reviewed by a certified trainer. Neither the AI, this app, nor its creator are liable for any injuries resulting from following a generated program. Consult a medical professional before starting any exercise program, especially if you have existing injuries or health conditions.
             </div>
 
@@ -4833,11 +4838,11 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
         ) : step === 'generating' ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '40px 0' }}>
             <div style={{ width: 40, height: 40, border: '3px solid var(--border-subtle)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'ptr-spin 0.8s linear infinite' }} />
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Generating your program...</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>This usually takes 15-30 seconds</div>
+            <div style={{ fontSize: 15, color: 'var(--text-secondary)' }}>Generating your program...</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>This usually takes 15-30 seconds</div>
           </div>
         ) : step === 'manual' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               <strong style={{ color: 'var(--text-primary)' }}>How to use:</strong><br/>
               1. Copy the prompt below<br/>
@@ -6003,14 +6008,14 @@ function BuilderPage({
         ))}
       </datalist>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button onClick={() => setShowPlanList(true)} style={BTN_STYLE}>
             Manage Plans & Templates</button>
           <button onClick={handleCreatePlan} style={BTN_STYLE}>
             + Plan
           </button>
           {(exerciseLoading || catalogLoading) && (
-            <div style={{ color: 'var(--text-muted)', alignSelf: 'center', fontSize: 12 }}>Loading exercises...</div>
+            <div style={{ color: 'var(--text-muted)', alignSelf: 'center', fontSize: 13 }}>Loading exercises...</div>
           )}
           {selectedPlan && (
             <>
@@ -6036,11 +6041,11 @@ function BuilderPage({
       {error && <div style={{ color: 'var(--error)', marginTop: 8, padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{error}</div>}
 
       {!selectedPlan ? (
-        <div style={{ marginTop: 16, color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>Create a plan to get started.</div>
+        <div style={{ marginTop: 16, color: 'var(--text-muted)', textAlign: 'center', padding: 24 }}>Create a plan to get started.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 14, color: 'var(--text-secondary)' }}>Plan Name</label>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 15, color: 'var(--text-secondary)' }}>Plan Name</label>
             <input
               value={selectedPlan.name}
               onChange={(e) => handlePlanNameChange(e.target.value)}
@@ -6049,7 +6054,7 @@ function BuilderPage({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 14, color: 'var(--text-secondary)' }}>Plan Type</label>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 15, color: 'var(--text-secondary)' }}>Plan Type</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'default' }))}
@@ -6074,7 +6079,7 @@ function BuilderPage({
                 Full Body
               </button>
             </div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
               {(selectedPlan.ghostMode ?? 'default') === 'default'
                 ? 'Ghost shows your most recent performance regardless of day.'
                 : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
@@ -6083,9 +6088,9 @@ function BuilderPage({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {selectedPlan.weeks.map((week) => (
-              <div key={week.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div key={week.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                       value={week.name}
                       onChange={(e) => handleWeekNameChange(week.id, e.target.value)}
@@ -6108,7 +6113,7 @@ function BuilderPage({
                     marginBottom: 12,
                     padding: '8px 12px',
                     background: 'var(--bg-card)',
-                    borderRadius: 10,
+                    borderRadius: 12,
                     fontSize: 13,
                     color: 'var(--text-secondary)',
                   }}>
@@ -6165,12 +6170,12 @@ function BuilderPage({
                   <div key={day.id} data-day-id={day.id} style={{
                     background: 'var(--bg-card)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 10,
+                    borderRadius: 12,
                     padding: 12,
                     transition: 'all 0.15s ease',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                         <div
                           onPointerDown={(e) => {
                             e.preventDefault();
@@ -6225,7 +6230,7 @@ function BuilderPage({
                         marginBottom: 12,
                         padding: '8px 12px',
                         background: 'var(--bg-elevated)',
-                        borderRadius: 10,
+                        borderRadius: 12,
                         fontSize: 13,
                         color: 'var(--text-secondary)',
                       }}>
@@ -6306,7 +6311,7 @@ function BuilderPage({
                                 style={{
                                   display: 'grid',
                                   gridTemplateColumns: 'auto 1fr auto auto auto auto',
-                                  gap: 6,
+                                  gap: 8,
                                   alignItems: 'center',
                                   cursor: 'grab',
                                   opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
@@ -6316,7 +6321,7 @@ function BuilderPage({
                                   borderLeft: '1px solid var(--border-default)',
                                   borderRight: '1px solid var(--border-default)',
                                   borderRadius: 8,
-                                  padding: 6,
+                                  padding: 8,
                                   touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                   userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                 }}
@@ -6360,7 +6365,7 @@ function BuilderPage({
                                     }
                                   }}
                                 list="exercise-options"
-                                style={{ padding: 6, borderRadius: 8, border: '1px solid var(--border-strong)' }}
+                                style={{ ...INPUT_STYLE, padding: '8px' }}
                                 placeholder="Exercise name"
                               />
                               <button
@@ -6376,7 +6381,7 @@ function BuilderPage({
                                     targetSets: Number(e.target.value),
                                   })
                                 }
-                                style={{ padding: '6px 20px 6px 6px', borderRadius: 8, border: '1px solid var(--border-strong)', width: 48 }}
+                                style={{ ...SELECT_STYLE, padding: '8px 24px 8px 8px', width: 52 }}
                                 title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
                               >
                                 {options.map((count) => (
@@ -6391,15 +6396,15 @@ function BuilderPage({
                                   ...SMALL_BTN_STYLE,
                                   padding: '4px 8px',
                                   fontSize: 11,
-                                  background: item.myoReps ? 'rgba(167, 139, 250, 0.15)' : 'var(--bg-card)',
-                                  borderColor: item.myoReps ? '#a78bfa' : 'var(--border-subtle)',
-                                  color: item.myoReps ? '#a78bfa' : 'var(--text-muted)',
+                                  background: item.myoReps ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
+                                  borderColor: item.myoReps ? 'var(--accent-purple)' : 'var(--border-subtle)',
+                                  color: item.myoReps ? 'var(--accent-purple)' : 'var(--text-muted)',
                                 }}
                                 title="Myo-Rep Match"
                               >
                                 MYO
                               </button>
-                              <button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} style={{ ...SMALL_BTN_STYLE, padding: '4px 8px' }} title="Remove exercise">
+                              <button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} style={{ ...XS_BTN_STYLE }} title="Remove exercise">
                                 X
                               </button>
                               </div>
@@ -6468,25 +6473,25 @@ function BuilderPage({
               >Templates</button>
             </div>
             {manageTab === 'plans' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {plans.length === 0 && <div style={{ color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>No plans yet.</div>}
                 {plans.map((plan) => (
                   <div key={plan.id} style={{
                     background: 'var(--bg-card)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 10,
+                    borderRadius: 12,
                     padding: 12,
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: 10,
+                    gap: 12,
                     transition: 'all 0.15s ease',
                   }}>
                     <div>
                       <div style={{ fontWeight: 600 }}>{plan.name}</div>
-                      {plan.serverId && <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>Synced</div>}
+                      {plan.serverId && <div style={{ fontSize: 13, color: 'var(--success)', fontWeight: 500 }}>Synced</div>}
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         onClick={() => {
                           const fullPlan = plans.find((p) => p.id === plan.id) || null;
@@ -6506,7 +6511,7 @@ function BuilderPage({
                 ))}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {templatesError && <div style={{ color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{templatesError}</div>}
                 {templatesLoading ? (
                   <div style={{ color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>Loading templates...</div>
@@ -6517,18 +6522,18 @@ function BuilderPage({
                     <div key={tpl.id} style={{
                       background: 'var(--bg-card)',
                       border: '1px solid var(--border-subtle)',
-                      borderRadius: 10,
+                      borderRadius: 12,
                       padding: 12,
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: 10,
+                      gap: 12,
                       transition: 'all 0.15s ease',
                     }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{tpl.name}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => openTemplate(tpl)} style={SMALL_BTN_STYLE}>Open</button>
                         <button onClick={() => renameTemplate(tpl)} style={SMALL_BTN_STYLE}>Rename</button>
                         <button onClick={() => handleExportTemplateCSV(tpl)} style={SMALL_BTN_STYLE}>Export</button>
@@ -6555,7 +6560,7 @@ function BuilderPage({
               <button onClick={() => setSearchOpen(false)} style={BTN_STYLE}>Close</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
               <input
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -6568,13 +6573,13 @@ function BuilderPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={searchSecondary} onChange={(e) => setSearchSecondary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}>
+              <select value={searchSecondary} onChange={(e) => setSearchSecondary(e.target.value)} style={SELECT_STYLE}>
                 <option value="All">Secondary Muscle (All)</option>
                 {secondaryMuscles.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value as SearchSource)} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}>
+              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value as SearchSource)} style={SELECT_STYLE}>
                 <option value="all">Source (All)</option>
                 <option value="defaults">Defaults</option>
                 <option value="home_made">Home Made *</option>
@@ -6649,9 +6654,9 @@ function BuilderPage({
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 14, minHeight: 280 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ fontWeight: 600 }}>Results</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{filteredCatalog.length} found</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{filteredCatalog.length} found</div>
                   </div>
                   <button
                     onClick={() => {
@@ -6664,7 +6669,7 @@ function BuilderPage({
                   </button>
                 </div>
                 {addMovementOpen && (
-                  <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 12, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 12, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <input
                       value={addMovementName}
                       onChange={(e) => setAddMovementName(e.target.value)}
@@ -6681,8 +6686,8 @@ function BuilderPage({
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6691,7 +6696,7 @@ function BuilderPage({
                         />
                         Machine
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6700,7 +6705,7 @@ function BuilderPage({
                         />
                         Free weight
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6709,7 +6714,7 @@ function BuilderPage({
                         />
                         Cable
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6719,7 +6724,7 @@ function BuilderPage({
                         Bodyweight
                       </label>
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         type="checkbox"
                         checked={addMovementCompound}
@@ -6735,7 +6740,7 @@ function BuilderPage({
                       <select
                         value={addMovementSecondary}
                         onChange={(e) => setAddMovementSecondary(e.target.value)}
-                        style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
+                        style={SELECT_STYLE}
                       >
                         <option value="">Secondary muscle</option>
                         {primaryMuscles
@@ -6746,7 +6751,7 @@ function BuilderPage({
                       </select>
                     )}
                     {addMovementError && (
-                      <div style={{ color: 'var(--error)', fontSize: 12 }}>{addMovementError}</div>
+                      <div style={{ color: 'var(--error)', fontSize: 13 }}>{addMovementError}</div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                       <button
@@ -6772,11 +6777,11 @@ function BuilderPage({
                       <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => addToQueue(ex)} style={SMALL_BTN_STYLE}>Add</button>
                           {ex.isCustom && (
                             <button onClick={() => handleDeleteCustomFromSearch(ex)} style={SMALL_BTN_STYLE}>Delete</button>
@@ -6788,7 +6793,7 @@ function BuilderPage({
                 </div>
               </div>
 
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: 10, padding: 12 }}>
+              <div style={{ border: '1px solid var(--border-default)', borderRadius: 12, padding: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {searchQueue.length === 0 ? (
                   <div style={{ color: 'var(--text-muted)' }}>No exercises selected.</div>
@@ -6809,7 +6814,7 @@ function BuilderPage({
                 </div>
               </div>
             </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'left' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'left' }}>
               * = self made movement
             </div>
           </div>

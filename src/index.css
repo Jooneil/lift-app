@@ -21,6 +21,9 @@
   --accent-blue: #818cf8;
   --accent-blue-muted: rgba(129, 140, 248, 0.15);
 
+  --accent-purple: #a78bfa;
+  --accent-purple-muted: rgba(167, 139, 250, 0.15);
+
   --success: #34d399;
   --success-muted: rgba(52, 211, 153, 0.12);
 
@@ -102,7 +105,7 @@ h3 {
 }
 
 button {
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border-default);
   padding: 0.6em 1.2em;
   font-size: 1em;
@@ -152,7 +155,7 @@ input, select, textarea {
   background: var(--bg-input);
   color: var(--text-primary);
   border: 1px solid var(--border-default);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
   transition: all var(--transition-fast);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);

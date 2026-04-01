@@ -73,7 +73,7 @@ export default function Auth({
 
   const inputStyle = {
     padding: '12px 14px',
-    borderRadius: 10,
+    borderRadius: 12,
     border: '1px solid var(--border-default)',
     background: 'var(--bg-input)',
     color: 'var(--text-primary)',
@@ -83,7 +83,7 @@ export default function Auth({
 
   const secondaryBtnStyle = {
     padding: '10px 12px',
-    borderRadius: 10,
+    borderRadius: 12,
     border: '1px solid var(--border-subtle)',
     background: 'transparent',
     color: 'var(--text-secondary)',
@@ -96,10 +96,10 @@ export default function Auth({
     <div style={{
       maxWidth: 380,
       margin: "60px auto",
-      padding: 28,
+      padding: 24,
       background: "var(--bg-elevated)",
       border: "1px solid var(--border-subtle)",
-      borderRadius: 20,
+      borderRadius: 16,
       boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04)",
     }}>
       <h2 style={{ marginTop: 0, marginBottom: 28, textAlign: 'center', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
@@ -163,7 +163,7 @@ export default function Auth({
             style={{
               padding: '14px 16px',
               marginTop: 8,
-              borderRadius: 10,
+              borderRadius: 12,
               border: '1px solid rgba(255, 255, 255, 0.2)',
               background: 'linear-gradient(180deg, #f0f0f2 0%, #d8d8e0 100%)',
               color: '#0a0a0c',
