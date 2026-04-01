@@ -493,7 +493,7 @@ ${goalGuidance}
 ${splitGuidance}
 
 ## Output Format
-Provide the program as a **downloadable CSV file** (not raw text). The file must have exactly these 13 columns in this order:
+Output ONLY the raw CSV text — no markdown, no explanation, no code fences. The CSV must have exactly these 13 columns in this order:
 
 planName,weekName,dayName,exerciseName,targetSets,targetReps,myoReps,note,isCustom,primaryMuscle,equipment,isCompound,secondaryMuscles
 
@@ -515,7 +515,7 @@ planName,weekName,dayName,exerciseName,targetSets,targetReps,myoReps,note,isCust
 ## Rules
 1. ONLY use exercises from the "Available Exercises" list below. Do not invent exercises.
 2. Every field that contains commas or quotes must be wrapped in double quotes with internal quotes escaped as "".
-3. Provide the output as a **downloadable .csv file**. Do not paste the raw CSV as text in your response.
+3. Output ONLY the raw CSV. No markdown, no code fences, no commentary before or after. Start with the header row and end with the last data row.
 4. The first row of the CSV must be the header row exactly as shown above.
 5. Use the split design guidance above for structuring training days.
 6. Total working sets per session should fit within ~${prefs.sessionMinutes} minutes (roughly 1 set per 2-3 minutes including rest).

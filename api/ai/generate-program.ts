@@ -86,9 +86,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const result = await anthropicRes.json();
     let csv = (result?.content?.[0]?.text || "").trim();
+    // Strip markdown code fences if present
     csv = csv.replace(/^```(?:csv)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    // Strip any text before the CSV header row
+    const headerIdx = csv.indexOf("planName");
+    if (headerIdx > 0) csv = csv.substring(headerIdx).trim();
+    // Strip any text after the last data row (look for trailing commentary)
+    const lines = csv.split("\n");
+    const dataEnd = lines.findIndex((line, i) => i > 0 && !line.includes(",") && line.trim().length > 0);
+    if (dataEnd > 0) csv = lines.slice(0, dataEnd).join("\n").trim();
 
     if (!csv || !csv.includes("planName")) {
+      console.error("[AI] Invalid CSV response:", csv.substring(0, 200));
       return res.status(502).json({ error: "AI did not return a valid program CSV. Please try again." });
     }
 
