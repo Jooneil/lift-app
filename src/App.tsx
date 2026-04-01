@@ -475,7 +475,9 @@ function generateAIPrompt(prefs: {
     if (prefs.deprioritizedMuscles.length) prefsSection += `\n- Muscles to DE-PRIORITIZE (reduce volume): ${prefs.deprioritizedMuscles.join(', ')}`;
   }
 
-  if (prefs.knowsMyoReps) {
+  if (prefs.experience === 'beginner') {
+    prefsSection += `\n- Do NOT use myo-rep sets — the user is a beginner (leave the myoReps column empty for all exercises).`;
+  } else if (prefs.knowsMyoReps) {
     prefsSection += `\n- The user is familiar with myo-rep sets. You may include them where appropriate for isolation exercises (set the myoReps column to "true").`;
   } else {
     prefsSection += `\n- Do NOT use myo-rep sets (leave the myoReps column empty for all exercises).`;
@@ -3757,13 +3759,25 @@ function WorkoutPage({
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 onClick={() => {
-                  setOpenInstructions((prev) => ({ ...prev, [entry.id]: true }));
-                  setInstructionsDraft((prev) => ({ ...prev, [entry.id]: getEntryInstruction(entry) }));
+                  if (openInstructions[entry.id]) {
+                    // Closing — check for unsaved changes
+                    const original = getEntryInstruction(entry);
+                    const draft = instructionsDraft[entry.id] ?? original;
+                    if (draft !== original) {
+                      if (confirm('Save changes to instructions?')) {
+                        updateEntryInstruction(entry.id, draft);
+                      }
+                    }
+                    setOpenInstructions((prev) => ({ ...prev, [entry.id]: false }));
+                  } else {
+                    setOpenInstructions((prev) => ({ ...prev, [entry.id]: true }));
+                    setInstructionsDraft((prev) => ({ ...prev, [entry.id]: getEntryInstruction(entry) }));
+                  }
                 }}
                 style={{
                   ...SMALL_BTN_STYLE,
-                  borderColor: getEntryInstruction(entry) ? '#60a5fa' : 'var(--border-subtle)',
-                  background: getEntryInstruction(entry) ? 'rgba(96,165,250,0.12)' : 'var(--bg-elevated)',
+                  borderColor: openInstructions[entry.id] ? '#60a5fa' : getEntryInstruction(entry) ? '#60a5fa' : 'var(--border-subtle)',
+                  background: openInstructions[entry.id] ? 'rgba(96,165,250,0.25)' : getEntryInstruction(entry) ? 'rgba(96,165,250,0.12)' : 'var(--bg-elevated)',
                 }}
                 title="Instructions"
               >
@@ -3771,13 +3785,25 @@ function WorkoutPage({
               </button>
               <button
                 onClick={() => {
-                  setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
-                  setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
+                  if (openNotes[entry.id]) {
+                    // Closing — check for unsaved changes
+                    const original = entry.note ?? '';
+                    const draft = notesDraft[entry.id] ?? original;
+                    if (draft !== original) {
+                      if (confirm('Save changes to notes?')) {
+                        updateEntryNote(entry.id, draft);
+                      }
+                    }
+                    setOpenNotes((prev) => ({ ...prev, [entry.id]: false }));
+                  } else {
+                    setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
+                    setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
+                  }
                 }}
                 style={{
                   ...SMALL_BTN_STYLE,
-                  borderColor: entry.note && String(entry.note).trim() !== '' ? 'var(--success)' : 'var(--border-subtle)',
-                  background: entry.note && String(entry.note).trim() !== '' ? 'var(--success-muted)' : 'var(--bg-elevated)',
+                  borderColor: openNotes[entry.id] ? 'var(--success)' : (entry.note && String(entry.note).trim() !== '' ? 'var(--success)' : 'var(--border-subtle)'),
+                  background: openNotes[entry.id] ? 'var(--success-muted)' : (entry.note && String(entry.note).trim() !== '' ? 'var(--success-muted)' : 'var(--bg-elevated)'),
                 }}
                 title="Notes"
               >
@@ -3800,12 +3826,6 @@ function WorkoutPage({
                 placeholder="Add instructions or coaching cues for this exercise"
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button
-                  onClick={() => setOpenInstructions((prev) => ({ ...prev, [entry.id]: false }))}
-                  style={SMALL_BTN_STYLE}
-                >
-                  Cancel
-                </button>
                 <button
                   onClick={() => {
                     updateEntryInstruction(entry.id, instructionsDraft[entry.id] ?? '');
@@ -3833,12 +3853,6 @@ function WorkoutPage({
                 placeholder="Add notes for this exercise"
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button
-                  onClick={() => setOpenNotes((prev) => ({ ...prev, [entry.id]: false }))}
-                  style={SMALL_BTN_STYLE}
-                >
-                  Cancel
-                </button>
                 <button
                   onClick={() => {
                     updateEntryNote(entry.id, notesDraft[entry.id] ?? '');
@@ -4683,25 +4697,27 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
               </div>
             </div>
 
-            {/* Detailed options (hidden for beginner random) */}
+            {/* Injuries (shown for all except beginner random) */}
             {showDetails && (
-              <>
-                {/* Injuries */}
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Injuries or Limitations (optional)</div>
-                  <textarea
-                    value={injuries}
-                    onChange={e => setInjuries(e.target.value)}
-                    placeholder="e.g., bad left shoulder, lower back issues"
-                    style={{ ...INPUT_STYLE, width: '100%', minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }}
-                  />
-                </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Injuries or Limitations (optional)</div>
+                <textarea
+                  value={injuries}
+                  onChange={e => setInjuries(e.target.value)}
+                  placeholder="e.g., bad left shoulder, lower back issues"
+                  style={{ ...INPUT_STYLE, width: '100%', minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+            )}
 
+            {/* Priority/depriority/myo-reps only for intermediate+ */}
+            {showDetails && experience !== 'beginner' && (
+              <>
                 {/* Priority muscles */}
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Muscles to Prioritize</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {MUSCLE_GROUPS.map(m => (
+                    {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
                       <button key={m} onClick={() => togglePriority(m)} style={pillStyle(priorityMuscles.includes(m))}>
                         {m}
                       </button>
@@ -4713,7 +4729,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Muscles to De-prioritize</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {MUSCLE_GROUPS.map(m => (
+                    {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
                       <button key={m} onClick={() => toggleDepriority(m)} style={pillStyle(deprioritizedMuscles.includes(m))}>
                         {m}
                       </button>
