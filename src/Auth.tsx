@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 // no direct API calls needed for auth
 import { supabase } from "./supabaseClient";
+import { Button } from "./components";
 
 type AuthMode = 'login' | 'register' | 'forgot' | 'reset';
 
@@ -71,27 +72,6 @@ export default function Auth({
     }
   };
 
-  const inputStyle = {
-    padding: '12px 14px',
-    borderRadius: 12,
-    border: '1px solid var(--border-default)',
-    background: 'var(--bg-input)',
-    color: 'var(--text-primary)',
-    fontSize: 16,
-    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.2)',
-  };
-
-  const secondaryBtnStyle = {
-    padding: '10px 12px',
-    borderRadius: 12,
-    border: '1px solid var(--border-subtle)',
-    background: 'transparent',
-    color: 'var(--text-secondary)',
-    fontSize: 14,
-    cursor: 'pointer' as const,
-    boxShadow: 'none',
-  };
-
   return (
     <div style={{
       maxWidth: 380,
@@ -119,7 +99,6 @@ export default function Auth({
               type="email"
               value={email}
               onChange={(e)=>setEmail(e.target.value)}
-              style={inputStyle}
             />
           )}
           {(mode === 'login' || mode === 'register' || mode === 'reset') && (
@@ -128,7 +107,6 @@ export default function Auth({
               type="password"
               value={password}
               onChange={(e)=>setPassword(e.target.value)}
-              style={inputStyle}
             />
           )}
           {mode === 'reset' && (
@@ -137,7 +115,6 @@ export default function Auth({
               type="password"
               value={confirmPassword}
               onChange={(e)=>setConfirmPassword(e.target.value)}
-              style={inputStyle}
             />
           )}
           {err && (
@@ -158,22 +135,16 @@ export default function Auth({
               fontSize: 14
             }}>{message}</div>
           )}
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            block
             style={{
-              padding: '14px 16px',
               marginTop: 8,
-              borderRadius: 12,
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              background: 'linear-gradient(180deg, #f0f0f2 0%, #d8d8e0 100%)',
-              color: '#0a0a0c',
-              fontWeight: 600,
               fontSize: 16,
-              letterSpacing: '-0.01em',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+              padding: '14px 16px',
               cursor: busy ? 'wait' : 'pointer',
               opacity: busy ? 0.7 : 1,
-              transition: 'all 0.12s cubic-bezier(0.22, 1, 0.36, 1)',
             }}
             disabled={busy}
           >
@@ -186,38 +157,37 @@ export default function Auth({
                   : mode === 'forgot'
                     ? 'Send Reset Link'
                     : 'Update Password'}
-          </button>
+          </Button>
         </div>
       </form>
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {mode === 'login' && (
           <>
-            <button
+            <Button
               onClick={()=>setMode('register')}
-              style={secondaryBtnStyle}
-            >Need an account? Sign Up</button>
-            <button
+              variant="ghost"
+              style={{ fontSize: 14 }}
+            >Need an account? Sign Up</Button>
+            <Button
               onClick={()=>setMode('forgot')}
-              style={{
-                ...secondaryBtnStyle,
-                border: 'none',
-                color: 'var(--text-muted)',
-                fontSize: 13,
-              }}
-            >Forgot password?</button>
+              variant="ghost"
+              style={{ fontSize: 13, color: 'var(--text-muted)' }}
+            >Forgot password?</Button>
           </>
         )}
         {mode === 'register' && (
-          <button
+          <Button
             onClick={()=>setMode('login')}
-            style={secondaryBtnStyle}
-          >Have an account? Sign In</button>
+            variant="ghost"
+            style={{ fontSize: 14 }}
+          >Have an account? Sign In</Button>
         )}
         {(mode === 'forgot' || mode === 'reset') && !isForcedReset && (
-          <button
+          <Button
             onClick={()=>setMode('login')}
-            style={secondaryBtnStyle}
-          >Back to Sign In</button>
+            variant="ghost"
+            style={{ fontSize: 14 }}
+          >Back to Sign In</Button>
         )}
       </div>
     </div>
