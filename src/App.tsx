@@ -2751,6 +2751,10 @@ function WorkoutPage({
   const exerciseNotesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const exerciseInstructionsRef = useRef<Record<string, string>>({});
+  const exerciseInstructionsSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [openInstructions, setOpenInstructions] = useState<Record<string, boolean>>({});
+  const [instructionsDraft, setInstructionsDraft] = useState<Record<string, string>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEntry, setHistoryEntry] = useState<{ exerciseId?: string; exerciseName: string } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -2777,6 +2781,9 @@ function WorkoutPage({
       const p = (up?.prefs as UserPrefsData | null) || null;
       if (p?.exercise_notes) {
         exerciseNotesRef.current = { ...p.exercise_notes };
+      }
+      if (p?.exercise_instructions) {
+        exerciseInstructionsRef.current = { ...p.exercise_instructions };
       }
     }).catch(() => { /* ignore */ });
     return () => { cancelled = true; };
@@ -3540,7 +3547,31 @@ function WorkoutPage({
     saveNow(next);
     return next;
   });
-};const updateSet = (entryId: string, setId: string, patch: Partial<SessionSet>) => {
+};
+
+  const updateEntryInstruction = (entryId: string, text: string) => {
+    const trimmed = text.trim();
+    // Find entry to get exercise name
+    const entry = session?.entries.find((e) => e.id === entryId);
+    if (entry) {
+      const nameKey = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+      if (nameKey) {
+        if (trimmed) exerciseInstructionsRef.current[nameKey] = trimmed;
+        else delete exerciseInstructionsRef.current[nameKey];
+        if (exerciseInstructionsSaveTimer.current) clearTimeout(exerciseInstructionsSaveTimer.current);
+        exerciseInstructionsSaveTimer.current = setTimeout(() => {
+          upsertUserPrefs({ exercise_instructions: { ...exerciseInstructionsRef.current } }).catch(() => { /* ignore */ });
+        }, 1200);
+      }
+    }
+  };
+
+  const getEntryInstruction = (entry: SessionEntry): string => {
+    const nameKey = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+    return exerciseInstructionsRef.current[nameKey] || '';
+  };
+
+  const updateSet = (entryId: string, setId: string, patch: Partial<SessionSet>) => {
     setSession((s) => {
       if (!s) return s;
 
@@ -3723,7 +3754,21 @@ function WorkoutPage({
                 )}
               </div>
             </div>
-            <div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => {
+                  setOpenInstructions((prev) => ({ ...prev, [entry.id]: true }));
+                  setInstructionsDraft((prev) => ({ ...prev, [entry.id]: getEntryInstruction(entry) }));
+                }}
+                style={{
+                  ...SMALL_BTN_STYLE,
+                  borderColor: getEntryInstruction(entry) ? '#60a5fa' : 'var(--border-subtle)',
+                  background: getEntryInstruction(entry) ? 'rgba(96,165,250,0.12)' : 'var(--bg-elevated)',
+                }}
+                title="Instructions"
+              >
+                Instructions
+              </button>
               <button
                 onClick={() => {
                   setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
@@ -3740,6 +3785,39 @@ function WorkoutPage({
               </button>
             </div>
           </div>
+
+          {openInstructions[entry.id] && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <textarea
+                value={instructionsDraft[entry.id] ?? ''}
+                onChange={(e) => setInstructionsDraft((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                style={{
+                  ...INPUT_STYLE,
+                  minHeight: 120,
+                  resize: 'vertical',
+                  width: '100%',
+                }}
+                placeholder="Add instructions or coaching cues for this exercise"
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  onClick={() => setOpenInstructions((prev) => ({ ...prev, [entry.id]: false }))}
+                  style={SMALL_BTN_STYLE}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    updateEntryInstruction(entry.id, instructionsDraft[entry.id] ?? '');
+                    setOpenInstructions((prev) => ({ ...prev, [entry.id]: false }));
+                  }}
+                  style={PRIMARY_BTN_STYLE}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
 
           {openNotes[entry.id] ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -5782,7 +5860,7 @@ function BuilderPage({
               note: header.indexOf('note'),
             } as const;
             if (idx.weekName >= 0 && idx.dayName >= 0 && idx.exerciseName >= 0 && idx.note >= 0) {
-              const importedNotes: Record<string, string> = {};
+              const importedInstructions: Record<string, string> = {};
               for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 if (!row || row.length === 0) continue;
@@ -5790,10 +5868,16 @@ function BuilderPage({
                 const note = (row[idx.note] || '').trim();
                 if (!exName || !note) continue;
                 const nameKey = normalizeExerciseName(exName).toLowerCase();
-                if (nameKey) importedNotes[nameKey] = note;
+                if (nameKey) importedInstructions[nameKey] = note;
               }
-              if (Object.keys(importedNotes).length > 0) {
-                upsertUserPrefs({ exercise_notes: importedNotes }).catch(() => { /* ignore */ });
+              if (Object.keys(importedInstructions).length > 0) {
+                // Store AI coaching notes as instructions (merged with existing)
+                getUserPrefs().then((up) => {
+                  const existing = ((up?.prefs as UserPrefsData | null)?.exercise_instructions) || {};
+                  upsertUserPrefs({ exercise_instructions: { ...existing, ...importedInstructions } }).catch(() => { /* ignore */ });
+                }).catch(() => {
+                  upsertUserPrefs({ exercise_instructions: importedInstructions }).catch(() => { /* ignore */ });
+                });
               }
             }
           }

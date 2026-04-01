@@ -27,6 +27,7 @@ export type UserPrefsData = {
   streak_config?: StreakConfig | null
   streak_state?: StreakState | null
   exercise_notes?: Record<string, string> | null
+  exercise_instructions?: Record<string, string> | null
 }
 
 export type UserPrefs = {
@@ -62,6 +63,7 @@ export async function upsertUserPrefs(partial: {
   streak_config?: StreakConfig | null
   streak_state?: StreakState | null
   exercise_notes?: Record<string, string> | null
+  exercise_instructions?: Record<string, string> | null
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
@@ -88,6 +90,7 @@ export async function upsertUserPrefs(partial: {
     ...(partial.streak_config !== undefined && { streak_config: partial.streak_config }),
     ...(partial.streak_state !== undefined && { streak_state: partial.streak_state }),
     ...(partial.exercise_notes !== undefined && { exercise_notes: partial.exercise_notes }),
+    ...(partial.exercise_instructions !== undefined && { exercise_instructions: partial.exercise_instructions }),
   }
 
   // Try update-first: if a row exists for this user, update it; otherwise insert.
