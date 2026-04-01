@@ -4551,6 +4551,8 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
   const [priorityMuscles, setPriorityMuscles] = useState<string[]>([]);
   const [deprioritizedMuscles, setDeprioritizedMuscles] = useState<string[]>([]);
   const [knowsMyoReps, setKnowsMyoReps] = useState(false);
+  const [showPrioMuscles, setShowPrioMuscles] = useState(false);
+  const [showDeprioMuscles, setShowDeprioMuscles] = useState(false);
   const [copied, setCopied] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [limitReached, setLimitReached] = useState(false);
@@ -4713,28 +4715,44 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
             {/* Priority/depriority/myo-reps only for intermediate+ */}
             {showDetails && experience !== 'beginner' && (
               <>
-                {/* Priority muscles */}
+                {/* Priority muscles (collapsible) */}
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Muscles to Prioritize</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
-                      <button key={m} onClick={() => togglePriority(m)} style={pillStyle(priorityMuscles.includes(m))}>
-                        {m}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    onClick={() => setShowPrioMuscles(p => !p)}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: priorityMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
+                  >
+                    <span style={{ fontSize: 10, transition: 'transform 0.15s', transform: showPrioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                    Muscles to Prioritize{priorityMuscles.length > 0 && ` (${priorityMuscles.length})`}
+                  </button>
+                  {showPrioMuscles && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
+                        <button key={m} onClick={() => togglePriority(m)} style={pillStyle(priorityMuscles.includes(m))}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* De-priority muscles */}
+                {/* De-priority muscles (collapsible) */}
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Muscles to De-prioritize</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
-                      <button key={m} onClick={() => toggleDepriority(m)} style={pillStyle(deprioritizedMuscles.includes(m))}>
-                        {m}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    onClick={() => setShowDeprioMuscles(p => !p)}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: deprioritizedMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
+                  >
+                    <span style={{ fontSize: 10, transition: 'transform 0.15s', transform: showDeprioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                    Muscles to De-prioritize{deprioritizedMuscles.length > 0 && ` (${deprioritizedMuscles.length})`}
+                  </button>
+                  {showDeprioMuscles && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
+                        <button key={m} onClick={() => toggleDepriority(m)} style={pillStyle(deprioritizedMuscles.includes(m))}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Myo reps */}
