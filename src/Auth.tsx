@@ -71,17 +71,38 @@ export default function Auth({
     }
   };
 
+  const inputStyle = {
+    padding: '12px 14px',
+    borderRadius: 10,
+    border: '1px solid var(--border-default)',
+    background: 'var(--bg-input)',
+    color: 'var(--text-primary)',
+    fontSize: 16,
+    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.2)',
+  };
+
+  const secondaryBtnStyle = {
+    padding: '10px 12px',
+    borderRadius: 10,
+    border: '1px solid var(--border-subtle)',
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    fontSize: 14,
+    cursor: 'pointer' as const,
+    boxShadow: 'none',
+  };
+
   return (
     <div style={{
       maxWidth: 380,
       margin: "60px auto",
-      padding: 24,
+      padding: 28,
       background: "var(--bg-elevated)",
       border: "1px solid var(--border-subtle)",
-      borderRadius: 16,
-      boxShadow: "var(--shadow-lg)"
+      borderRadius: 20,
+      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04)",
     }}>
-      <h2 style={{ marginTop: 0, marginBottom: 24, textAlign: 'center', fontSize: 24, fontWeight: 600 }}>
+      <h2 style={{ marginTop: 0, marginBottom: 28, textAlign: 'center', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
         {mode === 'login'
           ? 'Sign In'
           : mode === 'register'
@@ -98,14 +119,7 @@ export default function Auth({
               type="email"
               value={email}
               onChange={(e)=>setEmail(e.target.value)}
-              style={{
-                padding: '12px 14px',
-                borderRadius: 10,
-                border: '1px solid var(--border-default)',
-                background: 'var(--bg-input)',
-                color: 'var(--text-primary)',
-                fontSize: 16,
-              }}
+              style={inputStyle}
             />
           )}
           {(mode === 'login' || mode === 'register' || mode === 'reset') && (
@@ -114,14 +128,7 @@ export default function Auth({
               type="password"
               value={password}
               onChange={(e)=>setPassword(e.target.value)}
-              style={{
-                padding: '12px 14px',
-                borderRadius: 10,
-                border: '1px solid var(--border-default)',
-                background: 'var(--bg-input)',
-                color: 'var(--text-primary)',
-                fontSize: 16,
-              }}
+              style={inputStyle}
             />
           )}
           {mode === 'reset' && (
@@ -130,21 +137,14 @@ export default function Auth({
               type="password"
               value={confirmPassword}
               onChange={(e)=>setConfirmPassword(e.target.value)}
-              style={{
-                padding: '12px 14px',
-                borderRadius: 10,
-                border: '1px solid var(--border-default)',
-                background: 'var(--bg-input)',
-                color: 'var(--text-primary)',
-                fontSize: 16,
-              }}
+              style={inputStyle}
             />
           )}
           {err && (
             <div style={{
-              color: '#f88',
+              color: 'var(--error)',
               padding: '10px 12px',
-              background: 'rgba(255, 136, 136, 0.1)',
+              background: 'var(--error-muted)',
               borderRadius: 8,
               fontSize: 14
             }}>{err}</div>
@@ -164,13 +164,16 @@ export default function Auth({
               padding: '14px 16px',
               marginTop: 8,
               borderRadius: 10,
-              border: '1px solid var(--border-strong)',
-              background: 'var(--text-primary)',
-              color: 'var(--bg-base)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              background: 'linear-gradient(180deg, #f0f0f2 0%, #d8d8e0 100%)',
+              color: '#0a0a0c',
               fontWeight: 600,
               fontSize: 16,
+              letterSpacing: '-0.01em',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
               cursor: busy ? 'wait' : 'pointer',
               opacity: busy ? 0.7 : 1,
+              transition: 'all 0.12s cubic-bezier(0.22, 1, 0.36, 1)',
             }}
             disabled={busy}
           >
@@ -191,26 +194,15 @@ export default function Auth({
           <>
             <button
               onClick={()=>setMode('register')}
-              style={{
-                padding: '10px 12px',
-                borderRadius: 10,
-                border: '1px solid var(--border-subtle)',
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
+              style={secondaryBtnStyle}
             >Need an account? Sign Up</button>
             <button
               onClick={()=>setMode('forgot')}
               style={{
-                padding: '10px 12px',
-                borderRadius: 10,
+                ...secondaryBtnStyle,
                 border: 'none',
-                background: 'transparent',
                 color: 'var(--text-muted)',
                 fontSize: 13,
-                cursor: 'pointer',
               }}
             >Forgot password?</button>
           </>
@@ -218,29 +210,13 @@ export default function Auth({
         {mode === 'register' && (
           <button
             onClick={()=>setMode('login')}
-            style={{
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid var(--border-subtle)',
-              background: 'transparent',
-              color: 'var(--text-secondary)',
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
+            style={secondaryBtnStyle}
           >Have an account? Sign In</button>
         )}
         {(mode === 'forgot' || mode === 'reset') && !isForcedReset && (
           <button
             onClick={()=>setMode('login')}
-            style={{
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid var(--border-subtle)',
-              background: 'transparent',
-              color: 'var(--text-secondary)',
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
+            style={secondaryBtnStyle}
           >Back to Sign In</button>
         )}
       </div>

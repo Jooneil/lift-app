@@ -92,17 +92,20 @@ const BTN_STYLE = {
   background: "var(--bg-card)",
   color: "var(--text-primary)",
   fontWeight: 500,
-  transition: "all 0.15s ease",
+  letterSpacing: "-0.01em",
+  transition: "all var(--transition-fast)",
 } as const;
 
 const PRIMARY_BTN_STYLE = {
   padding: "12px 16px",
   borderRadius: 10,
-  border: "1px solid var(--border-strong)",
-  background: "var(--text-primary)",
-  color: "var(--bg-base)",
+  border: "1px solid rgba(255, 255, 255, 0.2)",
+  background: "linear-gradient(180deg, #f0f0f2 0%, #d8d8e0 100%)",
+  color: "#0a0a0c",
   fontWeight: 600,
-  boxShadow: "0 2px 8px rgba(255, 255, 255, 0.1)",
+  letterSpacing: "-0.01em",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
+  transition: "all var(--transition-fast)",
 } as const;
 
 const SMALL_BTN_STYLE = {
@@ -113,7 +116,8 @@ const SMALL_BTN_STYLE = {
   color: "var(--text-secondary)",
   fontSize: 12,
   fontWeight: 500,
-  transition: "all 0.15s ease",
+  letterSpacing: "-0.005em",
+  transition: "all var(--transition-fast)",
 } as const;
 
 const FILTER_TOGGLE_STYLE = {
@@ -126,7 +130,8 @@ const FILTER_TOGGLE_STYLE = {
   background: "var(--bg-elevated)",
   fontSize: 12,
   fontWeight: 500,
-  transition: "all 0.15s ease",
+  letterSpacing: "-0.005em",
+  transition: "all var(--transition-fast)",
 } as const;
 
 const CARD_STYLE = {
@@ -140,8 +145,9 @@ const CARD_STYLE = {
 const MODAL_OVERLAY_STYLE = {
   position: "fixed" as const,
   inset: 0,
-  background: "rgba(0, 0, 0, 0.75)",
-  backdropFilter: "blur(4px)",
+  background: "rgba(0, 0, 0, 0.80)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
@@ -153,8 +159,8 @@ const MODAL_CONTENT_STYLE = {
   background: "var(--bg-elevated)",
   border: "1px solid var(--border-subtle)",
   borderRadius: 16,
-  padding: 20,
-  boxShadow: "var(--shadow-lg)",
+  padding: 24,
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04)",
   maxHeight: "85vh",
   overflowY: "auto" as const,
 } as const;
@@ -165,7 +171,8 @@ const INPUT_STYLE = {
   border: "1px solid var(--border-default)",
   background: "var(--bg-input)",
   color: "var(--text-primary)",
-  transition: "all 0.15s ease",
+  transition: "all var(--transition-fast)",
+  boxShadow: "inset 0 1px 2px rgba(0, 0, 0, 0.2)",
 } as const;
 
 const SELECT_STYLE = {
@@ -727,10 +734,10 @@ export default function App() {
       const d = document.createElement('div');
       d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) scale(0.4);z-index:9999;pointer-events:none;opacity:0;display:flex;flex-direction:column;align-items:center;';
       d.innerHTML = `
-        <div data-bubble style="width:40px;height:40px;border-radius:50%;background:#1a1a1a;border:2px solid #333;box-shadow:0 2px 12px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
-          <span data-arrow style="display:block;font-size:18px;line-height:1;color:#888;transition:color .15s;">↓</span>
+        <div data-bubble style="width:40px;height:40px;border-radius:50%;background:var(--bg-card);border:2px solid var(--border-default);box-shadow:0 2px 12px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
+          <span data-arrow style="display:block;font-size:18px;line-height:1;color:var(--text-muted);transition:color .15s;">↓</span>
         </div>
-        <span data-label style="font-size:11px;margin-top:6px;color:#666;white-space:nowrap;opacity:0;"></span>`;
+        <span data-label style="font-size:11px;margin-top:6px;color:var(--text-muted);white-space:nowrap;opacity:0;"></span>`;
       document.body.appendChild(d);
       return d;
     };
@@ -819,11 +826,11 @@ export default function App() {
       if (arrow) {
         arrow.style.display = 'block';
         arrow.style.transform = `rotate(${progress * 180}deg)`;
-        arrow.style.color = ready ? '#4ade80' : '#888';
+        arrow.style.color = ready ? 'var(--success)' : 'var(--text-muted)';
       }
 
       if (bubble) {
-        bubble.style.borderColor = ready ? '#4ade80' : '#333';
+        bubble.style.borderColor = ready ? 'var(--success)' : 'var(--border-default)';
         bubble.style.boxShadow = ready
           ? '0 0 14px rgba(74,222,128,0.4), 0 2px 12px rgba(0,0,0,0.5)'
           : '0 2px 12px rgba(0,0,0,0.5)';
@@ -838,7 +845,7 @@ export default function App() {
       if (label) {
         label.style.opacity = progress > 0.3 ? '1' : '0';
         label.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
-        label.style.color = ready ? '#4ade80' : '#666';
+        label.style.color = ready ? 'var(--success)' : 'var(--text-muted)';
       }
 
       wasReady = ready;
@@ -858,9 +865,9 @@ export default function App() {
           el.style.transform = 'translateX(-50%) scale(1)';
         }
         if (bubble) {
-          bubble.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" style="animation:ptr-spin .6s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="45 18" stroke-linecap="round"/></svg>';
+          bubble.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" style="animation:ptr-spin .6s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-dasharray="45 18" stroke-linecap="round"/></svg>';
         }
-        if (label) { label.textContent = 'Refreshing...'; label.style.color = '#4ade80'; }
+        if (label) { label.textContent = 'Refreshing...'; label.style.color = 'var(--success)'; }
         setTimeout(() => window.location.reload(), 500);
       } else {
         unmount();
@@ -2246,7 +2253,7 @@ function AuthedApp({
                 <button onClick={closeArchive} style={BTN_STYLE}>Close</button>
               </div>
             </div>
-            {archivedError && <div style={{ color: '#f88', padding: '8px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{archivedError}</div>}
+            {archivedError && <div style={{ color: 'var(--error)', padding: '8px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{archivedError}</div>}
             {archivedLoading ? (
               <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading archived plans...</div>
             ) : archivedPlans.length === 0 ? (
@@ -2307,7 +2314,7 @@ function AuthedApp({
                                 <div key={day.id} style={{ marginBottom: 12 }}>
                                   <h5 style={{ margin: '6px 0' }}>{day.name}</h5>
                                   {day.items.length === 0 ? (
-                                    <div style={{ color: '#777' }}>No exercises defined for this day.</div>
+                                    <div style={{ color: 'var(--text-muted)' }}>No exercises defined for this day.</div>
                                   ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                       {day.items.map((item) => {
@@ -2582,7 +2589,7 @@ function AuthedApp({
                         upsertUserPrefs({ streak_state: resetState });
                       }
                     }}
-                    style={{ ...SMALL_BTN_STYLE, color: '#f88' }}
+                    style={{ ...SMALL_BTN_STYLE, color: 'var(--error)' }}
                   >
                     Reset Streak
                   </button>
@@ -3921,8 +3928,8 @@ function WorkoutPage({
                         ...SMALL_BTN_STYLE,
                         padding: '2px 6px',
                         minWidth: 0,
-                        color: '#ef4444',
-                        borderColor: '#ef4444',
+                        color: 'var(--error)',
+                        borderColor: 'var(--error)',
                         fontSize: 14,
                       }}
                       title="Remove set"
@@ -4201,11 +4208,11 @@ function WorkoutPage({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
+              <div style={{ border: '1px solid var(--border-default)', borderRadius: 10, padding: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontWeight: 600 }}>Results</div>
-                  <div style={{ color: '#777', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{replaceFilteredCatalog.length} found</div>
                 </div>
                   <button
                     onClick={() => {
@@ -4218,17 +4225,17 @@ function WorkoutPage({
                   </button>
                 </div>
                 {replaceAddMovementOpen && (
-                  <div style={{ border: '1px solid #222', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input
                       value={replaceAddMovementName}
                       onChange={(e) => setReplaceAddMovementName(e.target.value)}
                       placeholder="Movement name"
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
                     />
                     <select
                       value={replaceAddMovementPrimary}
                       onChange={(e) => setReplaceAddMovementPrimary(e.target.value)}
-                      style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                      style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
                     >
                       <option value="">Primary muscle</option>
                       {replacePrimaryMuscles.map((m) => (
@@ -4289,7 +4296,7 @@ function WorkoutPage({
                       <select
                         value={replaceAddMovementSecondary}
                         onChange={(e) => setReplaceAddMovementSecondary(e.target.value)}
-                        style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                        style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
                       >
                         <option value="">Secondary muscle</option>
                         {replacePrimaryMuscles
@@ -4300,7 +4307,7 @@ function WorkoutPage({
                       </select>
                     )}
                     {replaceAddMovementError && (
-                      <div style={{ color: '#f88', fontSize: 12 }}>{replaceAddMovementError}</div>
+                      <div style={{ color: 'var(--error)', fontSize: 12 }}>{replaceAddMovementError}</div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                       <button
@@ -4320,13 +4327,13 @@ function WorkoutPage({
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '40vh', overflowY: 'auto' }}>
                   {replaceFilteredCatalog.length === 0 ? (
-                    <div style={{ color: '#777' }}>No matches.</div>
+                    <div style={{ color: 'var(--text-muted)' }}>No matches.</div>
                   ) : (
                     replaceFilteredCatalog.map((ex) => (
-                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: '#777', fontSize: 11 }}>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
@@ -4342,11 +4349,11 @@ function WorkoutPage({
                 </div>
               </div>
 
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 10 }}>
+              <div style={{ border: '1px solid var(--border-default)', borderRadius: 10, padding: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>Queue:</div>
                   {replaceQueue.length === 0 ? (
-                    <div style={{ color: '#777', fontSize: 12 }}>None selected</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>None selected</div>
                   ) : (
                     replaceQueue.map((q) => (
                       <div key={q.name} style={{
@@ -4379,7 +4386,7 @@ function WorkoutPage({
                 </div>
               </div>
             </div>
-            <div style={{ color: '#777', fontSize: 12, textAlign: 'left' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'left' }}>
               * = self made movement
             </div>
           </div>
@@ -4442,7 +4449,7 @@ function WorkoutPage({
             {historyLoading ? (
               <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>Loading history...</div>
             ) : historyError ? (
-              <div style={{ color: '#f88', padding: '10px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{historyError}</div>
+              <div style={{ color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{historyError}</div>
             ) : !historyPr && historyItems.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', padding: 20, textAlign: 'center' }}>No recorded sets yet.</div>
             ) : (
@@ -4627,9 +4634,9 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
   const pillStyle = (active: boolean): React.CSSProperties => ({
     ...FILTER_TOGGLE_STYLE,
     cursor: 'pointer',
-    background: active ? 'var(--accent-muted)' : 'var(--bg-elevated)',
-    borderColor: active ? 'var(--border-strong)' : 'var(--border-subtle)',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+    background: active ? 'var(--accent-blue-muted)' : 'var(--bg-elevated)',
+    borderColor: active ? 'var(--accent-blue)' : 'var(--border-subtle)',
+    color: active ? 'var(--accent-blue)' : 'var(--text-secondary)',
   });
 
   return (
@@ -4768,7 +4775,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
 
             {/* Error message */}
             {genError && (
-              <div style={{ fontSize: 12, color: '#f88', padding: '10px 12px', background: 'rgba(255,136,136,0.1)', border: '1px solid rgba(255,136,136,0.3)', borderRadius: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', border: '1px solid var(--error)', borderRadius: 10 }}>
                 {genError}
               </div>
             )}
@@ -4777,7 +4784,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
             {(limitReached || showKeyInput) && (
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>
-                  Anthropic API Key {limitReached && <span style={{ color: '#f88', fontWeight: 400 }}>(free generations used up)</span>}
+                  Anthropic API Key {limitReached && <span style={{ color: 'var(--error)', fontWeight: 400 }}>(free generations used up)</span>}
                 </div>
                 <input
                   type="password"
@@ -6026,7 +6033,7 @@ function BuilderPage({
         </div>
       </div>
 
-      {error && <div style={{ color: '#f88', marginTop: 8, padding: '10px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--error)', marginTop: 8, padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{error}</div>}
 
       {!selectedPlan ? (
         <div style={{ marginTop: 16, color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>Create a plan to get started.</div>
@@ -6234,7 +6241,7 @@ function BuilderPage({
                     )}
 
                     {day.items.length === 0 ? (
-                      <div style={{ color: '#777', fontSize: 13 }}>No exercises yet.</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No exercises yet.</div>
                     ) : (
                       <div
                         style={{ display: 'flex', flexDirection: 'column', gap: 8, touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
@@ -6291,7 +6298,7 @@ function BuilderPage({
                           return (
                             <>
                               {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx && (
-                                <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
+                                <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
                               )}
                               <div
                                 key={item.id}
@@ -6304,10 +6311,10 @@ function BuilderPage({
                                   cursor: 'grab',
                                   opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
                                   background: 'transparent',
-                                  borderTop: '1px solid #333',
-                                  borderBottom: '1px solid #333',
-                                  borderLeft: '1px solid #333',
-                                  borderRight: '1px solid #333',
+                                  borderTop: '1px solid var(--border-default)',
+                                  borderBottom: '1px solid var(--border-default)',
+                                  borderLeft: '1px solid var(--border-default)',
+                                  borderRight: '1px solid var(--border-default)',
                                   borderRadius: 8,
                                   padding: 6,
                                   touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
@@ -6353,7 +6360,7 @@ function BuilderPage({
                                     }
                                   }}
                                 list="exercise-options"
-                                style={{ padding: 6, borderRadius: 8, border: '1px solid #444' }}
+                                style={{ padding: 6, borderRadius: 8, border: '1px solid var(--border-strong)' }}
                                 placeholder="Exercise name"
                               />
                               <button
@@ -6369,7 +6376,7 @@ function BuilderPage({
                                     targetSets: Number(e.target.value),
                                   })
                                 }
-                                style={{ padding: '6px 20px 6px 6px', borderRadius: 8, border: '1px solid #444', width: 48 }}
+                                style={{ padding: '6px 20px 6px 6px', borderRadius: 8, border: '1px solid var(--border-strong)', width: 48 }}
                                 title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
                               >
                                 {options.map((count) => (
@@ -6397,23 +6404,23 @@ function BuilderPage({
                               </button>
                               </div>
                               {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx + 1 && (
-                                <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
+                                <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
                               )}
                             </>
                           );
                         })}
                         {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === day.items.length && (
-                          <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
+                          <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
                         )}
                       </div>
                     )}
                     {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === dayIdx + 1 && (
-                      <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8, margin: '10px 0' }} />
+                      <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8, margin: '10px 0' }} />
                     )}
                   </div>
                 ))}
                 {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === week.days.length && (
-                  <div style={{ height: 8, borderTop: '2px dashed #888', borderRadius: 8 }} />
+                  <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
                 )}
                 </div>
               </div>
@@ -6500,7 +6507,7 @@ function BuilderPage({
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {templatesError && <div style={{ color: '#f88', padding: '10px 12px', background: 'rgba(255, 136, 136, 0.1)', borderRadius: 8 }}>{templatesError}</div>}
+                {templatesError && <div style={{ color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{templatesError}</div>}
                 {templatesLoading ? (
                   <div style={{ color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>Loading templates...</div>
                 ) : templates.length === 0 ? (
@@ -6561,13 +6568,13 @@ function BuilderPage({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={searchSecondary} onChange={(e) => setSearchSecondary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={searchSecondary} onChange={(e) => setSearchSecondary(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}>
                 <option value="All">Secondary Muscle (All)</option>
                 {secondaryMuscles.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value as SearchSource)} style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}>
+              <select value={searchSource} onChange={(e) => setSearchSource(e.target.value as SearchSource)} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}>
                 <option value="all">Source (All)</option>
                 <option value="defaults">Defaults</option>
                 <option value="home_made">Home Made *</option>
@@ -6728,7 +6735,7 @@ function BuilderPage({
                       <select
                         value={addMovementSecondary}
                         onChange={(e) => setAddMovementSecondary(e.target.value)}
-                        style={{ padding: 8, borderRadius: 8, border: '1px solid #444' }}
+                        style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border-strong)' }}
                       >
                         <option value="">Secondary muscle</option>
                         {primaryMuscles
@@ -6739,7 +6746,7 @@ function BuilderPage({
                       </select>
                     )}
                     {addMovementError && (
-                      <div style={{ color: '#f88', fontSize: 12 }}>{addMovementError}</div>
+                      <div style={{ color: 'var(--error)', fontSize: 12 }}>{addMovementError}</div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                       <button
@@ -6759,13 +6766,13 @@ function BuilderPage({
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
                   {filteredCatalog.length === 0 ? (
-                    <div style={{ color: '#777' }}>No matches.</div>
+                    <div style={{ color: 'var(--text-muted)' }}>No matches.</div>
                   ) : (
                     filteredCatalog.map((ex) => (
-                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: '#777', fontSize: 12 }}>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
@@ -6781,14 +6788,14 @@ function BuilderPage({
                 </div>
               </div>
 
-              <div style={{ border: '1px solid #333', borderRadius: 10, padding: 12 }}>
+              <div style={{ border: '1px solid var(--border-default)', borderRadius: 10, padding: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
                 {searchQueue.length === 0 ? (
-                  <div style={{ color: '#777' }}>No exercises selected.</div>
+                  <div style={{ color: 'var(--text-muted)' }}>No exercises selected.</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {searchQueue.map((q) => (
-                      <div key={q.name} style={{ border: '1px solid #222', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div key={q.name} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <div>{q.name}</div>
                         <button onClick={() => removeFromQueue(q.name)} style={SMALL_BTN_STYLE}>Remove</button>
                       </div>
@@ -6802,7 +6809,7 @@ function BuilderPage({
                 </div>
               </div>
             </div>
-            <div style={{ color: '#777', fontSize: 12, textAlign: 'left' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'left' }}>
               * = self made movement
             </div>
           </div>
