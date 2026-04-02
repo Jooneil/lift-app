@@ -5865,7 +5865,7 @@ function BuilderPage({
                               <div
                                 key={item.id}
                                 data-exercise-id={item.id}
-                                className="flex flex-wrap sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 items-center border border-default rounded-sm p-2 cursor-grab"
+                                className="hidden sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 items-center border border-default rounded-sm p-2 cursor-grab"
                                 style={{
                                   opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
                                   touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
@@ -5953,6 +5953,109 @@ function BuilderPage({
                               <Button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} size="xs" title="Remove exercise">
                                 X
                               </Button>
+                              </div>
+                              {/* Mobile: two-row layout */}
+                              <div
+                                data-exercise-id={item.id}
+                                className="flex flex-col gap-1.5 sm:hidden border border-default rounded-sm p-2 cursor-grab"
+                                style={{
+                                  opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
+                                  touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
+                                  userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
+                                }}
+                                title="Drag to reorder"
+                              >
+                                {/* Row 1: drag handle + full-width name */}
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    onPointerDown={(e) => {
+                                      e.preventDefault();
+                                      setDraggingExerciseId(item.id);
+                                      setDragWeekId(week.id);
+                                      setDragDayId(day.id);
+                                      setDragActive(false);
+                                      dragStartYRef.current = e.clientY;
+                                      setDragInsertIndex(idx);
+                                      if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
+                                      dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
+                                      try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+                                    }}
+                                    className="text-center text-lg leading-[18px] px-1 select-none touch-none cursor-grab"
+                                    aria-label="Drag handle"
+                                    title="Drag to reorder"
+                                  >
+                                    ≡
+                                  </div>
+                                  <input
+                                    value={item.exerciseName}
+                                    onFocus={(e) => e.target.select()}
+                                    onChange={(e) =>
+                                      handleExerciseChange(week.id, day.id, item.id, {
+                                        exerciseName: e.target.value,
+                                        exerciseId: undefined,
+                                      })
+                                    }
+                                    onBlur={(e) => {
+                                      void handleExerciseNameCommit(week.id, day.id, item.id, e.target.value);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        (e.currentTarget as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    list="exercise-options"
+                                    className="p-1.5 text-[14px] flex-1 min-w-0"
+                                    placeholder="Exercise name"
+                                  />
+                                </div>
+                                {/* Row 2: sets + actions */}
+                                <div className="flex items-center gap-2 pl-6">
+                                  <div className="flex items-center gap-1">
+                                    <select
+                                      value={String(item.targetSets)}
+                                      onChange={(e) =>
+                                        handleExerciseChange(week.id, day.id, item.id, {
+                                          targetSets: Number(e.target.value),
+                                        })
+                                      }
+                                      className="py-1 pl-2 pr-6 w-[48px] text-[13px]"
+                                      title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
+                                    >
+                                      {options.map((count) => (
+                                        <option key={count} value={count}>
+                                          {count}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <span className="text-[12px] text-secondary">sets</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 ml-auto">
+                                    <Button
+                                      onClick={() => openSearchForItem(week.id, day.id, item.id)}
+                                      size="sm"
+                                      style={{ padding: '4px 8px', fontSize: 12 }}
+                                    >
+                                      Search
+                                    </Button>
+                                    <Button
+                                      onClick={() => handleExerciseChange(week.id, day.id, item.id, { myoReps: !item.myoReps })}
+                                      size="sm"
+                                      style={{
+                                        padding: '4px 8px',
+                                        fontSize: 11,
+                                        background: item.myoReps ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
+                                        borderColor: item.myoReps ? 'var(--accent-purple)' : 'var(--border-subtle)',
+                                        color: item.myoReps ? 'var(--accent-purple)' : 'var(--text-muted)',
+                                      }}
+                                      title="Myo-Rep Match"
+                                    >
+                                      MYO
+                                    </Button>
+                                    <Button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} size="xs" title="Remove exercise">
+                                      X
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                               {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx + 1 && (
                                 <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
