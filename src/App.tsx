@@ -4567,6 +4567,20 @@ function BuilderPage({
   const [addMovementCompound, setAddMovementCompound] = useState(false);
   const [addMovementSecondary, setAddMovementSecondary] = useState("");
   const [addMovementError, setAddMovementError] = useState<string | null>(null);
+  const [builderMenuOpen, setBuilderMenuOpen] = useState(false);
+  const builderMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close builder overflow menu on outside click
+  useEffect(() => {
+    if (!builderMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (builderMenuRef.current && !builderMenuRef.current.contains(e.target as Node)) {
+        setBuilderMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [builderMenuOpen]);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -5620,34 +5634,57 @@ function BuilderPage({
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
-      <div className="flex justify-between gap-3 flex-wrap mb-4">
-        <div className="flex gap-3 flex-wrap">
-          <Button onClick={() => setShowPlanList(true)}>
-            Manage Plans & Templates</Button>
-          <Button onClick={handleCreatePlan}>
-            + Plan
-          </Button>
+      {/* Header row: plan name/selector + Save + overflow menu */}
+      <div className="flex items-center justify-between gap-3 mb-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {selectedPlan ? (
+            <input
+              value={selectedPlan.name}
+              onChange={(e) => handlePlanNameChange(e.target.value)}
+              className="text-[18px] font-bold tracking-[-0.02em] bg-transparent border-none shadow-none px-0 min-w-0 flex-1"
+              style={{ outline: 'none' }}
+              placeholder="Plan name"
+            />
+          ) : (
+            <h2 className="text-[18px] font-bold tracking-[-0.02em] m-0">Plan Builder</h2>
+          )}
           {(exerciseLoading || catalogLoading) && (
-            <div className="text-muted self-center text-[13px]">Loading exercises...</div>
+            <div className="text-muted text-[13px] whitespace-nowrap">Loading...</div>
           )}
+        </div>
+        <div className="flex items-center gap-2">
           {selectedPlan && (
-            <>
-              <Button onClick={handleAddWeek}>
-                + Week
-              </Button>
-              {selectedPlan.weeks.length > 1 && (
-                <Button onClick={handleCopyWeekOneToAll}>
-                  Copy Week 1 to All
-                </Button>
-              )}
-              <Button onClick={handleSavePlan} variant="primary" disabled={saving}>
-                {saving ? 'Saving...' : 'Save Plan'}
-              </Button>
-              <Button onClick={handleSaveAsTemplate} disabled={saving}>
-                Save as Template
-              </Button>
-            </>
+            <Button onClick={handleSavePlan} variant="primary" disabled={saving} size="sm">
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
           )}
+          <div className="relative" ref={builderMenuRef}>
+            <button
+              onClick={() => setBuilderMenuOpen((v) => !v)}
+              title="More actions"
+              className="text-secondary hover:text-primary transition-colors duration-150"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxShadow: 'none', padding: '6px 10px', minHeight: 'auto', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', fontSize: 16, fontWeight: 700 }}
+            >
+              ⋮
+            </button>
+            {builderMenuOpen && (
+              <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-2 mt-1 min-w-[200px] z-30 shadow-[var(--shadow-lg)]">
+                <Button onClick={() => { setBuilderMenuOpen(false); setShowPlanList(true); }} size="sm" block className="mb-1 text-left">
+                  Manage Plans
+                </Button>
+                <Button onClick={() => { setBuilderMenuOpen(false); handleCreatePlan(); }} size="sm" block className="mb-1 text-left">
+                  + New Plan
+                </Button>
+                {selectedPlan && (
+                  <>
+                    <Button onClick={() => { setBuilderMenuOpen(false); handleSaveAsTemplate(); }} size="sm" block className="mb-1 text-left" disabled={saving}>
+                      Save as Template
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -5657,20 +5694,14 @@ function BuilderPage({
         <EmptyState message="Create a plan to get started." className="mt-4" />
       ) : (
         <div className="flex flex-col gap-4">
+          {/* Plan type toggle */}
           <div>
-            <label className="block mb-2 font-semibold text-[15px] text-secondary">Plan Name</label>
-            <input
-              value={selectedPlan.name}
-              onChange={(e) => handlePlanNameChange(e.target.value)}
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block mb-2 font-semibold text-[15px] text-secondary">Plan Type</label>
+            <div className="border-t border-subtle my-1" />
+            <label className="block mb-2 mt-3 font-semibold text-[13px] text-muted uppercase tracking-[0.04em]">Plan Type</label>
             <div className="flex gap-2">
               <Button
                 onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'default' }))}
+                size="sm"
                 style={{
                   flex: 1,
                   background: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--accent-muted)' : 'var(--bg-card)',
@@ -5681,6 +5712,7 @@ function BuilderPage({
               </Button>
               <Button
                 onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'full-body' }))}
+                size="sm"
                 style={{
                   flex: 1,
                   background: selectedPlan.ghostMode === 'full-body' ? 'var(--accent-muted)' : 'var(--bg-card)',
@@ -5690,11 +5722,19 @@ function BuilderPage({
                 Full Body
               </Button>
             </div>
-            <p className="text-[13px] text-muted mt-2 leading-snug">
+            <p className="text-[12px] text-muted mt-1.5 leading-snug">
               {(selectedPlan.ghostMode ?? 'default') === 'default'
                 ? 'Ghost shows your most recent performance regardless of day.'
                 : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
             </p>
+          </div>
+
+          {/* Week actions row */}
+          <div className="flex items-center gap-2">
+            <Button onClick={handleAddWeek} size="sm">+ Week</Button>
+            {selectedPlan.weeks.length > 1 && (
+              <Button onClick={handleCopyWeekOneToAll} size="sm">Copy Week 1 → All</Button>
+            )}
           </div>
 
           <div className="flex flex-col gap-4">
