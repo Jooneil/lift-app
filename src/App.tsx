@@ -1969,9 +1969,9 @@ function AuthedApp({
       {mode === "workout" && (
         <div className="page-enter" key="workout-page">
         <Card>
-          <div className="flex flex-col gap-3 mb-4">
-            <div className="flex gap-3 items-center">
-              <label className="text-secondary font-medium text-[15px]">Plan:</label>
+          <div className="flex flex-col gap-0 mb-4">
+            {/* Row 1: Plan name + gear */}
+            <div className="flex items-center justify-between pb-2.5">
               <select
                 value={selectedPlanId ?? ''}
                 onChange={(e) => {
@@ -1979,7 +1979,9 @@ function AuthedApp({
                   selectPlan(newPlanId);
                   setSession(null);
                 }}
-                             >
+                className="text-[18px] font-bold tracking-[-0.02em] bg-transparent border-none shadow-none px-0 pr-6 cursor-pointer"
+                style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0 center', backgroundRepeat: 'no-repeat', backgroundSize: '18px' }}
+              >
                 {plans.length === 0 && <option value="">No plans yet</option>}
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -1987,76 +1989,97 @@ function AuthedApp({
                   </option>
                 ))}
               </select>
-              {selectedPlan && selectedWeekId && selectedDayId && (
-                <>
-                  <Button
-                    onClick={() => {
-                      const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                      setSelectedWeekId(prev.weekId);
-                      setSelectedDayId(prev.dayId);
-                      setSession(null);
-                      setShouldAutoNavigate(false);
-                    }}
-                    size="sm"
-                  >Previous</Button>
-                  <Button
-                    onClick={() => {
-                      const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                      setSelectedWeekId(next.weekId);
-                      setSelectedDayId(next.dayId);
-                      setSession(null);
-                      setShouldAutoNavigate(false);
-                    }}
-                    size="sm"
-                  >Next</Button>
-                </>
+              {selectedPlan && (
+                <button
+                  onClick={() => setShowPlanSettings(true)}
+                  title="Plan Settings"
+                  className="text-muted hover:text-secondary transition-colors duration-150"
+                  style={{ background: 'none', border: 'none', boxShadow: 'none', padding: '4px', minHeight: 'auto', cursor: 'pointer' }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+                    <path d="M16.2 12.2a1.4 1.4 0 0 0 .3 1.5l.05.05a1.7 1.7 0 1 1-2.4 2.4l-.05-.05a1.4 1.4 0 0 0-1.5-.3 1.4 1.4 0 0 0-.85 1.3v.13a1.7 1.7 0 1 1-3.4 0v-.07a1.4 1.4 0 0 0-.9-1.3 1.4 1.4 0 0 0-1.5.3l-.05.05a1.7 1.7 0 1 1-2.4-2.4l.05-.05a1.4 1.4 0 0 0 .3-1.5 1.4 1.4 0 0 0-1.3-.85H2.4a1.7 1.7 0 1 1 0-3.4h.07a1.4 1.4 0 0 0 1.3-.9 1.4 1.4 0 0 0-.3-1.5l-.05-.05a1.7 1.7 0 1 1 2.4-2.4l.05.05a1.4 1.4 0 0 0 1.5.3h.06a1.4 1.4 0 0 0 .85-1.3V2.4a1.7 1.7 0 0 1 3.4 0v.07a1.4 1.4 0 0 0 .85 1.3 1.4 1.4 0 0 0 1.5-.3l.05-.05a1.7 1.7 0 1 1 2.4 2.4l-.05.05a1.4 1.4 0 0 0-.3 1.5v.06a1.4 1.4 0 0 0 1.3.85h.13a1.7 1.7 0 0 1 0 3.4h-.07a1.4 1.4 0 0 0-1.3.85Z" />
+                  </svg>
+                </button>
               )}
             </div>
 
+            {/* Divider */}
+            <div className="border-t border-subtle mb-2.5" />
+
+            {/* Row 2: Segmented nav bar */}
             {selectedPlan && (
-              <div className="flex gap-3 items-center flex-wrap">
-                <label className="text-secondary font-medium text-[15px]">Week:</label>
-                <select
-                  value={selectedWeekId ?? ''}
-                  onChange={(e) => {
-                    const newWeekId = e.target.value || null;
-                    setSelectedWeekId(newWeekId);
-                    const wk = selectedPlan.weeks.find((w) => w.id === newWeekId) || null;
-                    setSelectedDayId(wk?.days[0]?.id ?? null);
-                    setSession(null);
-                    setShouldAutoNavigate(false);
-                  }}
-                                 >
-                  {selectedPlan.weeks.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-
-                <label className="text-secondary font-medium text-[15px]">Day:</label>
-                <select
-                  value={selectedDayId ?? ''}
-                  onChange={(e) => {
-                    setSelectedDayId(e.target.value || null);
-                    setSession(null);
-                    setShouldAutoNavigate(false);
-                  }}
-                                 >
-                  {(selectedWeek ?? { days: [] as PlanDay[] }).days.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-
-                <Button
-                  onClick={() => setShowPlanSettings(true)}
-                  size="sm"
-                  title="Plan Settings"
-                >
-                  Settings
-                </Button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-card rounded-md border border-subtle overflow-hidden flex-1">
+                  <select
+                    value={selectedWeekId ?? ''}
+                    onChange={(e) => {
+                      const newWeekId = e.target.value || null;
+                      setSelectedWeekId(newWeekId);
+                      const wk = selectedPlan.weeks.find((w) => w.id === newWeekId) || null;
+                      setSelectedDayId(wk?.days[0]?.id ?? null);
+                      setSession(null);
+                      setShouldAutoNavigate(false);
+                    }}
+                    className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
+                    style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
+                  >
+                    {selectedPlan.weeks.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="w-px h-6 bg-subtle flex-shrink-0" />
+                  <select
+                    value={selectedDayId ?? ''}
+                    onChange={(e) => {
+                      setSelectedDayId(e.target.value || null);
+                      setSession(null);
+                      setShouldAutoNavigate(false);
+                    }}
+                    className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
+                    style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
+                  >
+                    {(selectedWeek ?? { days: [] as PlanDay[] }).days.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedWeekId && selectedDayId && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                        setSelectedWeekId(prev.weekId);
+                        setSelectedDayId(prev.dayId);
+                        setSession(null);
+                        setShouldAutoNavigate(false);
+                      }}
+                      title="Previous day"
+                      className="text-secondary hover:text-primary transition-colors duration-150"
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxShadow: 'none', padding: '6px 8px', minHeight: 'auto', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3L5 7l4 4" /></svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                        setSelectedWeekId(next.weekId);
+                        setSelectedDayId(next.dayId);
+                        setSession(null);
+                        setShouldAutoNavigate(false);
+                      }}
+                      title="Next day"
+                      className="text-secondary hover:text-primary transition-colors duration-150"
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxShadow: 'none', padding: '6px 8px', minHeight: 'auto', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3l4 4-4 4" /></svg>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
