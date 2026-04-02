@@ -9,15 +9,8 @@ export type CardProps = {
 export default function Card({ children, style, className }: CardProps) {
   return (
     <div
-      className={className}
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: 12,
-        padding: 16,
-        boxShadow: "var(--shadow-card)",
-        ...style,
-      }}
+      className={`bg-card border border-subtle rounded-md p-4 shadow-card ${className ?? ""}`}
+      style={style}
     >
       {children}
     </div>

@@ -5,57 +5,28 @@ export type BadgeVariant = "default" | "success" | "error" | "purple" | "muted";
 export type BadgeProps = {
   variant?: BadgeVariant;
   children: React.ReactNode;
+  className?: string;
   style?: React.CSSProperties;
 };
 
-const variantStyles: Record<BadgeVariant, React.CSSProperties> = {
-  default: {
-    background: "var(--accent-blue-muted)",
-    color: "var(--accent-blue)",
-    borderColor: "var(--accent-blue)",
-  },
-  success: {
-    background: "var(--success-muted)",
-    color: "var(--success)",
-    borderColor: "var(--success)",
-  },
-  error: {
-    background: "var(--error-muted)",
-    color: "var(--error)",
-    borderColor: "var(--error)",
-  },
-  purple: {
-    background: "var(--accent-purple-muted)",
-    color: "var(--accent-purple)",
-    borderColor: "var(--accent-purple)",
-  },
-  muted: {
-    background: "var(--bg-elevated)",
-    color: "var(--text-muted)",
-    borderColor: "var(--border-subtle)",
-  },
+const variantClasses: Record<BadgeVariant, string> = {
+  default: "bg-accent-blue-muted text-accent-blue border-accent-blue",
+  success: "bg-success-muted text-success border-success",
+  error: "bg-error-muted text-error border-error",
+  purple: "bg-accent-purple-muted text-accent-purple border-accent-purple",
+  muted: "bg-elevated text-muted border-subtle",
 };
 
 export default function Badge({
   variant = "default",
   children,
+  className,
   style,
 }: BadgeProps) {
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "2px 8px",
-        borderRadius: 999,
-        border: "1px solid",
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "-0.005em",
-        lineHeight: 1.4,
-        ...variantStyles[variant],
-        ...style,
-      }}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-semibold tracking-[-0.005em] leading-[1.4] ${variantClasses[variant]} ${className ?? ""}`}
+      style={style}
     >
       {children}
     </span>

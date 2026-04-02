@@ -1867,53 +1867,31 @@ function AuthedApp({
   })();
   
   return (
-    <div style={{ maxWidth: 680, width: "100%", margin: "0 auto", padding: 24 }}>
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingBottom: 12,
-        marginBottom: 16,
-        borderBottom: "1px solid var(--border-subtle)"
-      }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div className="max-w-[680px] w-full mx-auto p-6">
+      <div className="flex justify-between items-center pb-3 mb-4 border-b border-b-subtle">
+        <div className="relative flex items-center gap-2">
           {streakConfig?.enabled && (
             <div
-              style={{
-                position: 'relative',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 32,
-                height: 32,
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)',
-              }}
+              className="relative inline-flex items-center justify-center w-8 h-8 cursor-pointer transition-all duration-150"
               onClick={() => setShowStreakSettings(true)}
               title={`${currentStreak} day streak`}
             >
               <span
                 style={{
-                  fontSize: 28,
                   filter: streakHitToday ? 'none' : 'grayscale(100%)',
                   opacity: streakHitToday ? 1 : 0.5,
-                  lineHeight: 1,
                 }}
+                className="text-[28px] leading-none"
               >
                 🔥
               </span>
               <span
                 style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
                   transform: 'translate(-50%, -45%)',
-                  fontSize: 11,
-                  fontWeight: 700,
                   color: streakHitToday ? '#000' : 'var(--text-muted)',
                   textShadow: streakHitToday ? '0 0 2px rgba(255,255,255,0.8)' : 'none',
-                  pointerEvents: 'none',
                 }}
+                className="absolute top-1/2 left-1/2 text-[11px] font-bold pointer-events-none"
               >
                 {currentStreak}
               </span>
@@ -1921,33 +1899,21 @@ function AuthedApp({
           )}
           <Button onClick={() => setUserMenuOpen((v) => !v)} aria-expanded={userMenuOpen} aria-haspopup="menu">Profile</Button>
           {userMenuOpen && (
-            <div role="menu" style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 12,
-              padding: 12,
-              marginTop: 8,
-              minWidth: 220,
-              zIndex: 30,
-              boxShadow: 'var(--shadow-lg)'
-            }}>
-              <div style={{ padding: '4px 8px', color: 'var(--text-muted)', fontSize: 13, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logged in as</div>
+            <div role="menu" className="dropdown-menu absolute top-full left-0 bg-elevated border border-subtle rounded-md p-3 mt-2 min-w-[220px] z-30 shadow-[var(--shadow-lg)]">
+              <div className="px-2 py-1 text-muted text-[13px] font-medium uppercase tracking-[0.05em]">Logged in as</div>
               <div
-                style={{ padding: '4px 8px 12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220, color: 'var(--text-primary)' }}
+                className="px-2 pt-1 pb-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px] text-primary"
                 title={user.username}
               >
                 <strong>{user.username}</strong>
               </div>
-              <Button onClick={() => { setUserMenuOpen(false); setShowStreakSettings(true); }} size="sm" block style={{ marginBottom: 8 }} role="menuitem">Streak Settings</Button>
-              <Button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} size="sm" block style={{ marginBottom: 8 }} role="menuitem">Archive</Button>
+              <Button onClick={() => { setUserMenuOpen(false); setShowStreakSettings(true); }} size="sm" block className="mb-2" role="menuitem">Streak Settings</Button>
+              <Button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} size="sm" block className="mb-2" role="menuitem">Archive</Button>
               <Button onClick={() => { setUserMenuOpen(false); onLogout(); }} size="sm" block role="menuitem">Logout</Button>
             </div>
           )}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="flex gap-2">
           <Button
             onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }}
             style={{
@@ -1968,7 +1934,7 @@ function AuthedApp({
       </div>
 
       {mode === "builder" && (
-        <BuilderPage
+        <div className="page-enter" key="builder-page"><BuilderPage
           plans={plans}
           setPlans={setPlans}
           selectedPlanId={selectedPlanId}
@@ -1997,14 +1963,15 @@ function AuthedApp({
             // We set explicit selection; disable auto picker to avoid overrides
             setShouldAutoNavigate(false);
           }}
-        />
+        /></div>
       )}
 
       {mode === "workout" && (
+        <div className="page-enter" key="workout-page">
         <Card>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 15 }}>Plan:</label>
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex gap-3 items-center">
+              <label className="text-secondary font-medium text-[15px]">Plan:</label>
               <select
                 value={selectedPlanId ?? ''}
                 onChange={(e) => {
@@ -2047,8 +2014,8 @@ function AuthedApp({
             </div>
 
             {selectedPlan && (
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 15 }}>Week:</label>
+              <div className="flex gap-3 items-center flex-wrap">
+                <label className="text-secondary font-medium text-[15px]">Week:</label>
                 <select
                   value={selectedWeekId ?? ''}
                   onChange={(e) => {
@@ -2067,7 +2034,7 @@ function AuthedApp({
                   ))}
                 </select>
 
-                <label style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: 15 }}>Day:</label>
+                <label className="text-secondary font-medium text-[15px]">Day:</label>
                 <select
                   value={selectedDayId ?? ''}
                   onChange={(e) => {
@@ -2095,9 +2062,9 @@ function AuthedApp({
           </div>
 
           {!selectedPlan ? (
-            <p style={{ color: 'var(--text-muted)' }}>No plan selected.</p>
+            <p className="text-muted">No plan selected.</p>
           ) : !selectedDay ? (
-            <div style={{ color: 'var(--text-muted)' }}>Select a day.</div>
+            <div className="text-muted">Select a day.</div>
           ) : (
             <>
               <WorkoutPage
@@ -2146,72 +2113,58 @@ function AuthedApp({
             </>
           )}
         </Card>
+        </div>
       )}
       <Modal open={showArchiveList} onClose={closeArchive} title="Archived Plans" maxWidth={950} maxHeight="80vh" zIndex={20}>
-            {archivedError && <div style={{ color: 'var(--error)', padding: '8px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{archivedError}</div>}
+            {archivedError && <div className="text-error px-3 py-2 bg-error-muted rounded-sm">{archivedError}</div>}
             {archivedLoading ? (
-              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Loading archived plans...</div>
+              <div className="text-muted p-6 text-center">Loading archived plans...</div>
             ) : archivedPlans.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No archived plans yet.</div>
+              <div className="text-muted p-6 text-center">No archived plans yet.</div>
             ) : (
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="flex gap-4 flex-wrap">
+                <div className="flex-[0_0_280px] flex flex-col gap-3">
                   {archivedPlans.map((plan) => (
                     <div
                       key={plan.id}
                       style={{
                         background: viewArchivedPlan?.id === plan.id ? 'var(--accent-muted)' : 'var(--bg-card)',
                         border: `1px solid ${viewArchivedPlan?.id === plan.id ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
-                        borderRadius: 12,
-                        padding: 12,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 12,
-                        transition: 'all 0.15s ease',
                       }}
+                      className="rounded-md p-3 flex justify-between items-center gap-3 transition-all duration-150"
                     >
-                      <Button onClick={() => openArchivedPlan(plan)} style={{ flex: 1, textAlign: 'left' }}>
+                      <Button onClick={() => openArchivedPlan(plan)} className="flex-1 text-left">
                         {plan.name}
                       </Button>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div className="flex gap-2">
                         <Button onClick={() => handleDeleteArchivedPlan(plan)} size="sm">Delete</Button>
                         <Button onClick={() => exportPlanCSV(plan, buildCatalogByName(searchCatalogExercises))} size="sm">Export</Button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div style={{
-                  flex: 1,
-                  minWidth: 320,
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 12,
-                  padding: 16,
-                  maxHeight: '60vh',
-                  overflowY: 'auto'
-                }}>
+                <div className="flex-1 min-w-[320px] bg-card border border-subtle rounded-md p-4 max-h-[60vh] overflow-y-auto">
                   {!viewArchivedPlan ? (
-                    <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Select an archived plan to view details.</div>
+                    <div className="text-muted p-6 text-center">Select an archived plan to view details.</div>
                   ) : viewArchivedLoading ? (
-                    <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Loading sessions...</div>
+                    <div className="text-muted p-6 text-center">Loading sessions...</div>
                   ) : (
                     <div>
-                      <h3 style={{ marginTop: 0 }}>{viewArchivedPlan.name}</h3>
+                      <h3 className="mt-0">{viewArchivedPlan.name}</h3>
                       {viewArchivedPlan.weeks.map((week) => {
                         const sessionWeek = viewArchivedSessions[week.id] || {};
                         return (
-                          <div key={week.id} style={{ marginBottom: 16 }}>
-                            <h4 style={{ marginBottom: 8 }}>{week.name}</h4>
+                          <div key={week.id} className="mb-4">
+                            <h4 className="mb-2">{week.name}</h4>
                             {week.days.map((day) => {
                               const session = sessionWeek[day.id] || null;
                               return (
-                                <div key={day.id} style={{ marginBottom: 12 }}>
-                                  <h5 style={{ margin: '6px 0' }}>{day.name}</h5>
+                                <div key={day.id} className="mb-3">
+                                  <h5 className="my-1.5">{day.name}</h5>
                                   {day.items.length === 0 ? (
-                                    <div style={{ color: 'var(--text-muted)' }}>No exercises defined for this day.</div>
+                                    <div className="text-muted">No exercises defined for this day.</div>
                                   ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    <div className="flex flex-col gap-2">
                                       {day.items.map((item) => {
                                         const entry = session?.entries?.find((entry) => {
                                           if (item.exerciseId && entry.exerciseId) return item.exerciseId === entry.exerciseId;
@@ -2223,36 +2176,31 @@ function AuthedApp({
                                         const sets = entry?.sets ?? [];
                                         const rowCount = Math.max(item.targetSets, sets.length);
                                         return (
-                                          <div key={item.id} style={{
-                                            background: 'var(--bg-elevated)',
-                                            border: '1px solid var(--border-subtle)',
-                                            borderRadius: 12,
-                                            padding: 12
-                                          }}>
-                                            <div style={{ fontWeight: 600, fontSize: 15 }}>{item.exerciseName}</div>
-                                            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+                                          <div key={item.id} className="bg-elevated border border-subtle rounded-md p-3">
+                                            <div className="font-semibold text-[15px]">{item.exerciseName}</div>
+                                            <div className="text-[13px] text-muted mb-2">
                                               Target: {item.targetSets} set{item.targetSets === 1 ? '' : 's'}
                                               {item.targetReps ? ` - ${item.targetReps}` : ''}
                                             </div>
                                             {rowCount === 0 ? (
-                                              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No recorded sets.</div>
+                                              <div className="text-muted text-[13px]">No recorded sets.</div>
                                             ) : (
-                                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                              <table className="w-full border-collapse text-[13px]">
                                                 <thead>
-                                                  <tr style={{ textAlign: 'left' }}>
-                                                    <th style={{ padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Set</th>
-                                                    <th style={{ padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Weight</th>
-                                                    <th style={{ padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Reps</th>
+                                                  <tr className="text-left">
+                                                    <th className="py-1.5 border-b border-b-subtle text-muted font-medium text-[11px] uppercase">Set</th>
+                                                    <th className="py-1.5 border-b border-b-subtle text-muted font-medium text-[11px] uppercase">Weight</th>
+                                                    <th className="py-1.5 border-b border-b-subtle text-muted font-medium text-[11px] uppercase">Reps</th>
                                                   </tr>
                                                 </thead>
                                                 <tbody>
                                                   {Array.from({ length: rowCount }).map((_, idx) => {
                                                     const recorded = sets[idx];
                                                     return (
-                                                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                                        <td style={{ padding: '8px 0', color: 'var(--text-secondary)' }}>{idx + 1}</td>
-                                                        <td style={{ padding: '8px 0', fontWeight: recorded?.weight != null ? 600 : 400 }}>{recorded?.weight ?? '-'}</td>
-                                                        <td style={{ padding: '8px 0', fontWeight: recorded?.reps != null ? 600 : 400 }}>{recorded?.reps ?? '-'}</td>
+                                                      <tr key={idx} className="border-b border-b-subtle">
+                                                        <td className="py-2 text-secondary">{idx + 1}</td>
+                                                        <td className="py-2" style={{ fontWeight: recorded?.weight != null ? 600 : 400 }}>{recorded?.weight ?? '-'}</td>
+                                                        <td className="py-2" style={{ fontWeight: recorded?.reps != null ? 600 : 400 }}>{recorded?.reps ?? '-'}</td>
                                                       </tr>
                                                     );
                                                   })}
@@ -2282,21 +2230,14 @@ function AuthedApp({
 
             {/* Current streak display */}
             {streakConfig?.enabled && (
-              <div style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 12,
-                padding: 16,
-                marginBottom: 24,
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>🔥</div>
-                <div style={{ fontSize: 28, fontWeight: 700 }}>{currentStreak}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 15 }}>
+              <div className="bg-card border border-subtle rounded-md p-4 mb-6 text-center">
+                <div className="text-[48px] mb-2">🔥</div>
+                <div className="text-[28px] font-bold">{currentStreak}</div>
+                <div className="text-muted text-[15px]">
                   {currentStreak === 1 ? 'day streak' : 'day streak'}
                 </div>
                 {streakState?.longestStreak != null && streakState.longestStreak > 0 && (
-                  <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 8 }}>
+                  <div className="text-muted text-[13px] mt-2">
                     Longest: {streakState.longestStreak} days
                   </div>
                 )}
@@ -2304,15 +2245,9 @@ function AuthedApp({
             )}
 
             {/* Enable/disable toggle */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '12px 0',
-              borderBottom: '1px solid var(--border-subtle)'
-            }}>
-              <span style={{ fontWeight: 500 }}>Enable Streak Tracking</span>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <div className="flex justify-between items-center py-3 border-b border-b-subtle">
+              <span className="font-medium">Enable Streak Tracking</span>
+              <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={streakConfig?.enabled ?? false}
@@ -2336,7 +2271,7 @@ function AuthedApp({
                       upsertUserPrefs({ streak_config: updated });
                     }
                   }}
-                  style={{ width: 20, height: 20 }}
+                  className="w-5 h-5"
                 />
               </label>
             </div>
@@ -2344,9 +2279,9 @@ function AuthedApp({
             {/* Schedule mode selection */}
             {streakConfig?.enabled && (
               <>
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontWeight: 500, marginBottom: 12 }}>Schedule Mode</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                <div className="mt-5">
+                  <div className="font-medium mb-3">Schedule Mode</div>
+                  <div className="flex gap-2">
                     {(['daily', 'rolling', 'weekly'] as StreakScheduleMode[]).map((mode) => (
                       <Button
                         key={mode}
@@ -2372,11 +2307,10 @@ function AuthedApp({
                           upsertUserPrefs({ streak_config: updated, streak_state: resetState });
                         }}
                         style={{
-                          flex: 1,
                           background: streakConfig.scheduleMode === mode ? 'var(--accent-muted)' : 'var(--bg-card)',
                           borderColor: streakConfig.scheduleMode === mode ? 'var(--border-strong)' : 'var(--border-default)',
-                          textTransform: 'capitalize'
                         }}
+                        className="flex-1 capitalize"
                       >
                         {mode}
                       </Button>
@@ -2386,10 +2320,10 @@ function AuthedApp({
 
                 {/* Rolling mode settings */}
                 {streakConfig.scheduleMode === 'rolling' && (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Days On</label>
+                  <div className="mt-4">
+                    <div className="flex gap-3 items-center">
+                      <div className="flex-1">
+                        <label className="text-[13px] text-muted block mb-1">Days On</label>
                         <input
                           type="number"
                           min={1}
@@ -2401,11 +2335,11 @@ function AuthedApp({
                             setStreakConfig(updated);
                             upsertUserPrefs({ streak_config: updated });
                           }}
-                          style={{ width: '100%' }}
+                          className="w-full"
                         />
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Days Off</label>
+                      <div className="flex-1">
+                        <label className="text-[13px] text-muted block mb-1">Days Off</label>
                         <input
                           type="number"
                           min={1}
@@ -2417,11 +2351,11 @@ function AuthedApp({
                             setStreakConfig(updated);
                             upsertUserPrefs({ streak_config: updated });
                           }}
-                          style={{ width: '100%' }}
+                          className="w-full"
                         />
                       </div>
                     </div>
-                    <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+                    <div className="mt-2 text-[13px] text-muted">
                       Example: {streakConfig.rollingDaysOn ?? 3} days on, {streakConfig.rollingDaysOff ?? 1} day{(streakConfig.rollingDaysOff ?? 1) !== 1 ? 's' : ''} off
                     </div>
                   </div>
@@ -2429,9 +2363,9 @@ function AuthedApp({
 
                 {/* Weekly mode settings */}
                 {streakConfig.scheduleMode === 'weekly' && (
-                  <div style={{ marginTop: 16 }}>
-                    <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>Workout Days</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="mt-4">
+                    <label className="text-[13px] text-muted block mb-2">Workout Days</label>
+                    <div className="flex gap-2 flex-wrap">
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, idx) => {
                         const selected = streakConfig.weeklyDays?.includes(idx) ?? false;
                         return (
@@ -2450,10 +2384,10 @@ function AuthedApp({
                             }}
                             size="sm"
                             style={{
-                              minWidth: 44,
                               background: selected ? 'var(--accent-muted)' : 'var(--bg-card)',
                               borderColor: selected ? 'var(--border-strong)' : 'var(--border-default)',
                             }}
+                            className="min-w-[44px]"
                           >
                             {dayName}
                           </Button>
@@ -2464,7 +2398,7 @@ function AuthedApp({
                 )}
 
                 {/* Reset streak button */}
-                <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+                <div className="mt-6 pt-4 border-t border-subtle">
                   <Button
                     onClick={() => {
                       if (confirm('Reset your streak to 0? This cannot be undone.')) {
@@ -2476,7 +2410,7 @@ function AuthedApp({
                       }
                     }}
                     size="sm"
-                    style={{ color: 'var(--error)' }}
+                    className="text-error"
                   >
                     Reset Streak
                   </Button>
@@ -2489,33 +2423,33 @@ function AuthedApp({
       <Modal open={!!(showPlanSettings && selectedPlan)} onClose={() => setShowPlanSettings(false)} title="Plan Settings" maxWidth={360}>
         {selectedPlan && (
           <>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: 'var(--text-secondary)', fontSize: 15 }}>
+            <div className="mb-4">
+              <label className="block mb-2 font-medium text-secondary text-[15px]">
                 Plan Type
               </label>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className="flex gap-2">
                 <Button
                   onClick={() => handleGhostModeChange('default')}
                   style={{
-                    flex: 1,
                     background: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--accent-muted)' : 'var(--bg-card)',
                     borderColor: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--border-strong)' : 'var(--border-default)',
                   }}
+                  className="flex-1"
                 >
                   Default
                 </Button>
                 <Button
                   onClick={() => handleGhostModeChange('full-body')}
                   style={{
-                    flex: 1,
                     background: selectedPlan.ghostMode === 'full-body' ? 'var(--accent-muted)' : 'var(--bg-card)',
                     borderColor: selectedPlan.ghostMode === 'full-body' ? 'var(--border-strong)' : 'var(--border-default)',
                   }}
+                  className="flex-1"
                 >
                   Full Body
                 </Button>
               </div>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+              <p className="text-[13px] text-muted mt-2 leading-[1.4]">
                 {(selectedPlan.ghostMode ?? 'default') === 'default'
                   ? 'Ghost shows your most recent performance regardless of day.'
                   : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
@@ -2541,13 +2475,13 @@ function AuthedApp({
 
       {/* Streak Reconfigure Prompt (after Finish & Archive) */}
       <Modal open={showStreakReconfigPrompt} onClose={() => setShowStreakReconfigPrompt(false)} maxWidth={360}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-          <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Plan Complete!</h3>
-          <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
+        <div className="text-center">
+          <div className="text-[48px] mb-3">🎉</div>
+          <h3 className="mt-0 mb-2 text-lg">Plan Complete!</h3>
+          <p className="text-muted mb-6">
             Great work finishing your plan. Would you like to update your streak schedule?
           </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <div className="flex gap-3 justify-center">
             <Button
               onClick={() => setShowStreakReconfigPrompt(false)}
             >
@@ -3547,22 +3481,17 @@ function WorkoutPage({
         ))}
       </datalist>
       {session.entries.map((entry, entryIndex) => (
-        <div key={entry.id} style={{
-          background: 'var(--bg-elevated)',
+        <div key={entry.id} className="list-stagger bg-elevated rounded-md p-4 mb-3 shadow-card transition-all duration-150 ease-in-out" style={{
+          '--i': entryIndex,
           border: editingEntryId === entry.id ? '1px solid var(--accent)' : '1px solid var(--border-default)',
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 12,
-          boxShadow: 'var(--shadow-card)',
-          transition: 'all 0.15s ease',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        } as React.CSSProperties}>
+          <div className="flex justify-between mb-3 items-center flex-wrap gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
               <div>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
+                <h3 className="m-0 text-[15px] font-semibold">
                   {entry.exerciseName}
                   {entry.myoRepMatch && (
-                    <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent-purple)', fontWeight: 500 }}>MYO</span>
+                    <span className="ml-2 text-[11px] text-accent-purple font-medium">MYO</span>
                   )}
                 </h3>
                 {(() => {
@@ -3571,10 +3500,10 @@ function WorkoutPage({
                   const label = cat.secondaryMuscles?.length
                     ? `${cat.primaryMuscle} · ${cat.secondaryMuscles[0]}`
                     : cat.primaryMuscle;
-                  return <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontWeight: 400 }}>{label}</div>;
+                  return <div className="text-[11px] text-muted mt-0.5 font-normal">{label}</div>;
                 })()}
               </div>
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <Button
                   onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
                   size="sm"
@@ -3584,38 +3513,26 @@ function WorkoutPage({
                   ⋮
                 </Button>
                 {openExerciseMenu === entry.id && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-default)',
-                    borderRadius: 12,
-                    padding: 8,
-                    marginTop: 4,
-                    minWidth: 160,
-                    zIndex: 20,
-                    boxShadow: 'var(--shadow-lg)',
-                  }}>
+                  <div className="dropdown-menu absolute top-full left-0 bg-elevated border border-default rounded-md p-2 mt-1 min-w-[160px] z-20 shadow-[var(--shadow-lg)]">
                     <Button
                       onClick={() => {
                         setOpenExerciseMenu(null);
                         setEditingEntryId(entry.id);
                         setEditDraftSets(entry.sets.map(s => ({ ...s })));
                       }}
-                      size="sm" block style={{ textAlign: 'left', marginBottom: 4 }}
+                      size="sm" block className="text-left mb-1"
                     >
                       Edit Sets
                     </Button>
                     <Button
                       onClick={() => { setOpenExerciseMenu(null); openReplaceSearch(entry, entryIndex); }}
-                      size="sm" block style={{ textAlign: 'left', marginBottom: 4 }}
+                      size="sm" block className="text-left mb-1"
                     >
                       Replace
                     </Button>
                     <Button
                       onClick={() => { setOpenExerciseMenu(null); openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }); }}
-                      size="sm" block style={{ textAlign: 'left', marginBottom: 4 }}
+                      size="sm" block className="text-left mb-1"
                     >
                       History
                     </Button>
@@ -3635,7 +3552,7 @@ function WorkoutPage({
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="flex gap-2">
               <Button
                 onClick={() => {
                   if (openInstructions[entry.id]) {
@@ -3690,18 +3607,14 @@ function WorkoutPage({
           </div>
 
           {openInstructions[entry.id] && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="flex flex-col gap-3">
               <textarea
                 value={instructionsDraft[entry.id] ?? ''}
                 onChange={(e) => setInstructionsDraft((prev) => ({ ...prev, [entry.id]: e.target.value }))}
-                style={{
-                  minHeight: 120,
-                  resize: 'vertical',
-                  width: '100%',
-                }}
+                className="min-h-[120px] resize-y w-full"
                 placeholder="Add instructions or coaching cues for this exercise"
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div className="flex justify-end gap-2">
                 <Button
                   onClick={() => {
                     updateEntryInstruction(entry.id, instructionsDraft[entry.id] ?? '');
@@ -3716,18 +3629,14 @@ function WorkoutPage({
           )}
 
           {openNotes[entry.id] ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="flex flex-col gap-3">
               <textarea
                 value={notesDraft[entry.id] ?? ''}
                 onChange={(e) => setNotesDraft((prev) => ({ ...prev, [entry.id]: e.target.value }))}
-                style={{
-                  minHeight: 120,
-                  resize: 'vertical',
-                  width: '100%',
-                }}
+                className="min-h-[120px] resize-y w-full"
                 placeholder="Add notes for this exercise"
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div className="flex justify-end gap-2">
                 <Button
                   onClick={() => {
                     updateEntryNote(entry.id, notesDraft[entry.id] ?? '');
@@ -3742,19 +3651,7 @@ function WorkoutPage({
           ) : (
             editingEntryId === entry.id ? (
               <>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '50px 1fr 1fr 36px',
-                  gap: 12,
-                  marginBottom: 12,
-                  padding: '0 4px',
-                  color: 'var(--text-muted)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  textAlign: 'center',
-                }}>
+                <div className="grid grid-cols-[50px_1fr_1fr_36px] gap-3 mb-3 px-1 text-muted text-[13px] font-semibold uppercase tracking-[0.05em] text-center">
                   <div>Set</div>
                   <div>Weight</div>
                   <div>Reps</div>
@@ -3762,44 +3659,21 @@ function WorkoutPage({
                 </div>
 
                 {editDraftSets.map((set, i) => (
-                  <div key={set.id} style={{
-                    display: 'grid',
-                    gridTemplateColumns: '50px 1fr 1fr 36px',
-                    gap: 12,
-                    marginBottom: 12,
-                    padding: '4px',
-                    borderRadius: 12,
+                  <div key={set.id} className="grid grid-cols-[50px_1fr_1fr_36px] gap-3 mb-3 p-1 rounded-md" style={{
                     background: (set.weight != null || set.reps != null) ? 'var(--accent-subtle)' : 'transparent',
                   }}>
-                    <div style={{
-                      alignSelf: 'center',
-                      textAlign: 'center',
-                      fontWeight: 600,
-                      color: 'var(--text-secondary)',
-                      fontSize: 15,
-                    }}>{i + 1}</div>
-                    <div style={{
-                      alignSelf: 'center',
-                      textAlign: 'center',
-                      fontSize: 15,
+                    <div className="self-center text-center font-semibold text-secondary text-[15px]">{i + 1}</div>
+                    <div className="self-center text-center text-[15px]" style={{
                       color: set.weight != null ? 'var(--text-primary)' : 'var(--text-muted)',
                     }}>{set.weight ?? '—'}</div>
-                    <div style={{
-                      alignSelf: 'center',
-                      textAlign: 'center',
-                      fontSize: 15,
+                    <div className="self-center text-center text-[15px]" style={{
                       color: set.reps != null ? 'var(--text-primary)' : 'var(--text-muted)',
                     }}>{set.reps ?? '—'}</div>
                     <Button
                       onClick={() => removeDraftSet(set.id)}
                       size="sm"
-                      style={{
-                        padding: '2px 6px',
-                        minWidth: 0,
-                        color: 'var(--error)',
-                        borderColor: 'var(--error)',
-                        fontSize: 15,
-                      }}
+                      className="text-error border-error min-w-0 text-[15px]"
+                      style={{ padding: '2px 6px' }}
                       title="Remove set"
                     >
                       ✕
@@ -3809,31 +3683,19 @@ function WorkoutPage({
 
                 <Button
                   onClick={addDraftSet}
-                  size="sm" block style={{ marginBottom: 12 }}
+                  size="sm" block className="mb-3"
                 >
                   + Add Set
                 </Button>
 
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <div className="flex gap-2 justify-end">
                   <Button onClick={cancelEdit} size="sm">Cancel</Button>
                   <Button onClick={saveEditSets} variant="primary">Save</Button>
                 </div>
               </>
             ) : (
               <>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '50px 1fr 1fr',
-                  gap: 12,
-                  marginBottom: 12,
-                  padding: '0 4px',
-                  color: 'var(--text-muted)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  textAlign: 'center',
-                }}>
+                <div className="grid grid-cols-[50px_1fr_1fr] gap-3 mb-3 px-1 text-muted text-[13px] font-semibold uppercase tracking-[0.05em] text-center">
                   <div>Set</div>
                   <div>Weight</div>
                   <div style={{ color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-muted)' }}>
@@ -3845,23 +3707,10 @@ function WorkoutPage({
                   const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
                   const hasValue = set.weight != null || set.reps != null;
                   return (
-                    <div key={set.id} style={{
-                      display: 'grid',
-                      gridTemplateColumns: '50px 1fr 1fr',
-                      gap: 12,
-                      marginBottom: 12,
-                      padding: '4px',
-                      borderRadius: 12,
+                    <div key={set.id} className="grid grid-cols-[50px_1fr_1fr] gap-3 mb-3 p-1 rounded-md transition-colors duration-150" style={{
                       background: hasValue ? 'var(--accent-subtle)' : 'transparent',
-                      transition: 'background 0.15s ease',
                     }}>
-                      <div style={{
-                        alignSelf: 'center',
-                        textAlign: 'center',
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        fontSize: 15,
-                      }}>{i + 1}</div>
+                      <div className="self-center text-center font-semibold text-secondary text-[15px]">{i + 1}</div>
                       <input
                         type="number"
                         step="any"
@@ -3876,12 +3725,8 @@ function WorkoutPage({
                             weight: num !== null && Number.isNaN(num) ? null : num,
                           });
                         }}
-                        style={{
-                          width: '100%',
-                          minWidth: 0,
-                          textAlign: 'center',
-                          fontWeight: set.weight != null ? 600 : 400,
-                        }}
+                        className="w-full min-w-0 text-center"
+                        style={{ fontWeight: set.weight != null ? 600 : 400 }}
                       />
                       <input
                         inputMode="numeric"
@@ -3902,36 +3747,21 @@ function WorkoutPage({
                             });
                           }
                         }}
-                        style={{
-                          width: '100%',
-                          minWidth: 0,
-                          textAlign: 'center',
-                          fontWeight: set.reps != null ? 600 : 400,
-                        }}
+                        className="w-full min-w-0 text-center"
+                        style={{ fontWeight: set.reps != null ? 600 : 400 }}
                       />
                     </div>
                   );
                 })}
 
-                {entry.sets.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No sets yet.</div>}
+                {entry.sets.length === 0 && <div className="text-muted">No sets yet.</div>}
               </>
             )
           )}
         </div>
       ))}
 
-      <div
-        style={{
-          marginTop: 20,
-          paddingTop: 16,
-          borderTop: '1px solid var(--border-subtle)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 12,
-        }}
-      >
+      <div className="mt-5 pt-4 border-t border-t-subtle flex justify-between items-center flex-wrap gap-3">
         <label style={{
           display: 'flex',
           alignItems: 'center',
@@ -3943,21 +3773,26 @@ function WorkoutPage({
           border: `1px solid ${completed ? 'var(--success)' : 'var(--border-subtle)'}`,
           transition: 'all 0.15s ease',
         }}>
-          <input
-            type="checkbox"
-            checked={completed}
-            onChange={(e) => {
-              const value = e.target.checked;
-              markSessionCompleted(value);
-              setCompleted(value);
-            }}
-          />
-          <span style={{ fontWeight: 500, color: completed ? 'var(--success)' : 'var(--text-secondary)' }}>
+          <span className="check-animated">
+            <input
+              type="checkbox"
+              checked={completed}
+              onChange={(e) => {
+                const value = e.target.checked;
+                markSessionCompleted(value);
+                setCompleted(value);
+              }}
+            />
+            <svg className="checkmark-svg" viewBox="0 0 20 20" fill="none">
+              <path className="checkmark-path" d="M5 10.5L8.5 14L15 7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span className="font-medium" style={{ color: completed ? 'var(--success)' : 'var(--text-secondary)' }}>
             Completed
           </span>
         </label>
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div className="flex gap-3 flex-wrap">
           {isLastDay && onFinishPlan && (
             <Button onClick={onFinishPlan} variant="primary" disabled={finishingPlan}>
               {finishingPlan ? 'Finishing...' : 'Finish & Archive'}
@@ -3974,7 +3809,7 @@ function WorkoutPage({
 
       <Modal open={replaceSearchOpen} onClose={closeReplaceSearch} title={`Replace Exercise${replaceTargetEntry ? ` - ${replaceTargetEntry.exerciseName}` : ''}`} maxWidth={980}>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
               <input
                 value={replaceSearchText}
                 onChange={(e) => setReplaceSearchText(e.target.value)}
@@ -3999,33 +3834,33 @@ function WorkoutPage({
                 <option value="home_made">Home Made *</option>
               </select>
               <Button variant="pill" active={replaceSearchMachine} onClick={() => setReplaceSearchMachine((prev) => !prev)} aria-pressed={replaceSearchMachine}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchMachine ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchMachine ? "var(--text-primary)" : "transparent" }} />
                 Machine
               </Button>
               <Button variant="pill" active={replaceSearchFreeWeight} onClick={() => setReplaceSearchFreeWeight((prev) => !prev)} aria-pressed={replaceSearchFreeWeight}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchFreeWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchFreeWeight ? "var(--text-primary)" : "transparent" }} />
                 Free weight
               </Button>
               <Button variant="pill" active={replaceSearchCable} onClick={() => setReplaceSearchCable((prev) => !prev)} aria-pressed={replaceSearchCable}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchCable ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchCable ? "var(--text-primary)" : "transparent" }} />
                 Cable
               </Button>
               <Button variant="pill" active={replaceSearchBodyWeight} onClick={() => setReplaceSearchBodyWeight((prev) => !prev)} aria-pressed={replaceSearchBodyWeight}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchBodyWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchBodyWeight ? "var(--text-primary)" : "transparent" }} />
                 Bodyweight
               </Button>
               <Button variant="pill" active={replaceSearchCompound} onClick={() => setReplaceSearchCompound((prev) => !prev)} aria-pressed={replaceSearchCompound}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: replaceSearchCompound ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchCompound ? "var(--text-primary)" : "transparent" }} />
                 Compound
               </Button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: 12, padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontWeight: 600 }}>Results</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{replaceFilteredCatalog.length} found</div>
+            <div className="flex flex-col gap-3">
+              <div className="border border-default rounded-md p-3">
+                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="font-semibold">Results</div>
+                  <div className="text-muted text-[13px]">{replaceFilteredCatalog.length} found</div>
                 </div>
                   <Button
                     onClick={() => {
@@ -4038,7 +3873,7 @@ function WorkoutPage({
                   </Button>
                 </div>
                 {replaceAddMovementOpen && (
-                  <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="border border-subtle rounded-sm p-2 mb-2 flex flex-col gap-2">
                     <input
                       value={replaceAddMovementName}
                       onChange={(e) => setReplaceAddMovementName(e.target.value)}
@@ -4054,8 +3889,8 @@ function WorkoutPage({
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="flex flex-wrap gap-3">
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4064,7 +3899,7 @@ function WorkoutPage({
                         />
                         Machine
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4073,7 +3908,7 @@ function WorkoutPage({
                         />
                         Free weight
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4082,7 +3917,7 @@ function WorkoutPage({
                         />
                         Cable
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="replace-add-movement-equipment"
@@ -4092,7 +3927,7 @@ function WorkoutPage({
                         Bodyweight
                       </label>
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={replaceAddMovementCompound}
@@ -4118,9 +3953,9 @@ function WorkoutPage({
                       </select>
                     )}
                     {replaceAddMovementError && (
-                      <div style={{ color: 'var(--error)', fontSize: 13 }}>{replaceAddMovementError}</div>
+                      <div className="text-error text-[13px]">{replaceAddMovementError}</div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <div className="flex justify-end gap-2">
                       <Button
                         onClick={() => {
                           resetReplaceAddMovement();
@@ -4135,19 +3970,19 @@ function WorkoutPage({
                     </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '40vh', overflowY: 'auto' }}>
+                <div className="flex flex-col gap-2 max-h-[40vh] overflow-y-auto">
                   {replaceFilteredCatalog.length === 0 ? (
-                    <div style={{ color: 'var(--text-muted)' }}>No matches.</div>
+                    <div className="text-muted">No matches.</div>
                   ) : (
                     replaceFilteredCatalog.map((ex) => (
-                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 15 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} className="border border-subtle rounded-sm p-2 flex justify-between items-center gap-2">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-[15px]">{ex.name}{ex.isCustom ? ' *' : ''}</div>
+                          <div className="text-muted text-[11px]">
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <div className="flex gap-2 shrink-0">
                           <Button onClick={() => addReplaceQueue(ex)} size="xs">Add</Button>
                           {ex.isCustom && (
                             <Button onClick={() => handleDeleteCustomFromReplace(ex)} size="xs">Del</Button>
@@ -4159,33 +3994,24 @@ function WorkoutPage({
                 </div>
               </div>
 
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: 12, padding: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>Queue:</div>
+              <div className="border border-default rounded-md p-3">
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <div className="font-semibold text-[13px]">Queue:</div>
                   {replaceQueue.length === 0 ? (
-                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>None selected</div>
+                    <div className="text-muted text-[13px]">None selected</div>
                   ) : (
                     replaceQueue.map((q) => (
-                      <div key={q.name} style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        background: 'var(--accent-subtle)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 8,
-                        padding: '2px 6px',
-                        fontSize: 13,
-                      }}>
+                      <div key={q.name} className="inline-flex items-center gap-1 bg-accent-subtle border border-subtle rounded-sm px-1.5 py-0.5 text-[13px]">
                         <span>{q.name}</span>
                         <button
                           onClick={() => removeReplaceQueue(q.name)}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1 }}
+                          className="bg-transparent border-none text-muted cursor-pointer px-0.5 py-0 text-[13px] leading-none"
                         >✕</button>
                       </div>
                     ))
                   )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <div className="flex justify-end gap-2">
                   <Button onClick={closeReplaceSearch} size="sm">Cancel</Button>
                   <Button onClick={() => applyReplaceQueue("today")} variant="primary" size="sm" disabled={replaceQueue.length === 0}>
                     Today Only
@@ -4196,20 +4022,20 @@ function WorkoutPage({
                 </div>
               </div>
             </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'left' }}>
+            <div className="text-muted text-[13px] text-left">
               * = self made movement
             </div>
       </Modal>
 
       <Modal open={!!myoScopeEntry} onClose={() => setMyoScopeEntry(null)} maxWidth={320}>
-        <div style={{ textAlign: 'center' }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Myo-Rep Match</h3>
+        <div className="text-center">
+          <h3 className="m-0 mb-2 text-lg">Myo-Rep Match</h3>
           {myoScopeEntry && (
-            <p style={{ color: 'var(--text-secondary)', fontSize: 15, marginBottom: 24 }}>
+            <p className="text-secondary text-[15px] mb-6">
               {myoScopeEntry.currentValue ? 'Turn off' : 'Turn on'} Myo-Rep Match for <strong>{myoScopeEntry.exerciseName}</strong>?
             </p>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="flex flex-col gap-2">
             <Button onClick={applyMyoToday} block>
               Just Today
             </Button>
@@ -4224,7 +4050,7 @@ function WorkoutPage({
             >
               {plan?.ghostMode === 'full-body' ? 'All ' + day?.name + ' Days' : 'Entire Plan'}
             </Button>
-            <Button onClick={() => setMyoScopeEntry(null)} block style={{ marginTop: 8 }}>
+            <Button onClick={() => setMyoScopeEntry(null)} block className="mt-2">
               Cancel
             </Button>
           </div>
@@ -4233,62 +4059,37 @@ function WorkoutPage({
 
       <Modal open={historyOpen} onClose={() => { setHistoryOpen(false); setHistoryError(null); }} title={`History${historyEntry ? ` - ${historyEntry.exerciseName}` : ''}`} maxWidth={520} maxHeight="80vh">
             {historyLoading ? (
-              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>Loading history...</div>
+              <div className="text-muted p-6 text-center">Loading history...</div>
             ) : historyError ? (
-              <div style={{ color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{historyError}</div>
+              <div className="text-error px-3 py-2.5 bg-error-muted rounded-sm">{historyError}</div>
             ) : !historyPr && historyItems.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', padding: 24, textAlign: 'center' }}>No recorded sets yet.</div>
+              <div className="text-muted p-6 text-center">No recorded sets yet.</div>
             ) : (
               <>
                 {historyPr && (
-                  <div style={{
-                    border: '1px solid var(--success)',
-                    borderRadius: 12,
-                    padding: 16,
-                    background: 'var(--success-muted)',
-                    boxShadow: '0 0 20px rgba(74, 222, 128, 0.1)'
-                  }}>
-                    <div style={{
-                      fontWeight: 600,
-                      color: 'var(--success)',
-                      fontSize: 13,
-                      marginBottom: 8,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>Personal Best</div>
-                    <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
-                      {historyPr.weight} <span style={{ color: 'var(--text-muted)', fontSize: 15, fontWeight: 400 }}>×</span> {historyPr.reps}
+                  <div className="border border-success rounded-md p-4 bg-success-muted shadow-[0_0_20px_rgba(74,222,128,0.1)]">
+                    <div className="font-semibold text-success text-[13px] mb-2 uppercase tracking-[0.05em]">Personal Best</div>
+                    <div className="text-[28px] font-bold tracking-[-0.02em]">
+                      {historyPr.weight} <span className="text-muted text-[15px] font-normal">×</span> {historyPr.reps}
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6 }}>{formatHistoryDate(historyPr.date)}</div>
+                    <div className="text-secondary text-[13px] mt-1.5">{formatHistoryDate(historyPr.date)}</div>
                   </div>
                 )}
 
                 {historyItems.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    <div style={{
-                      fontWeight: 600,
-                      fontSize: 13,
-                      color: 'var(--text-muted)',
-                      marginBottom: 12,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>Progression</div>
+                  <div className="flex flex-col">
+                    <div className="font-semibold text-[13px] text-muted mb-3 uppercase tracking-[0.05em]">Progression</div>
                     {historyItems.map((item, idx) => (
-                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '12px 0',
+                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} className="flex justify-between items-center gap-2 py-3" style={{
                         borderBottom: idx < historyItems.length - 1 ? '1px solid var(--border-subtle)' : 'none'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border-strong)' }} />
-                          <span style={{ fontWeight: 600, fontSize: 15 }}>{item.weight}</span>
-                          <span style={{ color: 'var(--text-muted)' }}>×</span>
-                          <span style={{ fontWeight: 600, fontSize: 15 }}>{item.reps}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-strong" />
+                          <span className="font-semibold text-[15px]">{item.weight}</span>
+                          <span className="text-muted">×</span>
+                          <span className="font-semibold text-[15px]">{item.reps}</span>
                         </div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{formatHistoryDate(item.date)}</div>
+                        <div className="text-muted text-[13px]">{formatHistoryDate(item.date)}</div>
                       </div>
                     ))}
                   </div>
@@ -4419,11 +4220,11 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
     <Modal open={true} onClose={onClose} title="AI Program Builder" maxWidth={540} zIndex={35}>
 
         {step === 'form' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="flex flex-col gap-4">
             {/* Experience */}
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Experience Level</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="text-[13px] font-semibold mb-2 text-secondary">Experience Level</div>
+              <div className="flex flex-wrap gap-2">
                 {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => (
                   <Button key={lvl} variant="pill" active={experience === lvl} onClick={() => { setExperience(lvl); if (lvl !== 'beginner') setBeginnerRandom(false); }}>
                     {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
@@ -4434,8 +4235,8 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
 
             {/* Training goal */}
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Training Goal</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="text-[13px] font-semibold mb-2 text-secondary">Training Goal</div>
+              <div className="flex flex-wrap gap-2">
                 <Button variant="pill" active={trainingGoal === 'strength'} onClick={() => setTrainingGoal('strength')}>Strength</Button>
                 <Button variant="pill" active={trainingGoal === 'hypertrophy'} onClick={() => setTrainingGoal('hypertrophy')}>Size (Hypertrophy)</Button>
                 <Button variant="pill" active={trainingGoal === 'both'} onClick={() => setTrainingGoal('both')}>Both</Button>
@@ -4445,8 +4246,8 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
             {/* Beginner: random or personalized */}
             {experience === 'beginner' && (
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Plan Type</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <div className="text-[13px] font-semibold mb-2 text-secondary">Plan Type</div>
+                <div className="flex flex-wrap gap-2">
                   <Button variant="pill" active={!beginnerRandom} onClick={() => setBeginnerRandom(false)}>Personalized Plan</Button>
                   <Button variant="pill" active={beginnerRandom} onClick={() => setBeginnerRandom(true)}>Random Starter Plan</Button>
                 </div>
@@ -4455,8 +4256,8 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
 
             {/* Days per week */}
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Days Per Week</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="text-[13px] font-semibold mb-2 text-secondary">Days Per Week</div>
+              <div className="flex flex-wrap gap-2">
                 {[1,2,3,4,5,6,7].map(d => (
                   <Button key={d} variant="pill" active={daysPerWeek === d} onClick={() => setDaysPerWeek(d)} style={{ minWidth: 36, justifyContent: 'center' }}>
                     {d}
@@ -4467,8 +4268,8 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
 
             {/* Session duration */}
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Session Duration</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="text-[13px] font-semibold mb-2 text-secondary">Session Duration</div>
+              <div className="flex flex-wrap gap-2">
                 {['30','45','60','75','90+'].map(t => (
                   <Button key={t} variant="pill" active={sessionMinutes === t} onClick={() => setSessionMinutes(t)}>
                     {t} min
@@ -4480,12 +4281,12 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
             {/* Injuries (shown for all except beginner random) */}
             {showDetails && (
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Injuries or Limitations (optional)</div>
+                <div className="text-[13px] font-semibold mb-2 text-secondary">Injuries or Limitations (optional)</div>
                 <textarea
                   value={injuries}
                   onChange={e => setInjuries(e.target.value)}
                   placeholder="e.g., bad left shoulder, lower back issues"
-                  style={{ width: '100%', minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }}
+                  className="w-full min-h-[60px] resize-y"
                 />
               </div>
             )}
@@ -4497,13 +4298,13 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
                 <div>
                   <button
                     onClick={() => setShowPrioMuscles(p => !p)}
-                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: priorityMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
+                    className="bg-transparent border-none p-0 cursor-pointer flex items-center gap-2 text-[13px] font-semibold shadow-none" style={{ color: priorityMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
                   >
-                    <span style={{ fontSize: 11, transition: 'transform 0.15s', transform: showPrioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                    <span className="text-[11px] transition-transform duration-150" style={{ transform: showPrioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
                     Muscles to Prioritize{priorityMuscles.length > 0 && ` (${priorityMuscles.length})`}
                   </button>
                   {showPrioMuscles && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
                         <Button key={m} variant="pill" active={priorityMuscles.includes(m)} onClick={() => togglePriority(m)}>
                           {m}
@@ -4517,13 +4318,13 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
                 <div>
                   <button
                     onClick={() => setShowDeprioMuscles(p => !p)}
-                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: deprioritizedMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
+                    className="bg-transparent border-none p-0 cursor-pointer flex items-center gap-2 text-[13px] font-semibold shadow-none" style={{ color: deprioritizedMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
                   >
-                    <span style={{ fontSize: 11, transition: 'transform 0.15s', transform: showDeprioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                    <span className="text-[11px] transition-transform duration-150" style={{ transform: showDeprioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
                     Muscles to De-prioritize{deprioritizedMuscles.length > 0 && ` (${deprioritizedMuscles.length})`}
                   </button>
                   {showDeprioMuscles && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
                         <Button key={m} variant="pill" active={deprioritizedMuscles.includes(m)} onClick={() => toggleDepriority(m)}>
                           {m}
@@ -4535,8 +4336,8 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
 
                 {/* Myo reps */}
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Do you know what myo-rep sets are?</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div className="text-[13px] font-semibold mb-2 text-secondary">Do you know what myo-rep sets are?</div>
+                  <div className="flex gap-2">
                     <Button variant="pill" active={knowsMyoReps} onClick={() => setKnowsMyoReps(true)}>Yes</Button>
                     <Button variant="pill" active={!knowsMyoReps} onClick={() => setKnowsMyoReps(false)}>No</Button>
                   </div>
@@ -4546,7 +4347,7 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
 
             {/* Error message */}
             {genError && (
-              <div style={{ fontSize: 13, color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', border: '1px solid var(--error)', borderRadius: 12 }}>
+              <div className="text-[13px] text-error px-3 py-2.5 bg-error-muted border border-error rounded-md">
                 {genError}
               </div>
             )}
@@ -4554,37 +4355,37 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
             {/* API Key section */}
             {(limitReached || showKeyInput) && (
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>
-                  Anthropic API Key {limitReached && <span style={{ color: 'var(--error)', fontWeight: 400 }}>(free generations used up)</span>}
+                <div className="text-[13px] font-semibold mb-2 text-secondary">
+                  Anthropic API Key {limitReached && <span className="text-error font-normal">(free generations used up)</span>}
                 </div>
                 <input
                   type="password"
                   value={userApiKey}
                   onChange={e => saveApiKey(e.target.value)}
                   placeholder="sk-ant-..."
-                  style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: 13 }}
+                  className="w-full font-mono text-[13px]"
                 />
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                <div className="text-[11px] text-muted mt-1">
                   Get a key at console.anthropic.com. Stored locally in your browser only.
                 </div>
               </div>
             )}
 
             {!showKeyInput && !limitReached && (
-              <Button onClick={() => setShowKeyInput(true)} size="sm" style={{ alignSelf: 'flex-start', fontSize: 11 }}>
+              <Button onClick={() => setShowKeyInput(true)} size="sm" className="self-start text-[11px]">
                 Use your own API key
               </Button>
             )}
 
             {/* Remaining count */}
             {remaining && !userApiKey.trim() && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <div className="text-[11px] text-muted">
                 {remaining.remaining} of {remaining.limit} free generation{remaining.limit !== 1 ? 's' : ''} remaining
               </div>
             )}
 
             {/* Disclaimer */}
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
+            <div className="text-[11px] text-muted leading-normal px-3 py-2.5 bg-card border border-subtle rounded-md">
               Disclaimer: Programs generated by AI are not reviewed by a certified trainer. Neither the AI, this app, nor its creator are liable for any injuries resulting from following a generated program. Consult a medical professional before starting any exercise program, especially if you have existing injuries or health conditions.
             </div>
 
@@ -4593,26 +4394,26 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
               onClick={handleGenerate}
               variant="primary"
               block
-              style={{ textAlign: 'center' }}
+              className="text-center"
               disabled={catalogExercises.length === 0 || (limitReached && !userApiKey.trim())}
             >
               {catalogExercises.length === 0 ? 'Loading exercises...' : 'Generate Program'}
             </Button>
 
-            <Button onClick={() => setStep('manual')} size="sm" style={{ alignSelf: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+            <Button onClick={() => setStep('manual')} size="sm" className="self-center text-[11px] text-muted">
               Or copy prompt manually for any AI
             </Button>
           </div>
         ) : step === 'generating' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '40px 0' }}>
-            <div style={{ width: 40, height: 40, border: '3px solid var(--border-subtle)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'ptr-spin 0.8s linear infinite' }} />
-            <div style={{ fontSize: 15, color: 'var(--text-secondary)' }}>Generating your program...</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>This usually takes 15-30 seconds</div>
+          <div className="flex flex-col items-center gap-4 py-10">
+            <div className="w-10 h-10 border-[3px] border-subtle border-t-accent rounded-full animate-[ptr-spin_0.8s_linear_infinite]" />
+            <div className="text-[15px] text-secondary">Generating your program...</div>
+            <div className="text-[13px] text-muted">This usually takes 15-30 seconds</div>
           </div>
         ) : step === 'manual' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--text-primary)' }}>How to use:</strong><br/>
+          <div className="flex flex-col gap-3">
+            <div className="text-[13px] text-secondary leading-relaxed">
+              <strong className="text-primary">How to use:</strong><br/>
               1. Copy the prompt below<br/>
               2. Download the exercise list CSV<br/>
               3. Paste the prompt into ChatGPT, Claude, or any AI<br/>
@@ -4625,19 +4426,19 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
               data-prompt-output=""
               readOnly
               value={promptText}
-              style={{ width: '100%', minHeight: 200, resize: 'vertical', fontFamily: 'monospace', fontSize: 11, boxSizing: 'border-box' }}
+              className="w-full min-h-[200px] resize-y font-mono text-[11px]"
             />
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <Button onClick={handleCopy} variant="primary" style={{ flex: 1, textAlign: 'center', minWidth: 140 }}>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleCopy} variant="primary" className="flex-1 text-center min-w-[140px]">
                 {copied ? 'Copied!' : 'Copy Prompt'}
               </Button>
-              <Button onClick={handleDownloadCatalog} style={{ flex: 1, textAlign: 'center', minWidth: 140 }}>
+              <Button onClick={handleDownloadCatalog} className="flex-1 text-center min-w-[140px]">
                 Download Exercise List
               </Button>
             </div>
 
-            <Button onClick={() => setStep('form')} size="sm" style={{ alignSelf: 'flex-start' }}>
+            <Button onClick={() => setStep('form')} size="sm" className="self-start">
               ← Back
             </Button>
           </div>
@@ -5774,15 +5575,15 @@ function BuilderPage({
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className="flex justify-between gap-3 flex-wrap mb-4">
+        <div className="flex gap-3 flex-wrap">
           <Button onClick={() => setShowPlanList(true)}>
             Manage Plans & Templates</Button>
           <Button onClick={handleCreatePlan}>
             + Plan
           </Button>
           {(exerciseLoading || catalogLoading) && (
-            <div style={{ color: 'var(--text-muted)', alignSelf: 'center', fontSize: 13 }}>Loading exercises...</div>
+            <div className="text-muted self-center text-[13px]">Loading exercises...</div>
           )}
           {selectedPlan && (
             <>
@@ -5805,24 +5606,24 @@ function BuilderPage({
         </div>
       </div>
 
-      {error && <div style={{ color: 'var(--error)', marginTop: 8, padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{error}</div>}
+      {error && <div className="text-error mt-2 px-3 py-2.5 bg-error-muted rounded-sm">{error}</div>}
 
       {!selectedPlan ? (
-        <EmptyState message="Create a plan to get started." style={{ marginTop: 16 }} />
+        <EmptyState message="Create a plan to get started." className="mt-4" />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="flex flex-col gap-4">
           <div>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 15, color: 'var(--text-secondary)' }}>Plan Name</label>
+            <label className="block mb-2 font-semibold text-[15px] text-secondary">Plan Name</label>
             <input
               value={selectedPlan.name}
               onChange={(e) => handlePlanNameChange(e.target.value)}
-              style={{ width: '100%' }}
+              className="w-full"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 15, color: 'var(--text-secondary)' }}>Plan Type</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <label className="block mb-2 font-semibold text-[15px] text-secondary">Plan Type</label>
+            <div className="flex gap-2">
               <Button
                 onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'default' }))}
                 style={{
@@ -5844,22 +5645,22 @@ function BuilderPage({
                 Full Body
               </Button>
             </div>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+            <p className="text-[13px] text-muted mt-2 leading-snug">
               {(selectedPlan.ghostMode ?? 'default') === 'default'
                 ? 'Ghost shows your most recent performance regardless of day.'
                 : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
             </p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="flex flex-col gap-4">
             {selectedPlan.weeks.map((week) => (
-              <div key={week.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div key={week.id} className="bg-elevated border border-subtle rounded-md p-3">
+                <div className="flex justify-between items-center mb-3 gap-3 flex-wrap">
+                  <div className="flex gap-3 items-center flex-wrap">
                     <input
                       value={week.name}
                       onChange={(e) => handleWeekNameChange(week.id, e.target.value)}
-                      style={{ minWidth: 140, fontWeight: 600 }}
+                      className="min-w-[140px] font-semibold"
                     />
                     <Button onClick={() => handleAddDay(week.id)} size="sm">
                       + Day
@@ -5871,18 +5672,8 @@ function BuilderPage({
                 </div>
 
                 {week.days.some((d) => d.items.length > 0) && (
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                    marginBottom: 12,
-                    padding: '8px 12px',
-                    background: 'var(--bg-card)',
-                    borderRadius: 12,
-                    fontSize: 13,
-                    color: 'var(--text-secondary)',
-                  }}>
-                    <span style={{ fontWeight: 600, marginRight: 4 }}>Week Total:</span>
+                  <div className="flex flex-wrap gap-2 mb-3 px-3 py-2 bg-card rounded-md text-[13px] text-secondary">
+                    <span className="font-semibold mr-1">Week Total:</span>
                     {Object.entries(calculateWeekSetsPerMuscle(week, catalogExercises))
                       .sort((a, b) => b[1] - a[1])
                       .map(([muscle, sets]) => (
@@ -5895,7 +5686,7 @@ function BuilderPage({
                 )}
 
                 <div
-                  style={{ display: 'flex', flexDirection: 'column', gap: 12, touchAction: draggingDayId && dayDragActive ? 'none' as any : 'auto' }}
+                  className="flex flex-col gap-3" style={{ touchAction: draggingDayId && dayDragActive ? 'none' as any : 'auto' }}
                   onPointerMove={(e) => {
                     if (!draggingDayId || dayDragWeekId !== week.id) return;
                     const dy = Math.abs(e.clientY - dayDragStartYRef.current);
@@ -5939,8 +5730,8 @@ function BuilderPage({
                     padding: 12,
                     transition: 'all 0.15s ease',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-                      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="flex justify-between items-center flex-wrap gap-3 mb-3">
+                      <div className="flex gap-3 items-center flex-wrap">
                         <div
                           onPointerDown={(e) => {
                             e.preventDefault();
@@ -5953,18 +5744,7 @@ function BuilderPage({
                             dayDragTimerRef.current = window.setTimeout(() => setDayDragActive(true), 150);
                             try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
                           }}
-                          style={{
-                            textAlign: 'center',
-                            fontSize: 18,
-                            lineHeight: '18px',
-                            padding: '6px 10px',
-                            userSelect: 'none',
-                            touchAction: 'none',
-                            cursor: 'grab',
-                            background: 'var(--bg-elevated)',
-                            borderRadius: 8,
-                            color: 'var(--text-muted)',
-                          }}
+                          className="text-center text-lg leading-[18px] px-2.5 py-1.5 select-none touch-none cursor-grab bg-elevated rounded-sm text-muted"
                           aria-label="Drag day handle"
                           title="Drag to reorder day"
                         >
@@ -5973,7 +5753,7 @@ function BuilderPage({
                         <input
                           value={day.name}
                           onChange={(e) => handleDayNameChange(week.id, day.id, e.target.value)}
-                          style={{ minWidth: 120 }}
+                          className="min-w-[120px]"
                         />
                         <Button onClick={() => handleAddExercise(week.id, day.id)} size="sm">
                           + Exercise
@@ -5988,17 +5768,7 @@ function BuilderPage({
                     </div>
 
                     {day.items.length > 0 && (
-                      <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 8,
-                        marginBottom: 12,
-                        padding: '8px 12px',
-                        background: 'var(--bg-elevated)',
-                        borderRadius: 12,
-                        fontSize: 13,
-                        color: 'var(--text-secondary)',
-                      }}>
+                      <div className="flex flex-wrap gap-2 mb-3 px-3 py-2 bg-elevated rounded-md text-[13px] text-secondary">
                         {Object.entries(calculateSetsPerMuscle(day.items, catalogExercises))
                           .sort((a, b) => b[1] - a[1])
                           .map(([muscle, sets]) => (
@@ -6011,10 +5781,10 @@ function BuilderPage({
                     )}
 
                     {day.items.length === 0 ? (
-                      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No exercises yet.</div>
+                      <div className="text-muted text-[13px]">No exercises yet.</div>
                     ) : (
                       <div
-                        style={{ display: 'flex', flexDirection: 'column', gap: 8, touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
+                        className="flex flex-col gap-2" style={{ touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
                         onPointerMove={(e) => {
                           if (!draggingExerciseId || dragWeekId !== week.id || dragDayId !== day.id) return;
                           const dy = Math.abs(e.clientY - dragStartYRef.current);
@@ -6068,7 +5838,7 @@ function BuilderPage({
                           return (
                             <>
                               {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx && (
-                                <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
+                                <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
                               )}
                               <div
                                 key={item.id}
@@ -6106,7 +5876,7 @@ function BuilderPage({
                                     dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
                                     try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
                                   }}
-                                  style={{ textAlign: 'center', fontSize: 18, lineHeight: '18px', padding: '0 6px', userSelect: 'none', touchAction: 'none', cursor: 'grab' }}
+                                  className="text-center text-lg leading-[18px] px-1.5 select-none touch-none cursor-grab"
                                   aria-label="Drag handle"
                                   title="Drag to reorder"
                                 >
@@ -6130,7 +5900,7 @@ function BuilderPage({
                                     }
                                   }}
                                 list="exercise-options"
-                                style={{ padding: '8px' }}
+                                className="p-2"
                                 placeholder="Exercise name"
                               />
                               <Button
@@ -6146,7 +5916,7 @@ function BuilderPage({
                                     targetSets: Number(e.target.value),
                                   })
                                 }
-                                style={{ padding: '8px 24px 8px 8px', width: 52 }}
+                                className="py-2 pl-2 pr-6 w-[52px]"
                                 title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
                               >
                                 {options.map((count) => (
@@ -6174,23 +5944,23 @@ function BuilderPage({
                               </Button>
                               </div>
                               {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx + 1 && (
-                                <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
+                                <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
                               )}
                             </>
                           );
                         })}
                         {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === day.items.length && (
-                          <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
+                          <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
                         )}
                       </div>
                     )}
                     {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === dayIdx + 1 && (
-                      <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8, margin: '10px 0' }} />
+                      <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm my-2.5" />
                     )}
                   </div>
                 ))}
                 {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === week.days.length && (
-                  <div style={{ height: 8, borderTop: '2px dashed var(--border-strong)', borderRadius: 8 }} />
+                  <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
                 )}
                 </div>
               </div>
@@ -6200,14 +5970,14 @@ function BuilderPage({
       )}
 
       <Modal open={showPlanList} onClose={() => setShowPlanList(false)} maxWidth={480} maxHeight="80vh" zIndex={10}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 18 }}>Manage {manageTab === 'plans' ? 'Plans' : 'Templates'}</h3>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="flex justify-between items-center">
+              <h3 className="m-0 text-lg">Manage {manageTab === 'plans' ? 'Plans' : 'Templates'}</h3>
+              <div className="flex gap-2 items-center">
                 {manageTab === 'plans' && (
                   <>
                     <Button onClick={() => setShowAIProgramBuilder(true)} size="sm">AI Program Builder</Button>
                     <Button onClick={handleClickImportPlan} size="sm">Import (CSV)</Button>
-                    <input ref={importInputRef} type="file" accept=".csv" onChange={handleImportPlanFile} style={{ display: 'none' }} />
+                    <input ref={importInputRef} type="file" accept=".csv" onChange={handleImportPlanFile} className="hidden" />
                   </>
                 )}
                 <Button onClick={() => setShowPlanList(false)}>
@@ -6215,7 +5985,7 @@ function BuilderPage({
                 </Button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
+            <div className="flex gap-2 border-b border-b-subtle pb-3">
               <Button
                 onClick={() => setManageTab('plans')}
                 style={{
@@ -6234,25 +6004,15 @@ function BuilderPage({
               >Templates</Button>
             </div>
             {manageTab === 'plans' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="flex flex-col gap-3">
                 {plans.length === 0 && <EmptyState message="No plans yet." />}
                 {plans.map((plan) => (
-                  <div key={plan.id} style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 12,
-                    padding: 12,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 12,
-                    transition: 'all 0.15s ease',
-                  }}>
+                  <div key={plan.id} className="bg-card border border-subtle rounded-md p-3 flex justify-between items-center gap-3 transition-all duration-150">
                     <div>
-                      <div style={{ fontWeight: 600 }}>{plan.name}</div>
+                      <div className="font-semibold">{plan.name}</div>
                       {plan.serverId && <Badge variant="success">Synced</Badge>}
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="flex gap-2">
                       <Button
                         onClick={() => {
                           const fullPlan = plans.find((p) => p.id === plan.id) || null;
@@ -6272,29 +6032,19 @@ function BuilderPage({
                 ))}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {templatesError && <div style={{ color: 'var(--error)', padding: '10px 12px', background: 'var(--error-muted)', borderRadius: 8 }}>{templatesError}</div>}
+              <div className="flex flex-col gap-3">
+                {templatesError && <div className="text-error px-3 py-2.5 bg-error-muted rounded-sm">{templatesError}</div>}
                 {templatesLoading ? (
-                  <div style={{ color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>Loading templates...</div>
+                  <div className="text-muted p-4 text-center">Loading templates...</div>
                 ) : templates.length === 0 ? (
                   <EmptyState message="No templates yet." />
                 ) : (
                   templates.map((tpl) => (
-                    <div key={tpl.id} style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 12,
-                      padding: 12,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: 12,
-                      transition: 'all 0.15s ease',
-                    }}>
+                    <div key={tpl.id} className="bg-card border border-subtle rounded-md p-3 flex justify-between items-center gap-3 transition-all duration-150">
                       <div>
-                        <div style={{ fontWeight: 600 }}>{tpl.name}</div>
+                        <div className="font-semibold">{tpl.name}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div className="flex gap-2">
                         <Button onClick={() => openTemplate(tpl)} size="sm">Open</Button>
                         <Button onClick={() => renameTemplate(tpl)} size="sm">Rename</Button>
                         <Button onClick={() => handleExportTemplateCSV(tpl)} size="sm">Export</Button>
@@ -6313,7 +6063,7 @@ function BuilderPage({
 
       <Modal open={searchOpen} onClose={() => setSearchOpen(false)} title="Search Exercises" maxWidth={980}>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
               <input
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -6338,23 +6088,23 @@ function BuilderPage({
                 <option value="home_made">Home Made *</option>
               </select>
               <Button variant="pill" active={searchMachine} onClick={() => setSearchMachine((prev) => !prev)} aria-pressed={searchMachine}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchMachine ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: searchMachine ? "var(--text-primary)" : "transparent" }} />
                 Machine
               </Button>
               <Button variant="pill" active={searchFreeWeight} onClick={() => setSearchFreeWeight((prev) => !prev)} aria-pressed={searchFreeWeight}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchFreeWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: searchFreeWeight ? "var(--text-primary)" : "transparent" }} />
                 Free weight
               </Button>
               <Button variant="pill" active={searchCable} onClick={() => setSearchCable((prev) => !prev)} aria-pressed={searchCable}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchCable ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: searchCable ? "var(--text-primary)" : "transparent" }} />
                 Cable
               </Button>
               <Button variant="pill" active={searchBodyWeight} onClick={() => setSearchBodyWeight((prev) => !prev)} aria-pressed={searchBodyWeight}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchBodyWeight ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: searchBodyWeight ? "var(--text-primary)" : "transparent" }} />
                 Bodyweight
               </Button>
               <Button variant="pill" active={searchCompound} onClick={() => setSearchCompound((prev) => !prev)} aria-pressed={searchCompound}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1px solid var(--border-strong)", background: searchCompound ? "var(--text-primary)" : "transparent", transition: 'all 0.15s ease' }} />
+                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: searchCompound ? "var(--text-primary)" : "transparent" }} />
                 Compound
               </Button>
             </div>
@@ -6377,7 +6127,7 @@ function BuilderPage({
                   </Button>
                 </div>
                 {addMovementOpen && (
-                  <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 12, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div className="bg-elevated border border-subtle rounded-md p-3 mb-3 flex flex-col gap-3">
                     <input
                       value={addMovementName}
                       onChange={(e) => setAddMovementName(e.target.value)}
@@ -6393,8 +6143,8 @@ function BuilderPage({
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="flex flex-wrap gap-3">
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6403,7 +6153,7 @@ function BuilderPage({
                         />
                         Machine
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6412,7 +6162,7 @@ function BuilderPage({
                         />
                         Free weight
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6421,7 +6171,7 @@ function BuilderPage({
                         />
                         Cable
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="add-movement-equipment"
@@ -6431,7 +6181,7 @@ function BuilderPage({
                         Bodyweight
                       </label>
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={addMovementCompound}
@@ -6457,9 +6207,9 @@ function BuilderPage({
                       </select>
                     )}
                     {addMovementError && (
-                      <div style={{ color: 'var(--error)', fontSize: 13 }}>{addMovementError}</div>
+                      <div className="text-error text-[13px]">{addMovementError}</div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <div className="flex justify-end gap-2">
                       <Button
                         onClick={() => {
                           resetAddMovement();
@@ -6474,19 +6224,19 @@ function BuilderPage({
                     </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto">
                   {filteredCatalog.length === 0 ? (
-                    <div style={{ color: 'var(--text-muted)' }}>No matches.</div>
+                    <div className="text-muted">No matches.</div>
                   ) : (
                     filteredCatalog.map((ex) => (
-                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} className="border border-subtle rounded-sm p-2 flex justify-between items-center gap-2">
                         <div>
-                          <div style={{ fontWeight: 600 }}>{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                          <div className="font-semibold">{ex.name}{ex.isCustom ? ' *' : ''}</div>
+                          <div className="text-muted text-[13px]">
                             {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div className="flex gap-2">
                           <Button onClick={() => addToQueue(ex)} size="sm">Add</Button>
                           {ex.isCustom && (
                             <Button onClick={() => handleDeleteCustomFromSearch(ex)} size="sm">Delete</Button>
@@ -6498,28 +6248,28 @@ function BuilderPage({
                 </div>
               </div>
 
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: 12, padding: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Queue</div>
+              <div className="border border-default rounded-md p-3">
+                <div className="font-semibold mb-2">Queue</div>
                 {searchQueue.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted)' }}>No exercises selected.</div>
+                  <div className="text-muted">No exercises selected.</div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="flex flex-col gap-2">
                     {searchQueue.map((q) => (
-                      <div key={q.name} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div key={q.name} className="border border-subtle rounded-sm p-2 flex justify-between items-center gap-2">
                         <div>{q.name}</div>
                         <Button onClick={() => removeFromQueue(q.name)} size="sm">Remove</Button>
                       </div>
                     ))}
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                <div className="flex justify-end mt-3">
                   <Button onClick={applyQueueToDay} variant="primary" disabled={searchQueue.length === 0}>
                     Add to Day
                   </Button>
                 </div>
               </div>
             </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'left' }}>
+            <div className="text-muted text-[13px] text-left">
               * = self made movement
             </div>
       </Modal>

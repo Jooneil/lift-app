@@ -1,3 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  /* Background colors → bg-base, bg-elevated, bg-card, etc. */
+  --color-base: #0a0a0c;
+  --color-elevated: #121214;
+  --color-card: #18181b;
+  --color-card-hover: #1f1f23;
+  --color-input: #0e0e11;
+
+  /* Border colors → border-subtle, border-default, border-strong */
+  --color-subtle: #1e1e24;
+  --color-default: #2a2a32;
+  --color-strong: #3a3a44;
+  --color-focus: #5a5a6a;
+
+  /* Text colors → text-primary, text-secondary, text-muted */
+  --color-primary: #f0f0f2;
+  --color-secondary: #9898a8;
+  --color-muted: #5c5c6e;
+
+  /* Accent colors → bg-accent-muted, text-accent-blue, etc. */
+  --color-accent: #e0e0e8;
+  --color-accent-muted: rgba(138, 143, 255, 0.10);
+  --color-accent-subtle: rgba(138, 143, 255, 0.05);
+  --color-accent-blue: #818cf8;
+  --color-accent-blue-muted: rgba(129, 140, 248, 0.15);
+  --color-accent-purple: #a78bfa;
+  --color-accent-purple-muted: rgba(167, 139, 250, 0.15);
+
+  /* Status colors → text-success, bg-error-muted, etc. */
+  --color-success: #34d399;
+  --color-success-muted: rgba(52, 211, 153, 0.12);
+  --color-error: #f87171;
+  --color-error-muted: rgba(248, 113, 113, 0.10);
+
+  /* Shadows → shadow-card */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-primary-btn: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+  --shadow-modal: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+
+  /* Border radius → rounded-sm (8), rounded-md (12), rounded-lg (16) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
 :root {
   /* Color palette — cool blue-gray tint for depth */
   --bg-base: #0a0a0c;
@@ -218,7 +265,7 @@ input[type="checkbox"] {
   background: var(--border-default);
 }
 
-/* Modal animations */
+/* Modal animations — enter */
 @keyframes modal-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -235,6 +282,101 @@ input[type="checkbox"] {
 
 .modal-content {
   animation: modal-content-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Modal animations — exit */
+@keyframes modal-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes modal-content-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+
+.modal-overlay.closing {
+  animation: modal-overlay-out 0.18s ease-in both;
+}
+
+.modal-overlay.closing .modal-content {
+  animation: modal-content-out 0.15s ease-in both;
+}
+
+/* Dropdown menu animation */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dropdown-menu {
+  animation: dropdown-in 0.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top left;
+}
+
+/* Page crossfade */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.page-enter {
+  animation: fade-in 0.15s ease-out both;
+}
+
+/* List item stagger */
+@keyframes list-item-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.list-stagger {
+  animation: list-item-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+/* Animated checkbox */
+.check-animated {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.check-animated input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: none;
+  padding: 0;
+}
+
+.check-animated input[type="checkbox"]:checked {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.check-animated .checkmark-svg {
+  position: absolute;
+  pointer-events: none;
+  width: 20px;
+  height: 20px;
+}
+
+.check-animated .checkmark-path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  transition: stroke-dashoffset 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.check-animated input[type="checkbox"]:checked ~ .checkmark-svg .checkmark-path {
+  stroke-dashoffset: 0;
 }
 
 /* Skeleton shimmer */

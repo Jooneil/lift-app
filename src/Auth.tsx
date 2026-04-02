@@ -73,16 +73,8 @@ export default function Auth({
   };
 
   return (
-    <div style={{
-      maxWidth: 380,
-      margin: "60px auto",
-      padding: 24,
-      background: "var(--bg-elevated)",
-      border: "1px solid var(--border-subtle)",
-      borderRadius: 16,
-      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04)",
-    }}>
-      <h2 style={{ marginTop: 0, marginBottom: 28, textAlign: 'center', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
+    <div className="max-w-[380px] mx-auto mt-[60px] p-6 bg-elevated border border-subtle rounded-lg shadow-modal">
+      <h2 className="mt-0 mb-7 text-center text-[22px] font-bold tracking-[-0.02em]">
         {mode === 'login'
           ? 'Sign In'
           : mode === 'register'
@@ -92,7 +84,7 @@ export default function Auth({
               : 'Set New Password'}
       </h2>
       <form onSubmit={submit}>
-        <div style={{ display: "grid", gap: 12 }}>
+        <div className="grid gap-3">
           {mode !== 'reset' && (
             <input
               placeholder="Email"
@@ -118,30 +110,17 @@ export default function Auth({
             />
           )}
           {err && (
-            <div style={{
-              color: 'var(--error)',
-              padding: '10px 12px',
-              background: 'var(--error-muted)',
-              borderRadius: 8,
-              fontSize: 14
-            }}>{err}</div>
+            <div className="text-error px-3 py-2.5 bg-error-muted rounded-sm text-sm">{err}</div>
           )}
           {message && (
-            <div style={{
-              color: 'var(--success)',
-              padding: '10px 12px',
-              background: 'var(--success-muted)',
-              borderRadius: 8,
-              fontSize: 14
-            }}>{message}</div>
+            <div className="text-success px-3 py-2.5 bg-success-muted rounded-sm text-sm">{message}</div>
           )}
           <Button
             type="submit"
             variant="primary"
             block
+            className="mt-2 text-base"
             style={{
-              marginTop: 8,
-              fontSize: 16,
               padding: '14px 16px',
               cursor: busy ? 'wait' : 'pointer',
               opacity: busy ? 0.7 : 1,
@@ -160,18 +139,18 @@ export default function Auth({
           </Button>
         </div>
       </form>
-      <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="mt-4 flex flex-col gap-2">
         {mode === 'login' && (
           <>
             <Button
               onClick={()=>setMode('register')}
               variant="ghost"
-              style={{ fontSize: 14 }}
+              className="text-sm"
             >Need an account? Sign Up</Button>
             <Button
               onClick={()=>setMode('forgot')}
               variant="ghost"
-              style={{ fontSize: 13, color: 'var(--text-muted)' }}
+              className="text-[13px] text-muted"
             >Forgot password?</Button>
           </>
         )}
@@ -179,14 +158,14 @@ export default function Auth({
           <Button
             onClick={()=>setMode('login')}
             variant="ghost"
-            style={{ fontSize: 14 }}
+            className="text-sm"
           >Have an account? Sign In</Button>
         )}
         {(mode === 'forgot' || mode === 'reset') && !isForcedReset && (
           <Button
             onClick={()=>setMode('login')}
             variant="ghost"
-            style={{ fontSize: 14 }}
+            className="text-sm"
           >Back to Sign In</Button>
         )}
       </div>

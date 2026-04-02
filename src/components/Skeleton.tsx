@@ -4,6 +4,7 @@ export type SkeletonProps = {
   lines?: number;
   height?: number;
   width?: string;
+  className?: string;
   style?: React.CSSProperties;
 };
 
@@ -11,29 +12,18 @@ export default function Skeleton({
   lines = 3,
   height = 16,
   width = "100%",
+  className,
   style,
 }: SkeletonProps) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        padding: 24,
-        ...style,
-      }}
-    >
+    <div className={`flex flex-col gap-3 p-6 ${className ?? ""}`} style={style}>
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
-          className="skeleton-shimmer"
+          className="skeleton-shimmer rounded-sm bg-[linear-gradient(90deg,var(--color-card)_25%,var(--color-card-hover)_50%,var(--color-card)_75%)] bg-[length:200%_100%]"
           style={{
             height,
             width: i === lines - 1 ? "60%" : width,
-            borderRadius: 8,
-            background:
-              "linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%)",
-            backgroundSize: "200% 100%",
           }}
         />
       ))}
