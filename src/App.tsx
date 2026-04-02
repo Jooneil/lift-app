@@ -6019,8 +6019,8 @@ function BuilderPage({
                                           targetSets: Number(e.target.value),
                                         })
                                       }
-                                      className="py-1 pl-2 pr-6 w-[56px]"
-                                      style={{ minHeight: 'auto', height: 32, fontSize: 13 }}
+                                      className="pl-2 pr-6 w-[56px]"
+                                      style={{ minHeight: 36, fontSize: 13 }}
                                       title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
                                     >
                                       {options.map((count) => (
@@ -6035,7 +6035,7 @@ function BuilderPage({
                                     <Button
                                       onClick={() => openSearchForItem(week.id, day.id, item.id)}
                                       size="sm"
-                                      style={{ padding: '3px 7px', fontSize: 11, minHeight: 'auto', height: 28 }}
+                                      style={{ padding: '5px 8px', fontSize: 12, minHeight: 34 }}
                                     >
                                       Search
                                     </Button>
@@ -6043,10 +6043,9 @@ function BuilderPage({
                                       onClick={() => handleExerciseChange(week.id, day.id, item.id, { myoReps: !item.myoReps })}
                                       size="sm"
                                       style={{
-                                        padding: '3px 7px',
-                                        fontSize: 11,
-                                        minHeight: 'auto',
-                                        height: 28,
+                                        padding: '5px 8px',
+                                        fontSize: 12,
+                                        minHeight: 34,
                                         background: item.myoReps ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
                                         borderColor: item.myoReps ? 'var(--accent-purple)' : 'var(--border-subtle)',
                                         color: item.myoReps ? 'var(--accent-purple)' : 'var(--text-muted)',
@@ -6055,7 +6054,7 @@ function BuilderPage({
                                     >
                                       MYO
                                     </Button>
-                                    <Button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} size="xs" style={{ minHeight: 'auto', height: 28 }} title="Remove exercise">
+                                    <Button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} size="xs" style={{ minHeight: 34, padding: '5px 8px', fontSize: 12 }} title="Remove exercise">
                                       X
                                     </Button>
                                   </div>
