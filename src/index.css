@@ -23,6 +23,7 @@
   --color-accent: #e0e0e8;
   --color-accent-muted: rgba(138, 143, 255, 0.10);
   --color-accent-subtle: rgba(138, 143, 255, 0.05);
+  --color-accent-filled: rgba(138, 143, 255, 0.10);
   --color-accent-blue: #818cf8;
   --color-accent-blue-muted: rgba(129, 140, 248, 0.15);
   --color-accent-purple: #a78bfa;
@@ -65,6 +66,7 @@
   --accent: #e0e0e8;
   --accent-muted: rgba(138, 143, 255, 0.10);
   --accent-subtle: rgba(138, 143, 255, 0.05);
+  --accent-filled: rgba(138, 143, 255, 0.10);
   --accent-blue: #818cf8;
   --accent-blue-muted: rgba(129, 140, 248, 0.15);
 
@@ -124,8 +126,12 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 16px;
+  padding-top: 8px;
   background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(138, 143, 255, 0.04) 0%, transparent 70%), var(--bg-base);
+}
+
+@media (min-width: 640px) {
+  body { padding-top: 16px; }
 }
 
 #root {
@@ -387,4 +393,37 @@ input[type="checkbox"] {
 
 .skeleton-shimmer {
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── Responsive: Mobile bottom-sheet modal ── */
+@keyframes modal-sheet-in {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modal-sheet-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(100%); }
+}
+
+@media (max-width: 639px) {
+  .modal-content {
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 16px 16px 0 0;
+    animation: modal-sheet-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .modal-overlay.closing .modal-content {
+    animation: modal-sheet-out 0.2s ease-in both;
+  }
+
+  /* Minimum touch targets on mobile */
+  button {
+    min-height: 44px;
+  }
+
+  input, select, textarea {
+    min-height: 44px;
+  }
 }

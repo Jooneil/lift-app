@@ -1867,7 +1867,7 @@ function AuthedApp({
   })();
   
   return (
-    <div className="max-w-[680px] w-full mx-auto p-6">
+    <div className="max-w-[680px] lg:max-w-[1000px] w-full mx-auto p-3 sm:p-6">
       <div className="flex justify-between items-center pb-3 mb-4 border-b border-b-subtle">
         <div className="relative flex items-center gap-2">
           {streakConfig?.enabled && (
@@ -3480,134 +3480,263 @@ function WorkoutPage({
           <option key={name} value={name} />
         ))}
       </datalist>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       {session.entries.map((entry, entryIndex) => (
-        <div key={entry.id} className="list-stagger bg-elevated rounded-md p-4 mb-3 shadow-card transition-all duration-150 ease-in-out" style={{
+        <div key={entry.id} className="list-stagger bg-elevated rounded-md p-4 shadow-card transition-all duration-150 ease-in-out border-l-[3px]" style={{
           '--i': entryIndex,
-          border: editingEntryId === entry.id ? '1px solid var(--accent)' : '1px solid var(--border-default)',
+          borderLeftColor: editingEntryId === entry.id ? 'var(--accent)' : 'var(--accent-blue)',
+          borderTop: '1px solid var(--border-subtle)',
+          borderRight: '1px solid var(--border-subtle)',
+          borderBottom: '1px solid var(--border-subtle)',
         } as React.CSSProperties}>
-          <div className="flex justify-between mb-3 items-center flex-wrap gap-2">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div>
-                <h3 className="m-0 text-[15px] font-semibold">
-                  {entry.exerciseName}
-                  {entry.myoRepMatch && (
-                    <span className="ml-2 text-[11px] text-accent-purple font-medium">MYO</span>
-                  )}
-                </h3>
-                {(() => {
-                  const cat = catalogByNameMap.get(normalizeExerciseName(entry.exerciseName || '').toLowerCase());
-                  if (!cat?.primaryMuscle) return null;
-                  const label = cat.secondaryMuscles?.length
-                    ? `${cat.primaryMuscle} · ${cat.secondaryMuscles[0]}`
-                    : cat.primaryMuscle;
-                  return <div className="text-[11px] text-muted mt-0.5 font-normal">{label}</div>;
-                })()}
-              </div>
-              <div className="relative">
-                <Button
-                  onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
-                  size="sm"
-                  style={{ padding: '4px 8px', minWidth: 32 }}
-                  title="Options"
-                >
-                  ⋮
-                </Button>
-                {openExerciseMenu === entry.id && (
-                  <div className="dropdown-menu absolute top-full left-0 bg-elevated border border-default rounded-md p-2 mt-1 min-w-[160px] z-20 shadow-[var(--shadow-lg)]">
-                    <Button
-                      onClick={() => {
-                        setOpenExerciseMenu(null);
-                        setEditingEntryId(entry.id);
-                        setEditDraftSets(entry.sets.map(s => ({ ...s })));
-                      }}
-                      size="sm" block className="text-left mb-1"
-                    >
-                      Edit Sets
-                    </Button>
-                    <Button
-                      onClick={() => { setOpenExerciseMenu(null); openReplaceSearch(entry, entryIndex); }}
-                      size="sm" block className="text-left mb-1"
-                    >
-                      Replace
-                    </Button>
-                    <Button
-                      onClick={() => { setOpenExerciseMenu(null); openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }); }}
-                      size="sm" block className="text-left mb-1"
-                    >
-                      History
-                    </Button>
-                    <Button
-                      onClick={() => openMyoScopeModal(entry.id)}
-                      size="sm" block
-                      style={{
-                        textAlign: 'left',
-                        background: entry.myoRepMatch ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
-                        borderColor: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--border-subtle)',
-                        color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-primary)',
-                      }}
-                    >
-                      Myo-Rep Match {entry.myoRepMatch ? '✓' : ''}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-2">
+          {/* Header: Name + ⋮ pinned top-right */}
+          <div className="relative mb-1">
+            <h3 className="m-0 text-[16px] font-bold pr-10">
+              {entry.exerciseName}
+            </h3>
+            <div className="absolute top-0 right-0">
               <Button
-                onClick={() => {
-                  if (openInstructions[entry.id]) {
-                    const original = getEntryInstruction(entry);
-                    const draft = instructionsDraft[entry.id] ?? original;
-                    if (draft !== original) {
-                      if (confirm('Save changes to instructions?')) {
-                        updateEntryInstruction(entry.id, draft);
-                      }
-                    }
-                    setOpenInstructions((prev) => ({ ...prev, [entry.id]: false }));
-                  } else {
-                    setOpenInstructions((prev) => ({ ...prev, [entry.id]: true }));
-                    setInstructionsDraft((prev) => ({ ...prev, [entry.id]: getEntryInstruction(entry) }));
-                  }
-                }}
+                onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
                 size="sm"
-                style={{
-                  borderColor: openInstructions[entry.id] ? '#60a5fa' : getEntryInstruction(entry) ? '#60a5fa' : 'var(--border-subtle)',
-                  background: openInstructions[entry.id] ? 'rgba(96,165,250,0.25)' : getEntryInstruction(entry) ? 'rgba(96,165,250,0.12)' : 'var(--bg-elevated)',
-                }}
-                title="Instructions"
+                style={{ padding: '4px 8px', minWidth: 32 }}
+                title="Options"
               >
-                Instructions
+                ⋮
               </Button>
-              <Button
-                onClick={() => {
-                  if (openNotes[entry.id]) {
-                    const original = entry.note ?? '';
-                    const draft = notesDraft[entry.id] ?? original;
-                    if (draft !== original) {
-                      if (confirm('Save changes to notes?')) {
-                        updateEntryNote(entry.id, draft);
-                      }
-                    }
-                    setOpenNotes((prev) => ({ ...prev, [entry.id]: false }));
-                  } else {
-                    setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
-                    setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
-                  }
-                }}
-                size="sm"
-                style={{
-                  borderColor: openNotes[entry.id] ? 'var(--success)' : (entry.note && String(entry.note).trim() !== '' ? 'var(--success)' : 'var(--border-subtle)'),
-                  background: openNotes[entry.id] ? 'var(--success-muted)' : (entry.note && String(entry.note).trim() !== '' ? 'var(--success-muted)' : 'var(--bg-elevated)'),
-                }}
-                title="Notes"
-              >
-                Notes
-              </Button>
+              {openExerciseMenu === entry.id && (
+                <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-default rounded-md p-2 mt-1 min-w-[160px] z-20 shadow-[var(--shadow-lg)]">
+                  <Button
+                    onClick={() => {
+                      setOpenExerciseMenu(null);
+                      setEditingEntryId(entry.id);
+                      setEditDraftSets(entry.sets.map(s => ({ ...s })));
+                    }}
+                    size="sm" block className="text-left mb-1"
+                  >
+                    Edit Sets
+                  </Button>
+                  <Button
+                    onClick={() => { setOpenExerciseMenu(null); openReplaceSearch(entry, entryIndex); }}
+                    size="sm" block className="text-left mb-1"
+                  >
+                    Replace
+                  </Button>
+                  <Button
+                    onClick={() => { setOpenExerciseMenu(null); openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }); }}
+                    size="sm" block className="text-left mb-1"
+                  >
+                    History
+                  </Button>
+                  <Button
+                    onClick={() => openMyoScopeModal(entry.id)}
+                    size="sm" block
+                    style={{
+                      textAlign: 'left',
+                      background: entry.myoRepMatch ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
+                      borderColor: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--border-subtle)',
+                      color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-primary)',
+                    }}
+                  >
+                    Myo-Rep Match {entry.myoRepMatch ? '✓' : ''}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Muscles + MYO badge row */}
+          <div className="flex items-center gap-2 mb-3">
+            {(() => {
+              const cat = catalogByNameMap.get(normalizeExerciseName(entry.exerciseName || '').toLowerCase());
+              if (!cat?.primaryMuscle) return null;
+              const label = cat.secondaryMuscles?.length
+                ? `${cat.primaryMuscle} · ${cat.secondaryMuscles[0]}`
+                : cat.primaryMuscle;
+              return <span className="text-[11px] text-muted font-normal">{label}</span>;
+            })()}
+            {entry.myoRepMatch && (
+              <span className="text-[11px] text-accent-purple font-medium px-1.5 py-0.5 bg-accent-purple-muted rounded-full">MYO</span>
+            )}
+          </div>
+
+          {/* Sets section */}
+          {editingEntryId === entry.id ? (
+            <>
+              <div className="grid grid-cols-[50px_1fr_1fr_36px] gap-2 mb-1 px-1 text-muted text-[13px] font-semibold uppercase tracking-[0.05em] text-center">
+                <div>Set</div>
+                <div>Weight</div>
+                <div>Reps</div>
+                <div></div>
+              </div>
+
+              {editDraftSets.map((set, i) => (
+                <div key={set.id} className="grid grid-cols-[50px_1fr_1fr_36px] gap-2 mb-1 p-1 rounded-md" style={{
+                  background: (set.weight != null || set.reps != null) ? 'var(--accent-filled)' : 'transparent',
+                }}>
+                  <div className="self-center text-center font-semibold text-secondary text-[15px]">{i + 1}</div>
+                  <div className="self-center text-center text-[15px]" style={{
+                    color: set.weight != null ? 'var(--text-primary)' : 'var(--text-muted)',
+                  }}>{set.weight ?? '—'}</div>
+                  <div className="self-center text-center text-[15px]" style={{
+                    color: set.reps != null ? 'var(--text-primary)' : 'var(--text-muted)',
+                  }}>{set.reps ?? '—'}</div>
+                  <Button
+                    onClick={() => removeDraftSet(set.id)}
+                    size="sm"
+                    className="text-error border-error min-w-0 text-[15px]"
+                    style={{ padding: '2px 6px' }}
+                    title="Remove set"
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ))}
+
+              <Button
+                onClick={addDraftSet}
+                size="sm" block className="mb-2 mt-1"
+              >
+                + Add Set
+              </Button>
+
+              <div className="flex gap-2 justify-end">
+                <Button onClick={cancelEdit} size="sm">Cancel</Button>
+                <Button onClick={saveEditSets} variant="primary">Save</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-[50px_1fr_1fr] gap-2 mb-1 px-1 text-muted text-[13px] font-semibold uppercase tracking-[0.05em] text-center">
+                <div>Set</div>
+                <div>Weight</div>
+                <div style={{ color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-muted)' }}>
+                  {entry.myoRepMatch ? 'Match' : 'Reps'}
+                </div>
+              </div>
+
+              {entry.sets.map((set, i) => {
+                const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
+                const hasValue = set.weight != null || set.reps != null;
+                return (
+                  <div key={set.id} className="grid grid-cols-[50px_1fr_1fr] gap-2 mb-1 p-1 rounded-md transition-colors duration-150" style={{
+                    background: hasValue ? 'var(--accent-filled)' : 'transparent',
+                    borderLeft: hasValue ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                  }}>
+                    <div className="self-center text-center font-semibold text-secondary text-[15px]">{i + 1}</div>
+                    <input
+                      type="number"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
+                      value={set.weight ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const normalized = v.replace(',', '.');
+                        const num = normalized === '' ? null : Number(normalized);
+                        updateSet(entry.id, set.id, {
+                          weight: num !== null && Number.isNaN(num) ? null : num,
+                        });
+                      }}
+                      className="w-full min-w-0 text-center"
+                      style={{ fontWeight: set.weight != null ? 600 : 400 }}
+                    />
+                    <input
+                      inputMode="numeric"
+                      placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
+                      value={set.reps ?? ''}
+                      onChange={(e) => {
+                        const num = e.target.value === '' ? null : Number(e.target.value);
+                        const repsValue = num !== null && Number.isNaN(num) ? null : num;
+                        // Auto-populate weight from ghost if weight is empty and entering reps
+                        if (set.weight == null && repsValue != null && ghostSet.weight != null) {
+                          updateSet(entry.id, set.id, {
+                            reps: repsValue,
+                            weight: ghostSet.weight,
+                          });
+                        } else {
+                          updateSet(entry.id, set.id, {
+                            reps: repsValue,
+                          });
+                        }
+                      }}
+                      className="w-full min-w-0 text-center"
+                      style={{ fontWeight: set.reps != null ? 600 : 400 }}
+                    />
+                  </div>
+                );
+              })}
+
+              {entry.sets.length === 0 && <div className="text-muted">No sets yet.</div>}
+            </>
+          )}
+
+          {/* Pill toggles: Instructions + Notes */}
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => {
+                if (openInstructions[entry.id]) {
+                  const original = getEntryInstruction(entry);
+                  const draft = instructionsDraft[entry.id] ?? original;
+                  if (draft !== original) {
+                    if (confirm('Save changes to instructions?')) {
+                      updateEntryInstruction(entry.id, draft);
+                    }
+                  }
+                  setOpenInstructions((prev) => ({ ...prev, [entry.id]: false }));
+                } else {
+                  setOpenInstructions((prev) => ({ ...prev, [entry.id]: true }));
+                  setInstructionsDraft((prev) => ({ ...prev, [entry.id]: getEntryInstruction(entry) }));
+                }
+              }}
+              className="text-[12px] px-3 py-1.5 rounded-full border transition-all duration-150 flex items-center gap-1.5"
+              style={{
+                borderColor: openInstructions[entry.id] ? '#60a5fa' : 'var(--border-subtle)',
+                background: openInstructions[entry.id] ? 'rgba(96,165,250,0.15)' : 'var(--bg-card)',
+                color: openInstructions[entry.id] ? '#60a5fa' : 'var(--text-secondary)',
+                boxShadow: 'none',
+                minHeight: 'auto',
+              }}
+            >
+              {getEntryInstruction(entry) && (
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: '#60a5fa' }} />
+              )}
+              Instructions
+            </button>
+            <button
+              onClick={() => {
+                if (openNotes[entry.id]) {
+                  const original = entry.note ?? '';
+                  const draft = notesDraft[entry.id] ?? original;
+                  if (draft !== original) {
+                    if (confirm('Save changes to notes?')) {
+                      updateEntryNote(entry.id, draft);
+                    }
+                  }
+                  setOpenNotes((prev) => ({ ...prev, [entry.id]: false }));
+                } else {
+                  setOpenNotes((prev) => ({ ...prev, [entry.id]: true }));
+                  setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
+                }
+              }}
+              className="text-[12px] px-3 py-1.5 rounded-full border transition-all duration-150 flex items-center gap-1.5"
+              style={{
+                borderColor: openNotes[entry.id] ? 'var(--success)' : 'var(--border-subtle)',
+                background: openNotes[entry.id] ? 'var(--success-muted)' : 'var(--bg-card)',
+                color: openNotes[entry.id] ? 'var(--success)' : 'var(--text-secondary)',
+                boxShadow: 'none',
+                minHeight: 'auto',
+              }}
+            >
+              {entry.note && String(entry.note).trim() !== '' && (
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: 'var(--success)' }} />
+              )}
+              Notes
+            </button>
+          </div>
+
+          {/* Expanded instructions */}
           {openInstructions[entry.id] && (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 mt-2">
               <textarea
                 value={instructionsDraft[entry.id] ?? ''}
                 onChange={(e) => setInstructionsDraft((prev) => ({ ...prev, [entry.id]: e.target.value }))}
@@ -3628,8 +3757,9 @@ function WorkoutPage({
             </div>
           )}
 
-          {openNotes[entry.id] ? (
-            <div className="flex flex-col gap-3">
+          {/* Expanded notes */}
+          {openNotes[entry.id] && (
+            <div className="flex flex-col gap-3 mt-2">
               <textarea
                 value={notesDraft[entry.id] ?? ''}
                 onChange={(e) => setNotesDraft((prev) => ({ ...prev, [entry.id]: e.target.value }))}
@@ -3648,118 +3778,10 @@ function WorkoutPage({
                 </Button>
               </div>
             </div>
-          ) : (
-            editingEntryId === entry.id ? (
-              <>
-                <div className="grid grid-cols-[50px_1fr_1fr_36px] gap-3 mb-3 px-1 text-muted text-[13px] font-semibold uppercase tracking-[0.05em] text-center">
-                  <div>Set</div>
-                  <div>Weight</div>
-                  <div>Reps</div>
-                  <div></div>
-                </div>
-
-                {editDraftSets.map((set, i) => (
-                  <div key={set.id} className="grid grid-cols-[50px_1fr_1fr_36px] gap-3 mb-3 p-1 rounded-md" style={{
-                    background: (set.weight != null || set.reps != null) ? 'var(--accent-subtle)' : 'transparent',
-                  }}>
-                    <div className="self-center text-center font-semibold text-secondary text-[15px]">{i + 1}</div>
-                    <div className="self-center text-center text-[15px]" style={{
-                      color: set.weight != null ? 'var(--text-primary)' : 'var(--text-muted)',
-                    }}>{set.weight ?? '—'}</div>
-                    <div className="self-center text-center text-[15px]" style={{
-                      color: set.reps != null ? 'var(--text-primary)' : 'var(--text-muted)',
-                    }}>{set.reps ?? '—'}</div>
-                    <Button
-                      onClick={() => removeDraftSet(set.id)}
-                      size="sm"
-                      className="text-error border-error min-w-0 text-[15px]"
-                      style={{ padding: '2px 6px' }}
-                      title="Remove set"
-                    >
-                      ✕
-                    </Button>
-                  </div>
-                ))}
-
-                <Button
-                  onClick={addDraftSet}
-                  size="sm" block className="mb-3"
-                >
-                  + Add Set
-                </Button>
-
-                <div className="flex gap-2 justify-end">
-                  <Button onClick={cancelEdit} size="sm">Cancel</Button>
-                  <Button onClick={saveEditSets} variant="primary">Save</Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="grid grid-cols-[50px_1fr_1fr] gap-3 mb-3 px-1 text-muted text-[13px] font-semibold uppercase tracking-[0.05em] text-center">
-                  <div>Set</div>
-                  <div>Weight</div>
-                  <div style={{ color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-muted)' }}>
-                    {entry.myoRepMatch ? 'Match' : 'Reps'}
-                  </div>
-                </div>
-
-                {entry.sets.map((set, i) => {
-                  const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
-                  const hasValue = set.weight != null || set.reps != null;
-                  return (
-                    <div key={set.id} className="grid grid-cols-[50px_1fr_1fr] gap-3 mb-3 p-1 rounded-md transition-colors duration-150" style={{
-                      background: hasValue ? 'var(--accent-subtle)' : 'transparent',
-                    }}>
-                      <div className="self-center text-center font-semibold text-secondary text-[15px]">{i + 1}</div>
-                      <input
-                        type="number"
-                        step="any"
-                        inputMode="decimal"
-                        placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
-                        value={set.weight ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const normalized = v.replace(',', '.');
-                          const num = normalized === '' ? null : Number(normalized);
-                          updateSet(entry.id, set.id, {
-                            weight: num !== null && Number.isNaN(num) ? null : num,
-                          });
-                        }}
-                        className="w-full min-w-0 text-center"
-                        style={{ fontWeight: set.weight != null ? 600 : 400 }}
-                      />
-                      <input
-                        inputMode="numeric"
-                        placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
-                        value={set.reps ?? ''}
-                        onChange={(e) => {
-                          const num = e.target.value === '' ? null : Number(e.target.value);
-                          const repsValue = num !== null && Number.isNaN(num) ? null : num;
-                          // Auto-populate weight from ghost if weight is empty and entering reps
-                          if (set.weight == null && repsValue != null && ghostSet.weight != null) {
-                            updateSet(entry.id, set.id, {
-                              reps: repsValue,
-                              weight: ghostSet.weight,
-                            });
-                          } else {
-                            updateSet(entry.id, set.id, {
-                              reps: repsValue,
-                            });
-                          }
-                        }}
-                        className="w-full min-w-0 text-center"
-                        style={{ fontWeight: set.reps != null ? 600 : 400 }}
-                      />
-                    </div>
-                  );
-                })}
-
-                {entry.sets.length === 0 && <div className="text-muted">No sets yet.</div>}
-              </>
-            )
           )}
         </div>
       ))}
+      </div>
 
       <div className="mt-5 pt-4 border-t border-t-subtle flex justify-between items-center flex-wrap gap-3">
         <label style={{
@@ -5843,20 +5865,9 @@ function BuilderPage({
                               <div
                                 key={item.id}
                                 data-exercise-id={item.id}
+                                className="flex flex-wrap sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 items-center border border-default rounded-sm p-2 cursor-grab"
                                 style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'auto 1fr auto auto auto auto',
-                                  gap: 8,
-                                  alignItems: 'center',
-                                  cursor: 'grab',
                                   opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
-                                  background: 'transparent',
-                                  borderTop: '1px solid var(--border-default)',
-                                  borderBottom: '1px solid var(--border-default)',
-                                  borderLeft: '1px solid var(--border-default)',
-                                  borderRight: '1px solid var(--border-default)',
-                                  borderRadius: 8,
-                                  padding: 8,
                                   touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                   userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                 }}
@@ -5900,7 +5911,7 @@ function BuilderPage({
                                     }
                                   }}
                                 list="exercise-options"
-                                className="p-2"
+                                className="p-2 flex-1 min-w-0"
                                 placeholder="Exercise name"
                               />
                               <Button

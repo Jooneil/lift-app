@@ -72,14 +72,14 @@ export default function Modal({
 
   return (
     <div
-      className={`modal-overlay fixed inset-0 bg-black/80 backdrop-blur flex justify-center items-center p-4${closing ? " closing" : ""}`}
+      className={`modal-overlay fixed inset-0 bg-black/80 backdrop-blur flex justify-center items-end sm:items-center p-0 sm:p-4${closing ? " closing" : ""}`}
       style={{ zIndex }}
       onClick={handleOverlayClick}
       data-no-ptr
     >
       <div
         ref={contentRef}
-        className="modal-content bg-elevated border border-subtle rounded-lg p-6 shadow-modal w-full overflow-y-auto flex flex-col gap-4"
+        className="modal-content bg-elevated border border-subtle rounded-none sm:rounded-lg p-4 sm:p-6 shadow-modal w-full overflow-y-auto flex flex-col gap-4"
         style={{ maxHeight, maxWidth }}
         onClick={(e) => e.stopPropagation()}
       >
