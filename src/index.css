@@ -384,6 +384,48 @@ input[type="checkbox"] {
   stroke-dashoffset: 0;
 }
 
+/* ── Drag-and-drop exercise reorder ── */
+.drag-container {
+  position: relative;
+}
+
+.drag-item {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, opacity 0.2s ease;
+  will-change: transform;
+}
+
+.drag-item.dragging {
+  position: relative;
+  z-index: 10;
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(138, 143, 255, 0.2);
+  opacity: 0.95;
+  cursor: grabbing !important;
+}
+
+.drag-item.dragging * {
+  cursor: grabbing !important;
+}
+
+.drag-placeholder {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent-blue);
+  margin: -2px 0;
+  transition: opacity 0.15s ease;
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(129, 140, 248, 0.4);
+}
+
+/* Items above/below the dragged item slide apart smoothly */
+.drag-item.shift-down {
+  transform: translateY(var(--drag-item-height, 52px));
+}
+
+.drag-item.shift-up {
+  transform: translateY(calc(-1 * var(--drag-item-height, 52px)));
+}
+
 /* Skeleton shimmer */
 @keyframes skeleton-shimmer {
   0% { background-position: 200% 0; }

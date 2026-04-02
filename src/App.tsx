@@ -5162,6 +5162,8 @@ function BuilderPage({
   const [dragActive, setDragActive] = useState<boolean>(false);
   const dragStartYRef = useRef<number>(0);
   const dragTimerRef = useRef<number | null>(null);
+  const dragOffsetYRef = useRef<number>(0);
+  const draggedElRef = useRef<HTMLElement | null>(null);
 
   // While dragging, disable text selection globally to avoid blue highlight
   useEffect(() => {
@@ -5869,15 +5871,31 @@ function BuilderPage({
                       <div className="text-muted text-[13px]">No exercises yet.</div>
                     ) : (
                       <div
-                        className="flex flex-col gap-2" style={{ touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
+                        className="drag-container flex flex-col gap-2" style={{ touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
                         onPointerMove={(e) => {
                           if (!draggingExerciseId || dragWeekId !== week.id || dragDayId !== day.id) return;
                           const dy = Math.abs(e.clientY - dragStartYRef.current);
                           if (!dragActive && dy > 8) setDragActive(true);
                           if (!dragActive) return;
                           e.preventDefault();
+                          // Move the dragged element visually
+                          dragOffsetYRef.current = e.clientY - dragStartYRef.current;
+                          if (draggedElRef.current) {
+                            draggedElRef.current.style.transform = `translateY(${dragOffsetYRef.current}px) scale(1.02)`;
+                          }
+                          // Calculate insert position from non-dragged items
                           const container = e.currentTarget as HTMLElement;
-                          const rows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
+                          const allRows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
+                          // Get unique items (desktop+mobile share same data-exercise-id, take first visible)
+                          const seen = new Set<string>();
+                          const rows: HTMLElement[] = [];
+                          for (const row of allRows) {
+                            const id = row.getAttribute('data-exercise-id')!;
+                            if (!seen.has(id) && row.offsetParent !== null) {
+                              seen.add(id);
+                              rows.push(row);
+                            }
+                          }
                           if (rows.length === 0) return;
                           const y = e.clientY;
                           let insert = rows.length;
@@ -5898,6 +5916,10 @@ function BuilderPage({
                             setDragInsertIndex(null);
                             return;
                           }
+                          // Snap back: remove inline transform before reorder
+                          if (draggedElRef.current) {
+                            draggedElRef.current.style.transform = '';
+                          }
                           const insert = dragInsertIndex == null ? day.items.length : dragInsertIndex;
                           handleReorderExerciseAtIndex(week.id, day.id, draggingExerciseId, insert);
                           setDraggingExerciseId(null);
@@ -5905,14 +5927,21 @@ function BuilderPage({
                           setDragDayId(null);
                           setDragInsertIndex(null);
                           setDragActive(false);
+                          dragOffsetYRef.current = 0;
+                          draggedElRef.current = null;
                         }}
                         onPointerCancel={() => {
                           if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
+                          if (draggedElRef.current) {
+                            draggedElRef.current.style.transform = '';
+                          }
                           setDraggingExerciseId(null);
                           setDragWeekId(null);
                           setDragDayId(null);
                           setDragInsertIndex(null);
                           setDragActive(false);
+                          dragOffsetYRef.current = 0;
+                          draggedElRef.current = null;
                         }}
                       >
                         {day.items.map((item, idx) => {
@@ -5920,17 +5949,21 @@ function BuilderPage({
                             ? SET_COUNT_OPTIONS
                             : [...SET_COUNT_OPTIONS, item.targetSets].sort((a, b) => a - b);
 
+                          const isDragging = draggingExerciseId === item.id && dragActive;
+                          const isDragContext = dragActive && dragWeekId === week.id && dragDayId === day.id;
+                          const showPlaceholder = isDragContext && draggingExerciseId !== item.id && dragInsertIndex === idx;
+
                           return (
                             <>
-                              {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx && (
-                                <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
+                              {showPlaceholder && (
+                                <div className="drag-placeholder" />
                               )}
                               <div
                                 key={item.id}
                                 data-exercise-id={item.id}
-                                className="hidden sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 items-center border border-default rounded-sm p-2 cursor-grab"
+                                ref={isDragging ? (el) => { draggedElRef.current = el; } : undefined}
+                                className={`drag-item hidden sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 items-center border border-default rounded-sm p-2 cursor-grab${isDragging ? ' dragging' : ''}`}
                                 style={{
-                                  opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
                                   touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                   userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                 }}
@@ -5938,13 +5971,15 @@ function BuilderPage({
                               >
                                 <div
                                   onPointerDown={(e) => {
-                                    // Start drag only from the handle to avoid selecting inputs
                                     e.preventDefault();
+                                    const exerciseRow = (e.currentTarget as HTMLElement).closest('[data-exercise-id]') as HTMLElement | null;
+                                    draggedElRef.current = exerciseRow;
                                     setDraggingExerciseId(item.id);
                                     setDragWeekId(week.id);
                                     setDragDayId(day.id);
                                     setDragActive(false);
                                     dragStartYRef.current = e.clientY;
+                                    dragOffsetYRef.current = 0;
                                     setDragInsertIndex(idx);
                                     if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
                                     dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
@@ -6020,9 +6055,9 @@ function BuilderPage({
                               {/* Mobile: two-row layout */}
                               <div
                                 data-exercise-id={item.id}
-                                className="flex flex-col gap-1.5 sm:hidden border border-default rounded-sm p-2 cursor-grab"
+                                ref={isDragging ? (el) => { draggedElRef.current = el; } : undefined}
+                                className={`drag-item flex flex-col gap-1.5 sm:hidden border border-default rounded-sm p-2 cursor-grab${isDragging ? ' dragging' : ''}`}
                                 style={{
-                                  opacity: draggingExerciseId === item.id && dragActive ? 0.6 : 1,
                                   touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                   userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
                                 }}
@@ -6033,11 +6068,14 @@ function BuilderPage({
                                   <div
                                     onPointerDown={(e) => {
                                       e.preventDefault();
+                                      const exerciseRow = (e.currentTarget as HTMLElement).closest('[data-exercise-id]') as HTMLElement | null;
+                                      draggedElRef.current = exerciseRow;
                                       setDraggingExerciseId(item.id);
                                       setDragWeekId(week.id);
                                       setDragDayId(day.id);
                                       setDragActive(false);
                                       dragStartYRef.current = e.clientY;
+                                      dragOffsetYRef.current = 0;
                                       setDragInsertIndex(idx);
                                       if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
                                       dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
@@ -6123,14 +6161,14 @@ function BuilderPage({
                                   </div>
                                 </div>
                               </div>
-                              {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === idx + 1 && (
-                                <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
+                              {isDragContext && draggingExerciseId !== item.id && dragInsertIndex === idx + 1 && (
+                                <div className="drag-placeholder" />
                               )}
                             </>
                           );
                         })}
-                        {draggingExerciseId && dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === day.items.length && (
-                          <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
+                        {dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === day.items.length && draggingExerciseId !== day.items[day.items.length - 1]?.id && (
+                          <div className="drag-placeholder" />
                         )}
                       </div>
                     )}
