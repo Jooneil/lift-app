@@ -166,7 +166,6 @@ button {
   font-family: inherit;
   letter-spacing: -0.01em;
   background-color: var(--bg-card);
-  color: var(--text-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
   box-shadow: var(--shadow-sm);
