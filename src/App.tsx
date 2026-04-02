@@ -5950,7 +5950,7 @@ function BuilderPage({
                                     targetSets: Number(e.target.value),
                                   })
                                 }
-                                className="py-2 pl-2 pr-6 w-[52px]"
+                                className="py-2 pl-3 pr-7 w-[62px]"
                                 title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
                               >
                                 {options.map((count) => (
