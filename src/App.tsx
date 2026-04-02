@@ -4567,20 +4567,6 @@ function BuilderPage({
   const [addMovementCompound, setAddMovementCompound] = useState(false);
   const [addMovementSecondary, setAddMovementSecondary] = useState("");
   const [addMovementError, setAddMovementError] = useState<string | null>(null);
-  const [builderMenuOpen, setBuilderMenuOpen] = useState(false);
-  const builderMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close builder overflow menu on outside click
-  useEffect(() => {
-    if (!builderMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (builderMenuRef.current && !builderMenuRef.current.contains(e.target as Node)) {
-        setBuilderMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [builderMenuOpen]);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -5636,8 +5622,8 @@ function BuilderPage({
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
-      {/* Header row: plan name/selector + Save + overflow menu */}
-      <div className="flex items-center justify-between gap-3 mb-0">
+      {/* Row 1: Plan name + navigation */}
+      <div className="flex items-center justify-between gap-3 pb-2.5">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {selectedPlan ? (
             <input
@@ -5654,41 +5640,34 @@ function BuilderPage({
             <div className="text-muted text-[13px] whitespace-nowrap">Loading...</div>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {selectedPlan && (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button onClick={() => setShowPlanList(true)} size="sm">Manage Plans</Button>
+          <Button onClick={handleCreatePlan} size="sm">+ Plan</Button>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-subtle mb-3" />
+
+      {/* Row 2: Save actions + week actions */}
+      {selectedPlan && (
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="flex items-center gap-2">
             <Button onClick={handleSavePlan} variant="primary" disabled={saving} size="sm">
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Saving...' : 'Save Plan'}
             </Button>
-          )}
-          <div className="relative" ref={builderMenuRef}>
-            <button
-              onClick={() => setBuilderMenuOpen((v) => !v)}
-              title="More actions"
-              className="text-secondary hover:text-primary transition-colors duration-150"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxShadow: 'none', padding: '6px 10px', minHeight: 'auto', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', fontSize: 16, fontWeight: 700 }}
-            >
-              ⋮
-            </button>
-            {builderMenuOpen && (
-              <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-2 mt-1 min-w-[200px] z-30 shadow-[var(--shadow-lg)]">
-                <Button onClick={() => { setBuilderMenuOpen(false); setShowPlanList(true); }} size="sm" block className="mb-1 text-left">
-                  Manage Plans
-                </Button>
-                <Button onClick={() => { setBuilderMenuOpen(false); handleCreatePlan(); }} size="sm" block className="mb-1 text-left">
-                  + New Plan
-                </Button>
-                {selectedPlan && (
-                  <>
-                    <Button onClick={() => { setBuilderMenuOpen(false); handleSaveAsTemplate(); }} size="sm" block className="mb-1 text-left" disabled={saving}>
-                      Save as Template
-                    </Button>
-                  </>
-                )}
-              </div>
+            <Button onClick={handleSaveAsTemplate} disabled={saving} size="sm">
+              Save as Template
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleAddWeek} size="sm">+ Week</Button>
+            {selectedPlan.weeks.length > 1 && (
+              <Button onClick={handleCopyWeekOneToAll} size="sm">Copy Week 1 → All</Button>
             )}
           </div>
         </div>
-      </div>
+      )}
 
       {error && <div className="text-error mt-2 px-3 py-2.5 bg-error-muted rounded-sm">{error}</div>}
 
@@ -5698,8 +5677,7 @@ function BuilderPage({
         <div className="flex flex-col gap-4">
           {/* Plan type toggle */}
           <div>
-            <div className="border-t border-subtle my-1" />
-            <label className="block mb-2 mt-3 font-semibold text-[13px] text-muted uppercase tracking-[0.04em]">Plan Type</label>
+            <label className="block mb-2 font-semibold text-[13px] text-muted uppercase tracking-[0.04em]">Plan Type</label>
             <div className="flex gap-2">
               <Button
                 onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'default' }))}
@@ -5731,13 +5709,6 @@ function BuilderPage({
             </p>
           </div>
 
-          {/* Week actions row */}
-          <div className="flex items-center gap-2">
-            <Button onClick={handleAddWeek} size="sm">+ Week</Button>
-            {selectedPlan.weeks.length > 1 && (
-              <Button onClick={handleCopyWeekOneToAll} size="sm">Copy Week 1 → All</Button>
-            )}
-          </div>
 
           <div className="flex flex-col gap-4">
             {selectedPlan.weeks.map((week) => (
