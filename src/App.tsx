@@ -2607,6 +2607,41 @@ function WorkoutPage({
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editDraftSets, setEditDraftSets] = useState<SessionSet[]>([]);
   const [myoScopeEntry, setMyoScopeEntry] = useState<{ entryId: string; exerciseId?: string; exerciseName: string; currentValue: boolean } | null>(null);
+  const sessionStartRef = useRef<number | null>(null);
+  const [elapsedDisplay, setElapsedDisplay] = useState('');
+
+  const formatElapsed = useCallback(() => {
+    if (!sessionStartRef.current) return '';
+    const mins = Math.floor((Date.now() - sessionStartRef.current) / 60000);
+    if (mins < 60) return `${mins} min`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  }, []);
+
+  // Detect first set logged, update elapsed immediately
+  useEffect(() => {
+    if (sessionStartRef.current != null) return;
+    if (!session) return;
+    const hasLogged = session.entries.some(e => e.sets.some(s => s.weight != null && s.reps != null));
+    if (hasLogged) {
+      sessionStartRef.current = Date.now();
+      setElapsedDisplay(formatElapsed());
+    }
+  }, [session, formatElapsed]);
+
+  // Refresh elapsed every 30s
+  useEffect(() => {
+    const id = setInterval(() => setElapsedDisplay(formatElapsed()), 30000);
+    return () => clearInterval(id);
+  }, [formatElapsed]);
+
+  const loggedSets = useMemo(() =>
+    session ? session.entries.reduce((acc, e) => acc + e.sets.filter(s => s.weight != null && s.reps != null).length, 0) : 0,
+    [session]
+  );
+  const totalSets = useMemo(() =>
+    session ? session.entries.reduce((acc, e) => acc + e.sets.length, 0) : 0,
+    [session]
+  );
 
   useEffect(() => {
     historyCacheRef.current = null;
@@ -3501,6 +3536,29 @@ function WorkoutPage({
           <option key={name} value={name} />
         ))}
       </datalist>
+      {totalSets > 0 && (
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[12px] font-medium uppercase tracking-[0.05em] text-muted">
+              {loggedSets} of {totalSets} sets logged
+            </span>
+            {elapsedDisplay && (
+              <span className="text-[12px] font-medium uppercase tracking-[0.05em] text-muted">
+                {elapsedDisplay}
+              </span>
+            )}
+          </div>
+          <div style={{ height: 2, background: 'var(--bg-subtle, rgba(255,255,255,0.06))', borderRadius: 1 }}>
+            <div style={{
+              height: 2,
+              width: `${(loggedSets / totalSets) * 100}%`,
+              background: 'var(--accent-blue)',
+              borderRadius: 1,
+              transition: 'width 0.4s ease',
+            }} />
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       {session.entries.map((entry, entryIndex) => (
         <div key={entry.id} className="list-stagger bg-elevated rounded-md p-4 shadow-card transition-all duration-150 ease-in-out border-l-[3px]" style={{
