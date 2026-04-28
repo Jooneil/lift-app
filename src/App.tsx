@@ -4567,6 +4567,11 @@ function BuilderPage({
   const [addMovementCompound, setAddMovementCompound] = useState(false);
   const [addMovementSecondary, setAddMovementSecondary] = useState("");
   const [addMovementError, setAddMovementError] = useState<string | null>(null);
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Set<string>>(new Set());
+  const [dayMenuOpenId, setDayMenuOpenId] = useState<string | null>(null);
+  const dayMenuRef = useRef<HTMLDivElement>(null);
+  const [plansMenuOpen, setPlansMenuOpen] = useState(false);
+  const plansMenuRef = useRef<HTMLDivElement>(null);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -4625,6 +4630,26 @@ function BuilderPage({
     searchBodyWeight,
     searchCompound,
   ]);
+
+  // Close day ⋮ menu and plans menu on outside click
+  useEffect(() => {
+    if (!dayMenuOpenId && !plansMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dayMenuRef.current && !dayMenuRef.current.contains(e.target as Node)) setDayMenuOpenId(null);
+      if (plansMenuRef.current && !plansMenuRef.current.contains(e.target as Node)) setPlansMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dayMenuOpenId, plansMenuOpen]);
+
+  const toggleWeek = (weekId: string) => {
+    setCollapsedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(weekId)) next.delete(weekId);
+      else next.add(weekId);
+      return next;
+    });
+  };
 
   const createDay = (index: number): PlanDay => ({
     id: uuid(),
@@ -5622,7 +5647,7 @@ function BuilderPage({
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
-      {/* Row 1: Plan name + navigation */}
+      {/* Row 1: Plan name + actions */}
       <div className="flex items-center justify-between gap-3 pb-2.5">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {selectedPlan ? (
@@ -5641,29 +5666,45 @@ function BuilderPage({
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button onClick={() => setShowPlanList(true)} size="sm">Manage Plans</Button>
-          <Button onClick={handleCreatePlan} size="sm">+ Plan</Button>
+          {/* Desktop: show all buttons */}
+          <div className="hidden sm:flex items-center gap-2">
+            <Button onClick={() => setShowPlanList(true)} size="sm">Manage Plans</Button>
+            <Button onClick={handleCreatePlan} size="sm">+ Plan</Button>
+          </div>
+          {/* Mobile: Plans dropdown */}
+          <div className="sm:hidden relative" ref={plansMenuRef}>
+            <button
+              onClick={() => setPlansMenuOpen((v) => !v)}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              Plans <span style={{ fontSize: 10 }}>▾</span>
+            </button>
+            {plansMenuOpen && (
+              <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-2 mt-1 min-w-[180px] z-30 shadow-[var(--shadow-lg)]">
+                <Button onClick={() => { setPlansMenuOpen(false); setShowPlanList(true); }} size="sm" block className="mb-1 text-left">Manage Plans</Button>
+                <Button onClick={() => { setPlansMenuOpen(false); handleCreatePlan(); }} size="sm" block className="text-left">+ New Plan</Button>
+              </div>
+            )}
+          </div>
+          {selectedPlan && (
+            <Button onClick={handleSavePlan} variant="primary" disabled={saving} size="sm">
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Divider */}
       <div className="border-t border-subtle mb-3" />
 
-      {/* Row 2: Save actions + week actions */}
+      {/* Row 2: Secondary actions */}
       {selectedPlan && (
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Button onClick={handleSavePlan} variant="primary" disabled={saving} size="sm">
-              {saving ? 'Saving...' : 'Save Plan'}
-            </Button>
-            <Button onClick={handleSaveAsTemplate} disabled={saving} size="sm">
-              Save as Template
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={handleSaveAsTemplate} disabled={saving} size="sm">Save as Template</Button>
             <Button onClick={handleAddWeek} size="sm">+ Week</Button>
             {selectedPlan.weeks.length > 1 && (
-              <Button onClick={handleCopyWeekOneToAll} size="sm">Copy Week 1 → All</Button>
+              <Button onClick={handleCopyWeekOneToAll} size="sm">Copy Wk 1 → All</Button>
             )}
           </div>
         </div>
@@ -5711,23 +5752,37 @@ function BuilderPage({
 
 
           <div className="flex flex-col gap-4">
-            {selectedPlan.weeks.map((week) => (
-              <div key={week.id} className="bg-elevated border border-subtle rounded-md p-3">
-                <div className="flex justify-between items-center mb-3 gap-3 flex-wrap">
-                  <div className="flex gap-3 items-center flex-wrap">
+            {selectedPlan.weeks.map((week) => {
+              const isWeekCollapsed = collapsedWeeks.has(week.id);
+              return (
+              <div key={week.id} className="bg-elevated border border-subtle rounded-md overflow-hidden">
+                {/* Week header — always visible, tappable to collapse */}
+                <div
+                  className="flex justify-between items-center gap-3 p-3 cursor-pointer select-none"
+                  onClick={() => toggleWeek(week.id)}
+                >
+                  <div className="flex gap-2 items-center min-w-0 flex-1">
+                    <span className="text-muted text-[13px] transition-transform duration-200" style={{ display: 'inline-block', transform: isWeekCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
                     <input
                       value={week.name}
-                      onChange={(e) => handleWeekNameChange(week.id, e.target.value)}
-                      className="min-w-[140px] font-semibold"
+                      onChange={(e) => { e.stopPropagation(); handleWeekNameChange(week.id, e.target.value); }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="min-w-0 flex-1 font-semibold bg-transparent border-none shadow-none px-1"
+                      style={{ outline: 'none' }}
                     />
-                    <Button onClick={() => handleAddDay(week.id)} size="sm">
-                      + Day
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {!isWeekCollapsed && (
+                      <Button onClick={() => handleAddDay(week.id)} size="sm">+ Day</Button>
+                    )}
+                    <Button onClick={() => handleRemoveWeek(week.id)} size="sm" disabled={selectedPlan.weeks.length <= 1}>
+                      Delete
                     </Button>
                   </div>
-                  <Button onClick={() => handleRemoveWeek(week.id)} size="sm" disabled={selectedPlan.weeks.length <= 1}>
-                    Delete Week
-                  </Button>
                 </div>
+                {/* Collapsible week body */}
+                {!isWeekCollapsed && (
+                <div className="px-3 pb-3">
 
                 {week.days.some((d) => d.items.length > 0) && (
                   <div className="flex flex-wrap gap-2 mb-3 px-3 py-2 bg-card rounded-md text-[13px] text-secondary">
@@ -5788,8 +5843,8 @@ function BuilderPage({
                     padding: 12,
                     transition: 'all 0.15s ease',
                   }}>
-                    <div className="flex justify-between items-center flex-wrap gap-3 mb-3">
-                      <div className="flex gap-3 items-center flex-wrap">
+                    <div className="flex justify-between items-center gap-2 mb-3">
+                      <div className="flex gap-2 items-center min-w-0 flex-1">
                         <div
                           onPointerDown={(e) => {
                             e.preventDefault();
@@ -5802,7 +5857,7 @@ function BuilderPage({
                             dayDragTimerRef.current = window.setTimeout(() => setDayDragActive(true), 150);
                             try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
                           }}
-                          className="text-center text-lg leading-[18px] px-2.5 py-1.5 select-none touch-none cursor-grab bg-elevated rounded-sm text-muted"
+                          className="text-center text-lg leading-[18px] px-2 py-1 select-none touch-none cursor-grab bg-elevated rounded-sm text-muted flex-shrink-0"
                           aria-label="Drag day handle"
                           title="Drag to reorder day"
                         >
@@ -5811,18 +5866,39 @@ function BuilderPage({
                         <input
                           value={day.name}
                           onChange={(e) => handleDayNameChange(week.id, day.id, e.target.value)}
-                          className="min-w-[120px]"
+                          className="min-w-0 flex-1 font-medium"
                         />
-                        <Button onClick={() => handleAddExercise(week.id, day.id)} size="sm">
-                          + Exercise
-                        </Button>
-                        <Button onClick={() => handleDuplicateDay(week.id, day.id)} size="sm">
-                          Duplicate Day
-                        </Button>
                       </div>
-                      <Button onClick={() => handleRemoveDay(week.id, day.id)} size="sm" disabled={week.days.length <= 1}>
-                        Delete Day
-                      </Button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Button onClick={() => handleAddExercise(week.id, day.id)} size="sm">+ Exercise</Button>
+                        {/* Day ⋮ menu for secondary actions */}
+                        <div className="relative" ref={dayMenuOpenId === day.id ? dayMenuRef : undefined}>
+                          <button
+                            onClick={() => setDayMenuOpenId(dayMenuOpenId === day.id ? null : day.id)}
+                            title="Day options"
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 16, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                          >
+                            ⋮
+                          </button>
+                          {dayMenuOpenId === day.id && (
+                            <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-2 mt-1 min-w-[160px] z-30 shadow-[var(--shadow-lg)]">
+                              <Button onClick={() => { setDayMenuOpenId(null); handleDuplicateDay(week.id, day.id); }} size="sm" block className="mb-1 text-left">
+                                Duplicate Day
+                              </Button>
+                              <Button
+                                onClick={() => { setDayMenuOpenId(null); handleRemoveDay(week.id, day.id); }}
+                                size="sm"
+                                block
+                                disabled={week.days.length <= 1}
+                                className="text-left"
+                                style={{ color: week.days.length <= 1 ? undefined : 'var(--color-error, #f87171)' }}
+                              >
+                                Delete Day
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {day.items.length > 0 && (
@@ -6152,8 +6228,11 @@ function BuilderPage({
                   <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
                 )}
                 </div>
+                </div>
+                )}
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       )}
