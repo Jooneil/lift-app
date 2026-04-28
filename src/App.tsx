@@ -1914,7 +1914,15 @@ function AuthedApp({
       {/* Streak Reconfigure Prompt (after Finish & Archive) */}
       <Modal open={showStreakReconfigPrompt} onClose={() => setShowStreakReconfigPrompt(false)} maxWidth={360}>
         <div className="text-center">
-          <div className="text-[48px] mb-3">🎉</div>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="mb-3" aria-hidden="true">
+            <rect x="20" y="2" width="6" height="8" rx="2" fill="#818cf8" transform="rotate(10 20 2)"/>
+            <rect x="3" y="12" width="5" height="9" rx="2" fill="#f97316" transform="rotate(-25 3 12)"/>
+            <rect x="37" y="8" width="5" height="9" rx="2" fill="#22c55e" transform="rotate(20 37 8)"/>
+            <rect x="7" y="29" width="6" height="6" rx="2" fill="#eab308" transform="rotate(-10 7 29)"/>
+            <rect x="36" y="26" width="5" height="9" rx="2" fill="#ec4899" transform="rotate(30 36 26)"/>
+            <rect x="18" y="38" width="5" height="7" rx="2" fill="#f97316" transform="rotate(5 18 38)"/>
+            <rect x="31" y="36" width="6" height="6" rx="2" fill="#818cf8" transform="rotate(-15 31 36)"/>
+          </svg>
           <h3 className="mt-0 mb-2 text-lg">Plan Complete!</h3>
           <p className="text-muted mb-6">
             Great work finishing your plan. Would you like to update your streak schedule?
@@ -2033,6 +2041,7 @@ function WorkoutPage({
   const [editDraftSets, setEditDraftSets] = useState<SessionSet[]>([]);
   const [myoScopeEntry, setMyoScopeEntry] = useState<{ entryId: string; exerciseId?: string; exerciseName: string; currentValue: boolean } | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const allTimePRRef = useRef<Record<string, number>>({});
   const sessionStartRef = useRef<number | null>(null);
   const [elapsedDisplay, setElapsedDisplay] = useState('');
   const timerPausedRef = useRef(false);
@@ -3079,6 +3088,33 @@ function WorkoutPage({
   const handleDone = async () => {
     markSessionCompleted(true);
     await onMarkDone();
+    // Fetch all-time best volumes per exercise (excluding today's session) for PR comparison
+    try {
+      const rows = await sessionApi.listAll();
+      const bests: Record<string, number> = {};
+      for (const row of rows) {
+        // Skip the current session — it's already been saved, don't count it as "history"
+        if (session &&
+            String(row.plan_id) === String(plan.serverId) &&
+            row.week_id === session.planWeekId &&
+            row.day_id === session.planDayId) continue;
+        const payload = row.data;
+        if (!payload?.entries) continue;
+        for (const entry of payload.entries) {
+          const name = (entry.exerciseName || '').trim().toLowerCase();
+          if (!name) continue;
+          for (const s of (entry.sets || [])) {
+            if (s.weight != null && s.reps != null) {
+              const vol = s.weight * s.reps;
+              if (vol > (bests[name] || 0)) bests[name] = vol;
+            }
+          }
+        }
+      }
+      allTimePRRef.current = bests;
+    } catch {
+      allTimePRRef.current = {};
+    }
     setShowCompletionModal(true);
   };
 
@@ -3529,9 +3565,11 @@ function WorkoutPage({
             ? `${elapsedMins}m`
             : `${Math.floor(elapsedMins / 60)}h ${elapsedMins % 60}m`;
 
-          // PR detection: compare today's best volume per exercise vs ghost
+          // Two-tier achievement detection
           const prs: { exerciseName: string; weight: number; reps: number }[] = [];
+          const improved: { exerciseName: string; weight: number; reps: number }[] = [];
           if (session) {
+            const allTimeBests = allTimePRRef.current;
             for (const entry of session.entries) {
               const todayBest = entry.sets
                 .filter(s => s.weight != null && s.reps != null)
@@ -3540,18 +3578,33 @@ function WorkoutPage({
                   return vol > best.vol ? { vol, weight: s.weight!, reps: s.reps! } : best;
                 }, { vol: 0, weight: 0, reps: 0 });
               if (todayBest.vol === 0) continue;
+              const nameLower = (entry.exerciseName || '').trim().toLowerCase();
+              const allTimeBest = allTimeBests[nameLower] ?? 0;
               const key = exerciseKey(entry);
               const ghostSets = ghost[key] ?? [];
               const ghostBest = ghostSets.reduce((best, s) => Math.max(best, (s.weight ?? 0) * (s.reps ?? 0)), 0);
-              if (todayBest.vol > ghostBest) {
+              if (todayBest.vol > allTimeBest) {
                 prs.push({ exerciseName: entry.exerciseName, weight: todayBest.weight, reps: todayBest.reps });
+              } else if (todayBest.vol > ghostBest) {
+                improved.push({ exerciseName: entry.exerciseName, weight: todayBest.weight, reps: todayBest.reps });
               }
             }
           }
 
           return (
             <>
-              <h2 className="text-[28px] font-bold m-0 mb-4">Day complete 🎉</h2>
+              <div className="flex items-center gap-2 mb-4">
+                <h2 className="text-[28px] font-bold m-0">Day complete</h2>
+                <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                  <rect x="13" y="1" width="4" height="5" rx="1.5" fill="#818cf8" transform="rotate(10 13 1)"/>
+                  <rect x="2" y="8" width="3" height="6" rx="1.5" fill="#f97316" transform="rotate(-25 2 8)"/>
+                  <rect x="25" y="5" width="3" height="6" rx="1.5" fill="#22c55e" transform="rotate(20 25 5)"/>
+                  <rect x="5" y="19" width="4" height="4" rx="1.5" fill="#eab308" transform="rotate(-10 5 19)"/>
+                  <rect x="24" y="17" width="3" height="6" rx="1.5" fill="#ec4899" transform="rotate(30 24 17)"/>
+                  <rect x="12" y="25" width="3" height="5" rx="1.5" fill="#f97316" transform="rotate(5 12 25)"/>
+                  <rect x="21" y="24" width="4" height="4" rx="1.5" fill="#818cf8" transform="rotate(-15 21 24)"/>
+                </svg>
+              </div>
               <div className="grid grid-cols-3 gap-2 mb-4">
                 {[
                   { label: 'Sets', value: String(completedSets.length) },
@@ -3564,16 +3617,26 @@ function WorkoutPage({
                   </div>
                 ))}
               </div>
-              {prs.length > 0 && (
+              {(prs.length > 0 || improved.length > 0) && (
                 <div className="mb-4 flex flex-col gap-1.5">
                   {prs.map((pr) => (
                     <div key={pr.exerciseName} className="flex items-center gap-2 text-[13px] font-medium px-3 py-2 bg-elevated border border-subtle rounded-md">
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--accent-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M5 3h6v3a3 3 0 0 1-6 0V3ZM3 4h2M11 4h2M6 9h4v3H6zM5 13h6" />
                       </svg>
-                      <span className="text-accent-blue font-semibold">PR</span>
+                      <span style={{ color: '#f59e0b' }} className="font-semibold">PR</span>
                       <span className="text-secondary">{pr.exerciseName}</span>
                       <span className="ml-auto text-muted tabular-nums">{pr.weight} × {pr.reps}</span>
+                    </div>
+                  ))}
+                  {improved.map((item) => (
+                    <div key={item.exerciseName} className="flex items-center gap-2 text-[13px] font-medium px-3 py-2 bg-elevated border border-subtle rounded-md">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M7 11V3M4 6l3-3 3 3" />
+                      </svg>
+                      <span className="text-secondary font-semibold">Up from last</span>
+                      <span className="text-muted">{item.exerciseName}</span>
+                      <span className="ml-auto text-muted tabular-nums">{item.weight} × {item.reps}</span>
                     </div>
                   ))}
                 </div>
