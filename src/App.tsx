@@ -1321,12 +1321,6 @@ function AuthedApp({
             </div>
           )}
         </div>
-        <button
-          onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }}
-          style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}
-        >
-          + New Plan
-        </button>
       </div>
 
       {mode === "builder" && (
@@ -1848,6 +1842,22 @@ function AuthedApp({
       <Modal open={!!(showPlanSettings && selectedPlan)} onClose={() => setShowPlanSettings(false)} title="Plan Settings" maxWidth={360}>
         {selectedPlan && (
           <>
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={() => { setShowPlanSettings(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }}
+              >
+                + New Plan
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => { setShowPlanSettings(false); setShowPlanList(true); }}
+              >
+                Manage Plans
+              </Button>
+            </div>
             <Button
               onClick={() => { setShowPlanSettings(false); setMode("builder"); setShowPlanList(false); }}
               block
@@ -2096,7 +2106,9 @@ function WorkoutPage({
   };
 
   const handleStopTimer = () => {
+    sessionStartRef.current = Date.now();
     timerPausedRef.current = true;
+    setElapsedDisplay('0 min');
     setShowTimerPopover(false);
   };
 
