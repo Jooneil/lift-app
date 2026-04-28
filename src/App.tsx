@@ -4580,6 +4580,15 @@ function BuilderPage({
   const [setWeeksInput, setSetWeeksInput] = useState('');
   const setWeeksInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!setWeeksOpen) return;
+    const t = setTimeout(() => {
+      setWeeksInputRef.current?.focus();
+      setWeeksInputRef.current?.select();
+    }, 50);
+    return () => clearTimeout(t);
+  }, [setWeeksOpen]);
+
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
     for (const ex of catalogExercises) {
@@ -5784,7 +5793,6 @@ function BuilderPage({
             onClick={() => {
               setSetWeeksInput(String(selectedPlan.weeks.length));
               setSetWeeksOpen(true);
-              setTimeout(() => setWeeksInputRef.current?.select(), 50);
             }}
             size="sm"
           >
@@ -6356,6 +6364,8 @@ function BuilderPage({
         <input
           ref={setWeeksInputRef}
           type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
           min={1}
           max={52}
           value={setWeeksInput}
@@ -6370,7 +6380,6 @@ function BuilderPage({
           className="w-full text-center text-[24px] font-bold mb-4"
           style={{ letterSpacing: '0.02em' }}
           placeholder="4"
-          autoFocus
         />
         <div className="flex gap-2 justify-end">
           <Button onClick={() => { setSetWeeksOpen(false); setSetWeeksInput(''); }}>Cancel</Button>
