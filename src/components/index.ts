@@ -18,3 +18,5 @@ export type { EmptyStateProps } from "./EmptyState";
 
 export { default as Skeleton } from "./Skeleton";
 export type { SkeletonProps } from "./Skeleton";
+
+export { KebabIcon, XIcon, TimerIcon, FlameIcon } from "./Icons";
