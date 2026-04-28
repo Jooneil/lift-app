@@ -450,6 +450,44 @@ Generate the program CSV file now.`;
 }
 
 // Fix common mojibake (UTF‑8 shown as Windows‑1252/Latin‑1) when reading data.
+function KebabIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="8" cy="3" r="1.5" />
+      <circle cx="8" cy="8" r="1.5" />
+      <circle cx="8" cy="13" r="1.5" />
+    </svg>
+  );
+}
+
+function XIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <line x1="2" y1="2" x2="12" y2="12" />
+      <line x1="12" y1="2" x2="2" y2="12" />
+    </svg>
+  );
+}
+
+function TimerIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8" cy="9" r="6" />
+      <path d="M8 6v3l2 1.5" />
+      <path d="M6 1h4" />
+      <path d="M8 1v2" />
+    </svg>
+  );
+}
+
+function FlameIcon({ size = 24, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M12 23C8.13 23 5 19.87 5 16c0-2.76 1.38-5.2 3.5-6.68.07 1.13.46 2.19 1.13 3.08A4.98 4.98 0 0 1 10 10c0-2.34 1.6-4.3 3.78-4.84C13.17 6.5 13 7.73 13 9c0 1.8.89 3.39 2.25 4.36A4.97 4.97 0 0 1 17 16c0 3.87-3.13 7-5 7zm2.67-9.36C13.96 12.9 13 11.55 13 10c0-.41.07-.81.18-1.18C11.88 9.61 11 10.7 11 12c0 .73.25 1.4.66 1.93A2.99 2.99 0 0 0 12 16a3 3 0 0 0 3-3c0-.48-.12-.93-.33-1.36z" />
+    </svg>
+  );
+}
+
 function fixMojibake(value: unknown): string {
   const s = typeof value === 'string' ? value : '';
   if (!s) return '';
@@ -1876,20 +1914,15 @@ function AuthedApp({
               onClick={() => setShowStreakSettings(true)}
               title={`${currentStreak} day streak`}
             >
-              <span
-                style={{
-                  filter: streakHitToday ? 'none' : 'grayscale(100%)',
-                  opacity: streakHitToday ? 1 : 0.5,
-                }}
-                className="text-[28px] leading-none"
-              >
-                🔥
-              </span>
+              <FlameIcon
+                size={28}
+                color={streakHitToday ? '#f97316' : 'var(--text-muted)'}
+              />
               <span
                 style={{
                   transform: 'translate(-50%, -45%)',
-                  color: streakHitToday ? '#000' : 'var(--text-muted)',
-                  textShadow: streakHitToday ? '0 0 2px rgba(255,255,255,0.8)' : 'none',
+                  color: streakHitToday ? '#fff' : 'var(--text-muted)',
+                  textShadow: streakHitToday ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
                 }}
                 className="absolute top-1/2 left-1/2 text-[11px] font-bold pointer-events-none"
               >
@@ -2247,7 +2280,7 @@ function AuthedApp({
             {/* Current streak display */}
             {streakConfig?.enabled && (
               <div className="bg-card border border-subtle rounded-md p-4 mb-6 text-center">
-                <div className="text-[48px] mb-2">🔥</div>
+                <div className="flex justify-center mb-2"><FlameIcon size={48} color="#f97316" /></div>
                 <div className="text-[28px] font-bold">{currentStreak}</div>
                 <div className="text-muted text-[15px]">
                   {currentStreak === 1 ? 'day streak' : 'day streak'}
@@ -3671,10 +3704,10 @@ function WorkoutPage({
               <Button
                 onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
                 size="sm"
-                style={{ padding: '4px 8px', minWidth: 32 }}
+                style={{ padding: '4px 8px', minWidth: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 title="Options"
               >
-                ⋮
+                <KebabIcon size={16} />
               </Button>
               {openExerciseMenu === entry.id && (
                 <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-default rounded-md p-2 mt-1 min-w-[160px] z-20 shadow-[var(--shadow-lg)]">
@@ -3756,11 +3789,11 @@ function WorkoutPage({
                   <Button
                     onClick={() => removeDraftSet(set.id)}
                     size="sm"
-                    className="text-error border-error min-w-0 text-[15px]"
-                    style={{ padding: '2px 6px' }}
+                    className="text-error border-error min-w-0"
+                    style={{ padding: '2px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     title="Remove set"
                   >
-                    ✕
+                    <XIcon size={13} />
                   </Button>
                 </div>
               ))}
@@ -3924,7 +3957,7 @@ function WorkoutPage({
                 }}
                 title="Tap to dismiss"
               >
-                {restTimer.done ? 'Go!' : `⏱ ${Math.floor(restTimer.secondsLeft / 60)}:${String(restTimer.secondsLeft % 60).padStart(2, '0')}`}
+                {restTimer.done ? 'Go!' : <><TimerIcon size={13} /> {Math.floor(restTimer.secondsLeft / 60)}:{String(restTimer.secondsLeft % 60).padStart(2, '0')}</>}
               </button>
             )}
           </div>
@@ -4085,7 +4118,7 @@ function WorkoutPage({
               )}
               {streakEnabled && currentStreak > 0 && (
                 <div className="flex items-center justify-center gap-2 mb-4 py-3 bg-elevated border border-subtle rounded-md">
-                  <span className="text-[22px]">🔥</span>
+                  <FlameIcon size={22} color="#f97316" />
                   <span className="text-[20px] font-bold tabular-nums">{currentStreak}</span>
                   <span className="text-[13px] text-muted">day streak</span>
                 </div>
@@ -4252,7 +4285,7 @@ function WorkoutPage({
                     ) : replaceQueue.map((q) => (
                       <div key={q.name} className="inline-flex items-center gap-1 bg-accent-subtle border border-subtle rounded-sm px-1.5 py-0.5 text-[13px]">
                         <span>{q.name}</span>
-                        <button onClick={() => removeReplaceQueue(q.name)} className="bg-transparent border-none text-muted cursor-pointer px-0.5 py-0 text-[13px] leading-none">✕</button>
+                        <button onClick={() => removeReplaceQueue(q.name)} className="bg-transparent border-none text-muted cursor-pointer px-0.5 py-0 leading-none flex items-center"><XIcon size={11} /></button>
                       </div>
                     ))}
                   </div>
@@ -6084,9 +6117,9 @@ function BuilderPage({
                       <button
                         onClick={() => setWeekMenuOpenId(weekMenuOpenId === week.id ? null : week.id)}
                         title="Week options"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 16, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}
                       >
-                        ⋮
+                        <KebabIcon size={16} />
                       </button>
                       {weekMenuOpenId === week.id && (
                         <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[180px] z-30 shadow-[var(--shadow-lg)]">
@@ -6208,9 +6241,9 @@ function BuilderPage({
                           <button
                             onClick={() => setDayMenuOpenId(dayMenuOpenId === day.id ? null : day.id)}
                             title="Day options"
-                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 16, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}
                           >
-                            ⋮
+                            <KebabIcon size={16} />
                           </button>
                           {dayMenuOpenId === day.id && (
                             <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-2 mt-1 min-w-[160px] z-30 shadow-[var(--shadow-lg)]">
