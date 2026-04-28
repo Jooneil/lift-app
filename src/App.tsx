@@ -1972,7 +1972,9 @@ function AuthedApp({
           <div className="flex flex-col gap-0 mb-4">
             {/* Row 1: Plan name + gear */}
             <div className="flex items-center justify-between pb-2.5">
-              <select
+              <div className="flex flex-col min-w-0 flex-1 mr-3">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-0.5">Plan</span>
+                <select
                 value={selectedPlanId ?? ''}
                 onChange={(e) => {
                   const newPlanId = e.target.value || null;
@@ -1989,6 +1991,7 @@ function AuthedApp({
                   </option>
                 ))}
               </select>
+              </div>
               {selectedPlan && (
                 <button
                   onClick={() => setShowPlanSettings(true)}
@@ -4712,7 +4715,7 @@ function BuilderPage({
   const handleCreatePlan = () => {
     const newPlan: Plan = {
       id: uuid(),
-      name: `New Plan ${plans.length + 1}`,
+      name: 'Untitled',
       weeks: [createWeek(0)],
     };
     setPlans((prev) => [...prev, newPlan]);
@@ -5672,21 +5675,24 @@ function BuilderPage({
       </datalist>
       {/* Row 1: Plan name + right-side controls */}
       <div className="flex items-center justify-between gap-3 pb-3">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {selectedPlan ? (
-            <input
-              value={selectedPlan.name}
-              onChange={(e) => handlePlanNameChange(e.target.value)}
-              className="text-[18px] font-bold tracking-[-0.02em] bg-transparent border-none shadow-none px-0 min-w-0 flex-1"
-              style={{ outline: 'none' }}
-              placeholder="Plan name"
-            />
-          ) : (
-            <h2 className="text-[18px] font-bold tracking-[-0.02em] m-0">Plan Builder</h2>
-          )}
-          {(exerciseLoading || catalogLoading) && (
-            <span className="text-muted text-[12px] whitespace-nowrap">Loading…</span>
-          )}
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-0.5">Plan</span>
+          <div className="flex items-center gap-2 min-w-0">
+            {selectedPlan ? (
+              <input
+                value={selectedPlan.name}
+                onChange={(e) => handlePlanNameChange(e.target.value)}
+                className="text-[18px] font-bold tracking-[-0.02em] bg-transparent border-none shadow-none px-0 min-w-0 flex-1"
+                style={{ outline: 'none' }}
+                placeholder="Untitled"
+              />
+            ) : (
+              <h2 className="text-[18px] font-bold tracking-[-0.02em] m-0">Plan Builder</h2>
+            )}
+            {(exerciseLoading || catalogLoading) && (
+              <span className="text-muted text-[12px] whitespace-nowrap">Loading…</span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -5696,7 +5702,7 @@ function BuilderPage({
               onClick={() => setPlansMenuOpen((v) => !v)}
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-primary)' }}
             >
-              <span className="hidden sm:inline">Manage </span>Plans <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
+              <span className="hidden sm:inline">Manage </span>Plans <span style={{ fontSize: 13, opacity: 0.8 }}>▾</span>
             </button>
             {plansMenuOpen && (
               <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[170px] z-30 shadow-[var(--shadow-lg)]">
@@ -5738,9 +5744,9 @@ function BuilderPage({
                 disabled={saving}
                 style={{
                   background: 'var(--accent)', color: '#0a0a0c',
-                  border: 'none', borderRadius: '0 8px 8px 0', padding: '7px 8px',
+                  border: 'none', borderRadius: '0 8px 8px 0', padding: '7px 10px',
                   cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-                  fontSize: 9,
+                  fontSize: 13,
                 }}
                 title="More save options"
               >
