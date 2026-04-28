@@ -2621,7 +2621,7 @@ function WorkoutPage({
   const sessionStartRef = useRef<number | null>(null);
   const [elapsedDisplay, setElapsedDisplay] = useState('');
   const REST_DURATION = 90; // seconds
-  const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string } | null>(null);
+  const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string; done?: boolean } | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const formatElapsed = useCallback(() => {
@@ -2656,8 +2656,8 @@ function WorkoutPage({
         if (!prev) return null;
         if (prev.secondsLeft <= 1) {
           if (restTimerRef.current) clearInterval(restTimerRef.current);
-          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-          return null;
+          setTimeout(() => setRestTimer(null), 1500);
+          return { ...prev, secondsLeft: 0, done: true };
         }
         return { ...prev, secondsLeft: prev.secondsLeft - 1 };
       });
@@ -3914,16 +3914,17 @@ function WorkoutPage({
                 onClick={dismissRestTimer}
                 className="text-[12px] px-3 py-1.5 rounded-full border transition-all duration-150 flex items-center gap-1.5 ml-auto"
                 style={{
-                  borderColor: 'var(--accent-blue)',
-                  background: 'var(--accent-blue-muted)',
-                  color: 'var(--accent-blue)',
+                  borderColor: restTimer.done ? 'var(--success)' : 'var(--accent-blue)',
+                  background: restTimer.done ? 'var(--success-muted)' : 'var(--accent-blue-muted)',
+                  color: restTimer.done ? 'var(--success)' : 'var(--accent-blue)',
                   boxShadow: 'none',
                   minHeight: 'auto',
                   fontVariantNumeric: 'tabular-nums',
+                  transition: 'all 0.2s ease',
                 }}
                 title="Tap to dismiss"
               >
-                ⏱ {Math.floor(restTimer.secondsLeft / 60)}:{String(restTimer.secondsLeft % 60).padStart(2, '0')}
+                {restTimer.done ? 'Go!' : `⏱ ${Math.floor(restTimer.secondsLeft / 60)}:${String(restTimer.secondsLeft % 60).padStart(2, '0')}`}
               </button>
             )}
           </div>
