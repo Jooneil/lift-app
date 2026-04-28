@@ -2621,7 +2621,7 @@ function WorkoutPage({
   const sessionStartRef = useRef<number | null>(null);
   const [elapsedDisplay, setElapsedDisplay] = useState('');
   const REST_DURATION = 90; // seconds
-  const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number } | null>(null);
+  const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string } | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const formatElapsed = useCallback(() => {
@@ -2648,9 +2648,9 @@ function WorkoutPage({
     return () => clearInterval(id);
   }, [formatElapsed]);
 
-  const startRestTimer = useCallback(() => {
+  const startRestTimer = useCallback((entryId: string) => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
-    setRestTimer({ secondsLeft: REST_DURATION, total: REST_DURATION });
+    setRestTimer({ secondsLeft: REST_DURATION, total: REST_DURATION, entryId });
     restTimerRef.current = setInterval(() => {
       setRestTimer(prev => {
         if (!prev) return null;
@@ -3630,38 +3630,6 @@ function WorkoutPage({
           <option key={name} value={name} />
         ))}
       </datalist>
-      {/* Rest timer */}
-      {restTimer && (
-        <div
-          onClick={dismissRestTimer}
-          className="mb-3 flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer select-none"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}
-        >
-          {/* Circular progress */}
-          <svg width="32" height="32" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
-            <circle cx="16" cy="16" r="13" fill="none" stroke="var(--border-default)" strokeWidth="2.5" />
-            <circle
-              cx="16" cy="16" r="13"
-              fill="none"
-              stroke="var(--accent-blue)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeDasharray={`${2 * Math.PI * 13}`}
-              strokeDashoffset={`${2 * Math.PI * 13 * (1 - restTimer.secondsLeft / restTimer.total)}`}
-              transform="rotate(-90 16 16)"
-              style={{ transition: 'stroke-dashoffset 1s linear' }}
-            />
-          </svg>
-          <div className="flex-1">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-0.5">Rest</div>
-            <div className="text-[20px] font-semibold tabular-nums leading-none" style={{ color: 'var(--text-primary)' }}>
-              {Math.floor(restTimer.secondsLeft / 60)}:{String(restTimer.secondsLeft % 60).padStart(2, '0')}
-            </div>
-          </div>
-          <div className="text-[12px] text-muted">tap to dismiss</div>
-        </div>
-      )}
-
       {totalSets > 0 && (
         <div className="mb-4">
           <div className="flex justify-between items-center mb-1.5">
@@ -3864,7 +3832,7 @@ function WorkoutPage({
                         }
                         // Start rest timer when set becomes complete
                         if (repsValue != null && effectiveWeight != null) {
-                          startRestTimer();
+                          startRestTimer(entry.id);
                         }
                       }}
                       className="workout-input w-full min-w-0"
@@ -3939,6 +3907,25 @@ function WorkoutPage({
               )}
               Notes
             </button>
+
+            {/* Rest timer — inline, right of Notes */}
+            {restTimer && restTimer.entryId === entry.id && (
+              <button
+                onClick={dismissRestTimer}
+                className="text-[12px] px-3 py-1.5 rounded-full border transition-all duration-150 flex items-center gap-1.5 ml-auto"
+                style={{
+                  borderColor: 'var(--accent-blue)',
+                  background: 'var(--accent-blue-muted)',
+                  color: 'var(--accent-blue)',
+                  boxShadow: 'none',
+                  minHeight: 'auto',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+                title="Tap to dismiss"
+              >
+                ⏱ {Math.floor(restTimer.secondsLeft / 60)}:{String(restTimer.secondsLeft % 60).padStart(2, '0')}
+              </button>
+            )}
           </div>
 
           {/* Expanded instructions */}
