@@ -4572,6 +4572,8 @@ function BuilderPage({
   const dayMenuRef = useRef<HTMLDivElement>(null);
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const plansMenuRef = useRef<HTMLDivElement>(null);
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
+  const saveMenuRef = useRef<HTMLDivElement>(null);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -4631,16 +4633,17 @@ function BuilderPage({
     searchCompound,
   ]);
 
-  // Close day ⋮ menu and plans menu on outside click
+  // Close builder menus on outside click
   useEffect(() => {
-    if (!dayMenuOpenId && !plansMenuOpen) return;
+    if (!dayMenuOpenId && !plansMenuOpen && !saveMenuOpen) return;
     const handler = (e: MouseEvent) => {
       if (dayMenuRef.current && !dayMenuRef.current.contains(e.target as Node)) setDayMenuOpenId(null);
       if (plansMenuRef.current && !plansMenuRef.current.contains(e.target as Node)) setPlansMenuOpen(false);
+      if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) setSaveMenuOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [dayMenuOpenId, plansMenuOpen]);
+  }, [dayMenuOpenId, plansMenuOpen, saveMenuOpen]);
 
   const toggleWeek = (weekId: string) => {
     setCollapsedWeeks((prev) => {
@@ -5647,9 +5650,9 @@ function BuilderPage({
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
-      {/* Row 1: Plan name + actions */}
-      <div className="flex items-center justify-between gap-3 pb-2.5">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+      {/* Row 1: Plan name + right-side controls */}
+      <div className="flex items-center justify-between gap-3 pb-3">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {selectedPlan ? (
             <input
               value={selectedPlan.name}
@@ -5662,34 +5665,88 @@ function BuilderPage({
             <h2 className="text-[18px] font-bold tracking-[-0.02em] m-0">Plan Builder</h2>
           )}
           {(exerciseLoading || catalogLoading) && (
-            <div className="text-muted text-[13px] whitespace-nowrap">Loading...</div>
+            <span className="text-muted text-[12px] whitespace-nowrap">Loading…</span>
           )}
         </div>
+
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Desktop: show all buttons */}
-          <div className="hidden sm:flex items-center gap-2">
-            <Button onClick={() => setShowPlanList(true)} size="sm">Manage Plans</Button>
-            <Button onClick={handleCreatePlan} size="sm">+ Plan</Button>
-          </div>
-          {/* Mobile: Plans dropdown */}
-          <div className="sm:hidden relative" ref={plansMenuRef}>
+          {/* Plans dropdown — single button on mobile, expanded on desktop */}
+          <div className="relative" ref={plansMenuRef}>
             <button
               onClick={() => setPlansMenuOpen((v) => !v)}
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-primary)' }}
             >
-              Plans <span style={{ fontSize: 10 }}>▾</span>
+              <span className="hidden sm:inline">Manage </span>Plans <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
             </button>
             {plansMenuOpen && (
-              <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-2 mt-1 min-w-[180px] z-30 shadow-[var(--shadow-lg)]">
-                <Button onClick={() => { setPlansMenuOpen(false); setShowPlanList(true); }} size="sm" block className="mb-1 text-left">Manage Plans</Button>
-                <Button onClick={() => { setPlansMenuOpen(false); handleCreatePlan(); }} size="sm" block className="text-left">+ New Plan</Button>
+              <div className="dropdown-menu absolute top-full left-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[170px] z-30 shadow-[var(--shadow-lg)]">
+                <button
+                  onClick={() => { setPlansMenuOpen(false); setShowPlanList(true); }}
+                  className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                >
+                  Manage Plans
+                </button>
+                <button
+                  onClick={() => { setPlansMenuOpen(false); handleCreatePlan(); }}
+                  className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                >
+                  + New Plan
+                </button>
               </div>
             )}
           </div>
+
+          {/* Split save button */}
           {selectedPlan && (
-            <Button onClick={handleSavePlan} variant="primary" disabled={saving} size="sm">
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
+            <div className="relative flex" ref={saveMenuRef}>
+              <button
+                onClick={async () => { setSaveMenuOpen(false); await handleSavePlan(); }}
+                disabled={saving}
+                style={{
+                  background: 'var(--accent)', color: '#0a0a0c', fontWeight: 600, fontSize: 13,
+                  border: 'none', borderRadius: '8px 0 0 8px', padding: '7px 14px',
+                  cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
+                  borderRight: '1px solid rgba(0,0,0,0.15)',
+                }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setSaveMenuOpen((v) => !v)}
+                disabled={saving}
+                style={{
+                  background: 'var(--accent)', color: '#0a0a0c',
+                  border: 'none', borderRadius: '0 8px 8px 0', padding: '7px 8px',
+                  cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
+                  fontSize: 9,
+                }}
+                title="More save options"
+              >
+                ▾
+              </button>
+              {saveMenuOpen && (
+                <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[200px] z-30 shadow-[var(--shadow-lg)]">
+                  <button
+                    onClick={async () => { setSaveMenuOpen(false); await handleSavePlan(); await handleSaveAsTemplate(); }}
+                    className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                    disabled={saving}
+                  >
+                    Save + Save as Template
+                  </button>
+                  <button
+                    onClick={async () => { setSaveMenuOpen(false); await handleSaveAsTemplate(); }}
+                    className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                    disabled={saving}
+                  >
+                    Save as Template only
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -5697,16 +5754,18 @@ function BuilderPage({
       {/* Divider */}
       <div className="border-t border-subtle mb-3" />
 
-      {/* Row 2: Secondary actions */}
+      {/* Row 2: Structure actions — always visible together */}
       {selectedPlan && (
-        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button onClick={handleSaveAsTemplate} disabled={saving} size="sm">Save as Template</Button>
-            <Button onClick={handleAddWeek} size="sm">+ Week</Button>
-            {selectedPlan.weeks.length > 1 && (
-              <Button onClick={handleCopyWeekOneToAll} size="sm">Copy Wk 1 → All</Button>
-            )}
-          </div>
+        <div className="flex items-center gap-2 mb-3">
+          <Button onClick={handleAddWeek} size="sm">+ Week</Button>
+          <Button
+            onClick={handleCopyWeekOneToAll}
+            size="sm"
+            disabled={selectedPlan.weeks.length <= 1}
+            title={selectedPlan.weeks.length <= 1 ? 'Add more weeks first' : 'Copy Week 1 layout to all weeks'}
+          >
+            Copy Wk 1 → All
+          </Button>
         </div>
       )}
 
