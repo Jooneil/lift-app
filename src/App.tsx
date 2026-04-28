@@ -2587,6 +2587,8 @@ function WorkoutPage({
   const [replaceSearchBodyWeight, setReplaceSearchBodyWeight] = useState(false);
   const [replaceSearchCompound, setReplaceSearchCompound] = useState(false);
   const [replaceQueue, setReplaceQueue] = useState<Array<{ name: string; id?: string }>>([]);
+  const [replaceDifferentExpanded, setReplaceDifferentExpanded] = useState(false);
+  const [replaceSuggestionTarget, setReplaceSuggestionTarget] = useState<string | null>(null);
   const [replaceAddMovementOpen, setReplaceAddMovementOpen] = useState(false);
   const [replaceAddMovementName, setReplaceAddMovementName] = useState("");
   const [replaceAddMovementPrimary, setReplaceAddMovementPrimary] = useState("");
@@ -2743,6 +2745,52 @@ function WorkoutPage({
     replaceSearchCompound,
   ]);
 
+  const suggestedSwaps = useMemo(() => {
+    if (!replaceTargetEntry) return [];
+    const targetEx = catalogByNameMap.get(replaceTargetEntry.exerciseName.trim().toLowerCase());
+    if (!targetEx) return [];
+
+    // Build excluded names: everything already in session + everything in the plan
+    const excluded = new Set<string>();
+    if (session) {
+      for (const e of session.entries) excluded.add(normalizeFilterValue(e.exerciseName));
+    }
+    for (const week of plan.weeks) {
+      for (const d of week.days) {
+        for (const item of d.items) excluded.add(normalizeFilterValue(item.exerciseName));
+      }
+    }
+
+    const swaps = catalogExercises.filter((ex) => {
+      const key = normalizeFilterValue(ex.name);
+      if (!key) return false;
+      if (excluded.has(key)) return false;
+      if (ex.primaryMuscle !== targetEx.primaryMuscle) return false;
+      // Same equipment family
+      if (targetEx.machine && !ex.machine) return false;
+      if (targetEx.freeWeight && !ex.freeWeight) return false;
+      if (targetEx.cable && !ex.cable) return false;
+      if (targetEx.bodyWeight && !ex.bodyWeight) return false;
+      return true;
+    });
+
+    // Deduplicate by name
+    const byName = new Map<string, CatalogExercise>();
+    for (const ex of swaps) {
+      const key = normalizeFilterValue(ex.name);
+      const existing = byName.get(key);
+      if (!existing || (ex.isCustom && !existing.isCustom)) byName.set(key, ex);
+    }
+
+    // Sort by secondary muscle overlap (desc), then alphabetically
+    return Array.from(byName.values()).sort((a, b) => {
+      const aOverlap = targetEx.secondaryMuscles.filter(m => a.secondaryMuscles.includes(m)).length;
+      const bOverlap = targetEx.secondaryMuscles.filter(m => b.secondaryMuscles.includes(m)).length;
+      if (bOverlap !== aOverlap) return bOverlap - aOverlap;
+      return a.name.localeCompare(b.name);
+    }).slice(0, 12);
+  }, [replaceTargetEntry, catalogExercises, catalogByNameMap, session, plan]);
+
   const openReplaceSearch = (entry: SessionEntry, entryIndex: number) => {
     setReplaceTargetEntry({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName });
     setReplaceTargetIndex(entryIndex);
@@ -2753,8 +2801,17 @@ function WorkoutPage({
   const closeReplaceSearch = () => {
     setReplaceSearchOpen(false);
     setReplaceQueue([]);
+    setReplaceDifferentExpanded(false);
+    setReplaceSuggestionTarget(null);
     setReplaceAddMovementOpen(false);
     resetReplaceAddMovement();
+  };
+
+  const applySingleReplace = (name: string, scope: "today" | "remaining") => {
+    if (!replaceTargetEntry) return;
+    if (typeof onReplaceExercise === "function") onReplaceExercise(replaceTargetEntry, name, scope);
+    historyCacheRef.current = null;
+    closeReplaceSearch();
   };
 
   const addReplaceQueue = (ex: CatalogExercise) => {
@@ -4004,224 +4061,164 @@ function WorkoutPage({
         })()}
       </Modal>
 
-      <Modal open={replaceSearchOpen} onClose={closeReplaceSearch} title={`Replace Exercise${replaceTargetEntry ? ` - ${replaceTargetEntry.exerciseName}` : ''}`} maxWidth={980}>
+      <Modal open={replaceSearchOpen} onClose={closeReplaceSearch} title={`Replace — ${replaceTargetEntry?.exerciseName ?? ''}`} maxWidth={560}>
+        <div className="flex flex-col gap-4">
 
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-              <input
-                value={replaceSearchText}
-                onChange={(e) => setReplaceSearchText(e.target.value)}
-                placeholder="Search name..."
-               
-              />
-              <select value={replaceSearchPrimary} onChange={(e) => setReplaceSearchPrimary(e.target.value)} >
-                <option value="All">Primary Muscle (All)</option>
-                {replacePrimaryMuscles.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+          {/* Section A: Suggested Swaps */}
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-2">Suggested Swaps</div>
+            {suggestedSwaps.length === 0 ? (
+              <div className="text-[13px] text-muted py-3 text-center">No fresh swaps available — try Different Movement below.</div>
+            ) : (
+              <div className="flex flex-col gap-1.5 max-h-[40vh] overflow-y-auto">
+                {suggestedSwaps.map((ex) => (
+                  <div key={ex.id} className="border border-subtle rounded-md overflow-hidden">
+                    <button
+                      onClick={() => setReplaceSuggestionTarget(replaceSuggestionTarget === ex.name ? null : ex.name)}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors duration-100 hover:bg-accent-muted"
+                      style={{ background: replaceSuggestionTarget === ex.name ? 'var(--accent-muted)' : 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      <span className="font-medium text-[14px]">{ex.name}</span>
+                      <span className="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">{ex.primaryMuscle}</span>
+                    </button>
+                    {replaceSuggestionTarget === ex.name && (
+                      <div className="flex gap-2 px-3 pb-2.5">
+                        <Button onClick={() => applySingleReplace(ex.name, 'today')} size="sm" variant="primary">Today Only</Button>
+                        <Button onClick={() => applySingleReplace(ex.name, 'remaining')} size="sm">Rest of Meso</Button>
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </select>
-              <select value={replaceSearchSecondary} onChange={(e) => setReplaceSearchSecondary(e.target.value)} >
-                <option value="All">Secondary Muscle (All)</option>
-                {replaceSecondaryMuscles.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-              <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value as SearchSource)} >
-                <option value="all">Source (All)</option>
-                <option value="defaults">Defaults</option>
-                <option value="home_made">Home Made *</option>
-              </select>
-              <Button variant="pill" active={replaceSearchMachine} onClick={() => setReplaceSearchMachine((prev) => !prev)} aria-pressed={replaceSearchMachine}>
-                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchMachine ? "var(--text-primary)" : "transparent" }} />
-                Machine
-              </Button>
-              <Button variant="pill" active={replaceSearchFreeWeight} onClick={() => setReplaceSearchFreeWeight((prev) => !prev)} aria-pressed={replaceSearchFreeWeight}>
-                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchFreeWeight ? "var(--text-primary)" : "transparent" }} />
-                Free weight
-              </Button>
-              <Button variant="pill" active={replaceSearchCable} onClick={() => setReplaceSearchCable((prev) => !prev)} aria-pressed={replaceSearchCable}>
-                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchCable ? "var(--text-primary)" : "transparent" }} />
-                Cable
-              </Button>
-              <Button variant="pill" active={replaceSearchBodyWeight} onClick={() => setReplaceSearchBodyWeight((prev) => !prev)} aria-pressed={replaceSearchBodyWeight}>
-                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchBodyWeight ? "var(--text-primary)" : "transparent" }} />
-                Bodyweight
-              </Button>
-              <Button variant="pill" active={replaceSearchCompound} onClick={() => setReplaceSearchCompound((prev) => !prev)} aria-pressed={replaceSearchCompound}>
-                <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: replaceSearchCompound ? "var(--text-primary)" : "transparent" }} />
-                Compound
-              </Button>
-            </div>
+              </div>
+            )}
+          </div>
 
-            <div className="flex flex-col gap-3">
-              <div className="border border-default rounded-md p-3">
-                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="font-semibold">Results</div>
-                  <div className="text-muted text-[13px]">{replaceFilteredCatalog.length} found</div>
+          {/* Section B: Different Movement (collapsible) */}
+          <div className="border border-subtle rounded-md overflow-hidden">
+            <button
+              onClick={() => setReplaceDifferentExpanded(v => !v)}
+              className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+              style={{ background: 'var(--bg-elevated)', border: 'none', cursor: 'pointer' }}
+            >
+              <span className="text-[13px] font-semibold">Different Movement</span>
+              <span className="text-muted text-[12px]">{replaceDifferentExpanded ? '▴' : '▾'}</span>
+            </button>
+
+            {replaceDifferentExpanded && (
+              <div className="px-3 pb-3 flex flex-col gap-3 border-t border-subtle">
+                {/* Filters */}
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2 pt-3">
+                  <input value={replaceSearchText} onChange={(e) => setReplaceSearchText(e.target.value)} placeholder="Search name..." />
+                  <select value={replaceSearchPrimary} onChange={(e) => setReplaceSearchPrimary(e.target.value)}>
+                    <option value="All">Primary Muscle (All)</option>
+                    {replacePrimaryMuscles.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <select value={replaceSearchSecondary} onChange={(e) => setReplaceSearchSecondary(e.target.value)}>
+                    <option value="All">Secondary Muscle (All)</option>
+                    {replaceSecondaryMuscles.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <select value={replaceSearchSource} onChange={(e) => setReplaceSearchSource(e.target.value as SearchSource)}>
+                    <option value="all">Source (All)</option>
+                    <option value="defaults">Defaults</option>
+                    <option value="home_made">Home Made *</option>
+                  </select>
+                  {[
+                    { label: 'Machine', val: replaceSearchMachine, set: setReplaceSearchMachine },
+                    { label: 'Free weight', val: replaceSearchFreeWeight, set: setReplaceSearchFreeWeight },
+                    { label: 'Cable', val: replaceSearchCable, set: setReplaceSearchCable },
+                    { label: 'Bodyweight', val: replaceSearchBodyWeight, set: setReplaceSearchBodyWeight },
+                    { label: 'Compound', val: replaceSearchCompound, set: setReplaceSearchCompound },
+                  ].map(({ label, val, set }) => (
+                    <Button key={label} variant="pill" active={val} onClick={() => set(p => !p)} aria-pressed={val}>
+                      <span className="w-2.5 h-2.5 rounded-full border border-strong transition-all duration-150" style={{ background: val ? 'var(--text-primary)' : 'transparent' }} />
+                      {label}
+                    </Button>
+                  ))}
                 </div>
-                  <Button
-                    onClick={() => {
-                      setReplaceAddMovementOpen((prev) => !prev);
-                      setReplaceAddMovementError(null);
-                    }}
-                    size="xs"
-                  >
+
+                {/* Results */}
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px] text-muted">{replaceFilteredCatalog.length} found</span>
+                  <Button onClick={() => { setReplaceAddMovementOpen(p => !p); setReplaceAddMovementError(null); }} size="xs">
                     Can't find it? Create one!
                   </Button>
                 </div>
+
                 {replaceAddMovementOpen && (
-                  <div className="border border-subtle rounded-sm p-2 mb-2 flex flex-col gap-2">
-                    <input
-                      value={replaceAddMovementName}
-                      onChange={(e) => setReplaceAddMovementName(e.target.value)}
-                      placeholder="Movement name"
-                     
-                    />
-                    <select
-                      value={replaceAddMovementPrimary}
-                      onChange={(e) => setReplaceAddMovementPrimary(e.target.value)}
-                                         >
+                  <div className="border border-subtle rounded-sm p-2 flex flex-col gap-2">
+                    <input value={replaceAddMovementName} onChange={(e) => setReplaceAddMovementName(e.target.value)} placeholder="Movement name" />
+                    <select value={replaceAddMovementPrimary} onChange={(e) => setReplaceAddMovementPrimary(e.target.value)}>
                       <option value="">Primary muscle</option>
-                      {replacePrimaryMuscles.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
+                      {replacePrimaryMuscles.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                     <div className="flex flex-wrap gap-3">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="replace-add-movement-equipment"
-                          checked={replaceAddMovementEquipment === 'machine'}
-                          onChange={() => setReplaceAddMovementEquipment('machine')}
-                        />
-                        Machine
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="replace-add-movement-equipment"
-                          checked={replaceAddMovementEquipment === 'free_weight'}
-                          onChange={() => setReplaceAddMovementEquipment('free_weight')}
-                        />
-                        Free weight
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="replace-add-movement-equipment"
-                          checked={replaceAddMovementEquipment === 'cable'}
-                          onChange={() => setReplaceAddMovementEquipment('cable')}
-                        />
-                        Cable
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="replace-add-movement-equipment"
-                          checked={replaceAddMovementEquipment === 'body_weight'}
-                          onChange={() => setReplaceAddMovementEquipment('body_weight')}
-                        />
-                        Bodyweight
-                      </label>
+                      {(['machine','free_weight','cable','body_weight'] as const).map((eq) => (
+                        <label key={eq} className="flex items-center gap-2">
+                          <input type="radio" name="replace-add-movement-equipment" checked={replaceAddMovementEquipment === eq} onChange={() => setReplaceAddMovementEquipment(eq)} />
+                          {eq === 'free_weight' ? 'Free weight' : eq === 'body_weight' ? 'Bodyweight' : eq.charAt(0).toUpperCase() + eq.slice(1)}
+                        </label>
+                      ))}
                     </div>
                     <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={replaceAddMovementCompound}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setReplaceAddMovementCompound(checked);
-                          if (!checked) setReplaceAddMovementSecondary('');
-                        }}
-                      />
+                      <input type="checkbox" checked={replaceAddMovementCompound} onChange={(e) => { setReplaceAddMovementCompound(e.target.checked); if (!e.target.checked) setReplaceAddMovementSecondary(''); }} />
                       Compound
                     </label>
                     {replaceAddMovementCompound && (
-                      <select
-                        value={replaceAddMovementSecondary}
-                        onChange={(e) => setReplaceAddMovementSecondary(e.target.value)}
-                                             >
+                      <select value={replaceAddMovementSecondary} onChange={(e) => setReplaceAddMovementSecondary(e.target.value)}>
                         <option value="">Secondary muscle</option>
-                        {replacePrimaryMuscles
-                          .filter((m) => m !== replaceAddMovementPrimary)
-                          .map((m) => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
+                        {replacePrimaryMuscles.filter(m => m !== replaceAddMovementPrimary).map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     )}
-                    {replaceAddMovementError && (
-                      <div className="text-error text-[13px]">{replaceAddMovementError}</div>
-                    )}
+                    {replaceAddMovementError && <div className="text-error text-[13px]">{replaceAddMovementError}</div>}
                     <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={() => {
-                          resetReplaceAddMovement();
-                          setReplaceAddMovementOpen(false);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={handleReplaceAddMovement} variant="primary">
-                        Add
-                      </Button>
+                      <Button onClick={() => { resetReplaceAddMovement(); setReplaceAddMovementOpen(false); }}>Cancel</Button>
+                      <Button onClick={handleReplaceAddMovement} variant="primary">Add</Button>
                     </div>
                   </div>
                 )}
-                <div className="flex flex-col gap-2 max-h-[40vh] overflow-y-auto">
-                  {replaceFilteredCatalog.length === 0 ? (
-                    <div className="text-muted">No matches.</div>
-                  ) : (
-                    replaceFilteredCatalog.map((ex) => (
-                      <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} className="border border-subtle rounded-sm p-2 flex justify-between items-center gap-2">
-                        <div className="min-w-0">
-                          <div className="font-semibold text-[15px]">{ex.name}{ex.isCustom ? ' *' : ''}</div>
-                          <div className="text-muted text-[11px]">
-                            {ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}
-                          </div>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                          <Button onClick={() => addReplaceQueue(ex)} size="xs">Add</Button>
-                          {ex.isCustom && (
-                            <Button onClick={() => handleDeleteCustomFromReplace(ex)} size="xs">Del</Button>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
 
-              <div className="border border-default rounded-md p-3">
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <div className="font-semibold text-[13px]">Queue:</div>
-                  {replaceQueue.length === 0 ? (
-                    <div className="text-muted text-[13px]">None selected</div>
-                  ) : (
-                    replaceQueue.map((q) => (
+                <div className="flex flex-col gap-1.5 max-h-[32vh] overflow-y-auto">
+                  {replaceFilteredCatalog.length === 0 ? (
+                    <div className="text-muted text-[13px]">No matches.</div>
+                  ) : replaceFilteredCatalog.map((ex) => (
+                    <div key={`${ex.isCustom ? 'custom' : 'catalog'}:${ex.id}`} className="border border-subtle rounded-sm p-2 flex justify-between items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-[14px]">{ex.name}{ex.isCustom ? ' *' : ''}</div>
+                        <div className="text-muted text-[11px]">{ex.primaryMuscle}{ex.secondaryMuscles.length ? ` / ${ex.secondaryMuscles.join(', ')}` : ''}</div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button onClick={() => addReplaceQueue(ex)} size="xs">Add</Button>
+                        {ex.isCustom && <Button onClick={() => handleDeleteCustomFromReplace(ex)} size="xs">Del</Button>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Queue */}
+                <div className="border border-default rounded-md p-3">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <div className="font-semibold text-[13px]">Queue:</div>
+                    {replaceQueue.length === 0 ? (
+                      <div className="text-muted text-[13px]">None selected</div>
+                    ) : replaceQueue.map((q) => (
                       <div key={q.name} className="inline-flex items-center gap-1 bg-accent-subtle border border-subtle rounded-sm px-1.5 py-0.5 text-[13px]">
                         <span>{q.name}</span>
-                        <button
-                          onClick={() => removeReplaceQueue(q.name)}
-                          className="bg-transparent border-none text-muted cursor-pointer px-0.5 py-0 text-[13px] leading-none"
-                        >✕</button>
+                        <button onClick={() => removeReplaceQueue(q.name)} className="bg-transparent border-none text-muted cursor-pointer px-0.5 py-0 text-[13px] leading-none">✕</button>
                       </div>
-                    ))
-                  )}
+                    ))}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button onClick={closeReplaceSearch} size="sm">Cancel</Button>
+                    <Button onClick={() => applyReplaceQueue("today")} variant="primary" size="sm" disabled={replaceQueue.length === 0}>Today Only</Button>
+                    <Button onClick={() => applyReplaceQueue("remaining")} variant="primary" size="sm" disabled={replaceQueue.length === 0}>Rest of Meso</Button>
+                  </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button onClick={closeReplaceSearch} size="sm">Cancel</Button>
-                  <Button onClick={() => applyReplaceQueue("today")} variant="primary" size="sm" disabled={replaceQueue.length === 0}>
-                    Today Only
-                  </Button>
-                  <Button onClick={() => applyReplaceQueue("remaining")} variant="primary" size="sm" disabled={replaceQueue.length === 0}>
-                    Rest of Meso
-                  </Button>
-                </div>
+                <div className="text-muted text-[12px]">* = self made movement</div>
               </div>
-            </div>
-            <div className="text-muted text-[13px] text-left">
-              * = self made movement
-            </div>
+            )}
+          </div>
+
+        </div>
       </Modal>
 
       <Modal open={!!myoScopeEntry} onClose={() => setMyoScopeEntry(null)} maxWidth={320}>
