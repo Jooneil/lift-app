@@ -1913,24 +1913,12 @@ function AuthedApp({
             </div>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }}
-            style={{
-              background: mode === "builder" ? "var(--accent-muted)" : "var(--bg-card)",
-              borderColor: mode === "builder" ? "var(--border-strong)" : "var(--border-default)"
-            }}
-            aria-pressed={mode === "builder"}
-          >Builder</Button>
-          <Button
-            onClick={() => { setUserMenuOpen(false); setMode("workout"); }}
-            style={{
-              background: mode === "workout" ? "var(--accent-muted)" : "var(--bg-card)",
-              borderColor: mode === "workout" ? "var(--border-strong)" : "var(--border-default)"
-            }}
-            aria-pressed={mode === "workout"}
-          >Workout</Button>
-        </div>
+        <button
+          onClick={() => { setUserMenuOpen(false); setMode("builder"); setShowPlanList(false); setSelectedPlanId(null); }}
+          style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}
+        >
+          + New Plan
+        </button>
       </div>
 
       {mode === "builder" && (
@@ -2449,6 +2437,13 @@ function AuthedApp({
       <Modal open={!!(showPlanSettings && selectedPlan)} onClose={() => setShowPlanSettings(false)} title="Plan Settings" maxWidth={360}>
         {selectedPlan && (
           <>
+            <Button
+              onClick={() => { setShowPlanSettings(false); setMode("builder"); setShowPlanList(false); }}
+              block
+              className="mb-4"
+            >
+              Edit plan structure
+            </Button>
             <div className="mb-4">
               <label className="block mb-2 font-medium text-secondary text-[15px]">
                 Plan Type
