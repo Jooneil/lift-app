@@ -14,7 +14,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 const variantClasses: Record<ButtonVariant, string> = {
   secondary: "",
   primary:
-    "border-white/20 font-semibold bg-linear-to-b from-primary to-[#d8d8e0] text-[#0a0a0c] shadow-primary-btn",
+    "border-white/10 font-semibold bg-accent-blue text-white shadow-primary-btn",
   ghost: "border-transparent bg-transparent text-secondary shadow-none",
   danger: "border-subtle bg-elevated text-error",
   pill: "inline-flex items-center gap-2 border-subtle bg-elevated text-secondary tracking-[-0.005em] !rounded-full px-3 py-2 text-[13px]",

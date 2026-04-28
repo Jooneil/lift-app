@@ -3690,7 +3690,7 @@ function WorkoutPage({
       {session.entries.map((entry, entryIndex) => (
         <div key={entry.id} className="list-stagger bg-elevated rounded-md p-4 shadow-card transition-all duration-150 ease-in-out border-l-[3px]" style={{
           '--i': entryIndex,
-          borderLeftColor: editingEntryId === entry.id ? 'var(--accent)' : 'var(--accent-blue)',
+          borderLeftColor: 'var(--accent-blue)',
           borderTop: '1px solid var(--border-subtle)',
           borderRight: '1px solid var(--border-subtle)',
           borderBottom: '1px solid var(--border-subtle)',
