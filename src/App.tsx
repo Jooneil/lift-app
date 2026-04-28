@@ -2101,10 +2101,10 @@ function AuthedApp({
                       await sessionApi.complete(serverId, selectedWeek.id, selectedDay.id, true);
                     } catch { void 0; }
                   }
-
-                  // Update streak
                   await updateStreak();
-
+                }}
+                onContinueAfterDone={() => {
+                  if (!selectedPlan || !selectedWeek || !selectedDay) return;
                   const nxt = nextWeekDay(selectedPlan, selectedWeek.id, selectedDay.id);
                   setSelectedWeekId(nxt.weekId);
                   setSelectedDayId(nxt.dayId);
@@ -2116,6 +2116,8 @@ function AuthedApp({
                 isLastDay={isLastDayOfPlan}
                 onFinishPlan={handleFinishPlan}
                 finishingPlan={finishingPlan}
+                currentStreak={currentStreak}
+                streakEnabled={!!(streakConfig?.enabled)}
                 onUpdatePlan={(updatedPlan) => {
                   setPlans(prev => prev.map(p => p.id === updatedPlan.id ? updatedPlan : p));
                   if (updatedPlan.serverId) {
@@ -2535,11 +2537,14 @@ function WorkoutPage({
   onCreateCustomExercise,
   onDeleteCustomExercise,
   onMarkDone,
+  onContinueAfterDone,
   completed,
   setCompleted,
   isLastDay,
   onFinishPlan,
   finishingPlan,
+  currentStreak,
+  streakEnabled,
   onUpdatePlan,
 }: {
   plan: Plan;
@@ -2558,12 +2563,15 @@ function WorkoutPage({
     secondaryMuscles?: string[];
   }) => Promise<CatalogExercise>;
   onDeleteCustomExercise?: (id: string) => Promise<void>;
-  onMarkDone: () => void;
+  onMarkDone: () => void | Promise<void>;
+  onContinueAfterDone: () => void;
   completed: boolean;
   setCompleted: (value: boolean) => void | Promise<void>;
   isLastDay: boolean;
   onFinishPlan?: () => void;
   finishingPlan: boolean;
+  currentStreak: number;
+  streakEnabled: boolean;
   onUpdatePlan: (plan: Plan) => void;
 }) {
   const [replaceSearchOpen, setReplaceSearchOpen] = useState(false);
@@ -2607,6 +2615,7 @@ function WorkoutPage({
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editDraftSets, setEditDraftSets] = useState<SessionSet[]>([]);
   const [myoScopeEntry, setMyoScopeEntry] = useState<{ entryId: string; exerciseId?: string; exerciseName: string; currentValue: boolean } | null>(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const sessionStartRef = useRef<number | null>(null);
   const [elapsedDisplay, setElapsedDisplay] = useState('');
 
@@ -3526,6 +3535,7 @@ function WorkoutPage({
   const handleDone = async () => {
     markSessionCompleted(true);
     await onMarkDone();
+    setShowCompletionModal(true);
   };
 
 
@@ -3907,6 +3917,92 @@ function WorkoutPage({
           )}
         </div>
       </div>
+
+      {/* Completion Modal */}
+      <Modal open={showCompletionModal} onClose={() => setShowCompletionModal(false)} maxWidth={400}>
+        {(() => {
+          const completedSets = session ? session.entries.flatMap(e => e.sets.filter(s => s.weight != null && s.reps != null)) : [];
+          const totalVolume = completedSets.reduce((acc, s) => acc + (s.weight ?? 0) * (s.reps ?? 0), 0);
+          const elapsedMins = sessionStartRef.current ? Math.floor((Date.now() - sessionStartRef.current) / 60000) : 0;
+          const durationStr = elapsedMins < 60
+            ? `${elapsedMins}m`
+            : `${Math.floor(elapsedMins / 60)}h ${elapsedMins % 60}m`;
+
+          // PR detection: compare today's best volume per exercise vs ghost
+          const prs: { exerciseName: string; weight: number; reps: number }[] = [];
+          if (session) {
+            for (const entry of session.entries) {
+              const todayBest = entry.sets
+                .filter(s => s.weight != null && s.reps != null)
+                .reduce((best, s) => {
+                  const vol = (s.weight ?? 0) * (s.reps ?? 0);
+                  return vol > best.vol ? { vol, weight: s.weight!, reps: s.reps! } : best;
+                }, { vol: 0, weight: 0, reps: 0 });
+              if (todayBest.vol === 0) continue;
+              const key = exerciseKey(entry);
+              const ghostSets = ghost[key] ?? [];
+              const ghostBest = ghostSets.reduce((best, s) => Math.max(best, (s.weight ?? 0) * (s.reps ?? 0)), 0);
+              if (todayBest.vol > ghostBest) {
+                prs.push({ exerciseName: entry.exerciseName, weight: todayBest.weight, reps: todayBest.reps });
+              }
+            }
+          }
+
+          return (
+            <>
+              <h2 className="text-[28px] font-bold m-0 mb-4">Day complete 🎉</h2>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {[
+                  { label: 'Sets', value: String(completedSets.length) },
+                  { label: 'Volume', value: totalVolume > 0 ? `${totalVolume.toLocaleString()} lbs` : '—' },
+                  { label: 'Time', value: elapsedMins > 0 ? durationStr : '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-elevated border border-subtle rounded-md p-3 text-center">
+                    <div className="text-[20px] font-bold tabular-nums">{value}</div>
+                    <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted mt-0.5">{label}</div>
+                  </div>
+                ))}
+              </div>
+              {prs.length > 0 && (
+                <div className="mb-4 flex flex-col gap-1.5">
+                  {prs.map((pr) => (
+                    <div key={pr.exerciseName} className="flex items-center gap-2 text-[13px] font-medium px-3 py-2 bg-elevated border border-subtle rounded-md">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--accent-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 3h6v3a3 3 0 0 1-6 0V3ZM3 4h2M11 4h2M6 9h4v3H6zM5 13h6" />
+                      </svg>
+                      <span className="text-accent-blue font-semibold">PR</span>
+                      <span className="text-secondary">{pr.exerciseName}</span>
+                      <span className="ml-auto text-muted tabular-nums">{pr.weight} × {pr.reps}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {streakEnabled && currentStreak > 0 && (
+                <div className="flex items-center justify-center gap-2 mb-4 py-3 bg-elevated border border-subtle rounded-md">
+                  <span className="text-[22px]">🔥</span>
+                  <span className="text-[20px] font-bold tabular-nums">{currentStreak}</span>
+                  <span className="text-[13px] text-muted">day streak</span>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => { setShowCompletionModal(false); onContinueAfterDone(); }}
+                  variant="primary"
+                  block
+                >
+                  Continue
+                </Button>
+                <Button
+                  onClick={() => setShowCompletionModal(false)}
+                  block
+                >
+                  Stay here
+                </Button>
+              </div>
+            </>
+          );
+        })()}
+      </Modal>
 
       <Modal open={replaceSearchOpen} onClose={closeReplaceSearch} title={`Replace Exercise${replaceTargetEntry ? ` - ${replaceTargetEntry.exerciseName}` : ''}`} maxWidth={980}>
 
