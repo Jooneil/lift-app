@@ -1361,27 +1361,29 @@ function AuthedApp({
         <div className="page-enter" key="workout-page">
         <Card>
           <div className="flex flex-col gap-0 mb-4">
-            {/* Row 1: Plan name + gear */}
+            {/* Row 1: Plan name (22px bold) + gear */}
             <div className="flex items-center justify-between pb-2.5">
               <div className="flex flex-col min-w-0 flex-1 mr-3">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-0.5">Plan</span>
                 <select
-                value={selectedPlanId ?? ''}
-                onChange={(e) => {
-                  const newPlanId = e.target.value || null;
-                  selectPlan(newPlanId);
-                  setSession(null);
-                }}
-                className="text-[18px] font-bold tracking-[-0.02em] bg-transparent border-none shadow-none px-0 pr-6 cursor-pointer"
-                style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0 center', backgroundRepeat: 'no-repeat', backgroundSize: '18px' }}
-              >
-                {plans.length === 0 && <option value="">No plans yet</option>}
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                  value={selectedPlanId ?? ''}
+                  onChange={(e) => {
+                    const newPlanId = e.target.value || null;
+                    selectPlan(newPlanId);
+                    setSession(null);
+                  }}
+                  className="font-bold bg-transparent border-none shadow-none px-0 pr-6 cursor-pointer"
+                  style={{ fontSize: 22, letterSpacing: '-0.02em', appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0 center', backgroundRepeat: 'no-repeat', backgroundSize: '18px', color: 'var(--text-primary)' }}
+                >
+                  {plans.length === 0 && <option value="">No plans yet</option>}
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {selectedWeekId && selectedDayId && selectedPlan && (
+                  <span className="text-[13px]" style={{ color: 'var(--text-secondary)', marginTop: 1 }}>
+                    {selectedPlan.weeks.find(w => w.id === selectedWeekId)?.name} · {selectedPlan.weeks.find(w => w.id === selectedWeekId)?.days.find(d => d.id === selectedDayId)?.name}
+                  </span>
+                )}
               </div>
               {selectedPlan && (
                 <button
@@ -1401,78 +1403,72 @@ function AuthedApp({
             {/* Divider */}
             <div className="border-t border-subtle mb-2.5" />
 
-            {/* Row 2: Segmented nav bar */}
+            {/* Row 2: Week/Day selectors + prev/next chevrons inside one bordered container */}
             {selectedPlan && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-card rounded-md border border-subtle overflow-hidden flex-1">
-                  <select
-                    value={selectedWeekId ?? ''}
-                    onChange={(e) => {
-                      const newWeekId = e.target.value || null;
-                      setSelectedWeekId(newWeekId);
-                      const wk = selectedPlan.weeks.find((w) => w.id === newWeekId) || null;
-                      setSelectedDayId(wk?.days[0]?.id ?? null);
-                      setSession(null);
-                      setShouldAutoNavigate(false);
-                    }}
-                    className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
-                    style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
-                  >
-                    {selectedPlan.weeks.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="w-px h-6 bg-subtle flex-shrink-0" />
-                  <select
-                    value={selectedDayId ?? ''}
-                    onChange={(e) => {
-                      setSelectedDayId(e.target.value || null);
-                      setSession(null);
-                      setShouldAutoNavigate(false);
-                    }}
-                    className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
-                    style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
-                  >
-                    {(selectedWeek ?? { days: [] as PlanDay[] }).days.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="flex items-center bg-card rounded-md border border-subtle overflow-hidden">
                 {selectedWeekId && selectedDayId && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                        setSelectedWeekId(prev.weekId);
-                        setSelectedDayId(prev.dayId);
-                        setSession(null);
-                        setShouldAutoNavigate(false);
-                      }}
-                      title="Previous day"
-                      className="text-secondary hover:text-primary transition-colors duration-150"
-                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxShadow: 'none', padding: '6px 8px', minHeight: 'auto', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3L5 7l4 4" /></svg>
-                    </button>
-                    <button
-                      onClick={() => {
-                        const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                        setSelectedWeekId(next.weekId);
-                        setSelectedDayId(next.dayId);
-                        setSession(null);
-                        setShouldAutoNavigate(false);
-                      }}
-                      title="Next day"
-                      className="text-secondary hover:text-primary transition-colors duration-150"
-                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxShadow: 'none', padding: '6px 8px', minHeight: 'auto', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3l4 4-4 4" /></svg>
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                      setSelectedWeekId(prev.weekId);
+                      setSelectedDayId(prev.dayId);
+                      setSession(null);
+                      setShouldAutoNavigate(false);
+                    }}
+                    title="Previous day"
+                    className="text-secondary hover:text-primary transition-colors duration-150 flex-shrink-0"
+                    style={{ background: 'none', border: 'none', borderRight: '1px solid var(--border-subtle)', boxShadow: 'none', padding: '8px 10px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3L5 7l4 4" /></svg>
+                  </button>
+                )}
+                <select
+                  value={selectedWeekId ?? ''}
+                  onChange={(e) => {
+                    const newWeekId = e.target.value || null;
+                    setSelectedWeekId(newWeekId);
+                    const wk = selectedPlan.weeks.find((w) => w.id === newWeekId) || null;
+                    setSelectedDayId(wk?.days[0]?.id ?? null);
+                    setSession(null);
+                    setShouldAutoNavigate(false);
+                  }}
+                  className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
+                  style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
+                >
+                  {selectedPlan.weeks.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+                <div className="w-px h-6 bg-subtle flex-shrink-0" />
+                <select
+                  value={selectedDayId ?? ''}
+                  onChange={(e) => {
+                    setSelectedDayId(e.target.value || null);
+                    setSession(null);
+                    setShouldAutoNavigate(false);
+                  }}
+                  className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
+                  style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
+                >
+                  {(selectedWeek ?? { days: [] as PlanDay[] }).days.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+                {selectedWeekId && selectedDayId && (
+                  <button
+                    onClick={() => {
+                      const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
+                      setSelectedWeekId(next.weekId);
+                      setSelectedDayId(next.dayId);
+                      setSession(null);
+                      setShouldAutoNavigate(false);
+                    }}
+                    title="Next day"
+                    className="text-secondary hover:text-primary transition-colors duration-150 flex-shrink-0"
+                    style={{ background: 'none', border: 'none', borderLeft: '1px solid var(--border-subtle)', boxShadow: 'none', padding: '8px 10px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3l4 4-4 4" /></svg>
+                  </button>
                 )}
               </div>
             )}
@@ -3470,30 +3466,39 @@ function WorkoutPage({
 
       <div className="mt-5 pt-4 border-t border-t-subtle flex justify-between items-center flex-wrap gap-3">
         <label style={{
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          gap: 12,
+          gap: 8,
           cursor: 'pointer',
-          padding: '8px 12px',
-          borderRadius: 12,
+          padding: '0 20px',
+          height: 40,
+          borderRadius: 9999,
           background: completed ? 'var(--success-muted)' : 'transparent',
           border: `1px solid ${completed ? 'var(--success)' : 'var(--border-subtle)'}`,
           transition: 'all 0.15s ease',
+          width: 'auto',
         }}>
-          <span className="check-animated">
-            <input
-              type="checkbox"
-              checked={completed}
-              onChange={(e) => {
-                const value = e.target.checked;
-                markSessionCompleted(value);
-                setCompleted(value);
-              }}
-            />
-            <svg className="checkmark-svg" viewBox="0 0 20 20" fill="none">
-              <path className="checkmark-path" d="M5 10.5L8.5 14L15 7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <input
+            type="checkbox"
+            checked={completed}
+            onChange={(e) => {
+              const value = e.target.checked;
+              markSessionCompleted(value);
+              setCompleted(value);
+            }}
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+          />
+          {completed ? (
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="var(--success)" aria-hidden="true">
+              <circle cx="10" cy="10" r="10" />
+              <path d="M5.5 10.5L8.5 13.5L14.5 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
-          </span>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--border-strong)" strokeWidth="1.5" aria-hidden="true">
+              <circle cx="10" cy="10" r="9" />
+              <path d="M5.5 10.5L8.5 13.5L14.5 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
           <span className="font-medium" style={{ color: completed ? 'var(--success)' : 'var(--text-secondary)' }}>
             Completed
           </span>
