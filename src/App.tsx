@@ -4574,6 +4574,8 @@ function BuilderPage({
   const plansMenuRef = useRef<HTMLDivElement>(null);
   const [saveMenuOpen, setSaveMenuOpen] = useState(false);
   const saveMenuRef = useRef<HTMLDivElement>(null);
+  const [weekMenuOpenId, setWeekMenuOpenId] = useState<string | null>(null);
+  const weekMenuRef = useRef<HTMLDivElement>(null);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -4635,15 +4637,16 @@ function BuilderPage({
 
   // Close builder menus on outside click
   useEffect(() => {
-    if (!dayMenuOpenId && !plansMenuOpen && !saveMenuOpen) return;
+    if (!dayMenuOpenId && !plansMenuOpen && !saveMenuOpen && !weekMenuOpenId) return;
     const handler = (e: MouseEvent) => {
       if (dayMenuRef.current && !dayMenuRef.current.contains(e.target as Node)) setDayMenuOpenId(null);
       if (plansMenuRef.current && !plansMenuRef.current.contains(e.target as Node)) setPlansMenuOpen(false);
       if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) setSaveMenuOpen(false);
+      if (weekMenuRef.current && !weekMenuRef.current.contains(e.target as Node)) setWeekMenuOpenId(null);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [dayMenuOpenId, plansMenuOpen, saveMenuOpen]);
+  }, [dayMenuOpenId, plansMenuOpen, saveMenuOpen, weekMenuOpenId]);
 
   const toggleWeek = (weekId: string) => {
     setCollapsedWeeks((prev) => {
@@ -4723,41 +4726,54 @@ function BuilderPage({
 
   const handleAddWeek = () => {
     if (!selectedPlan) return;
-    const newWeek = createWeek(selectedPlan.weeks.length);
+    const sourceWeek = selectedPlan.weeks[0];
+    const weekIndex = selectedPlan.weeks.length;
+    let newWeek: PlanWeek;
+    if (sourceWeek && sourceWeek.days.length > 0) {
+      // Auto-copy Week 1 structure
+      newWeek = {
+        id: uuid(),
+        name: `Week ${weekIndex + 1}`,
+        days: sourceWeek.days.map((day) => ({
+          id: uuid(),
+          name: day.name,
+          items: day.items.map((item) => ({
+            id: uuid(),
+            exerciseId: item.exerciseId,
+            exerciseName: item.exerciseName,
+            targetSets: item.targetSets,
+            targetReps: item.targetReps ?? '',
+          })),
+        })),
+      };
+    } else {
+      newWeek = createWeek(weekIndex);
+    }
     updatePlan(selectedPlan.id, (plan) => ({ ...plan, weeks: [...plan.weeks, newWeek] }));
     setSelectedWeekId(newWeek.id);
     setSelectedDayId(newWeek.days[0]?.id ?? null);
   };
 
-  const handleCopyWeekOneToAll = () => {
-    if (!selectedPlan || selectedPlan.weeks.length <= 1) return;
+  const handleResetWeekToOne = (weekId: string) => {
+    if (!selectedPlan) return;
     const sourceWeek = selectedPlan.weeks[0];
-    let replacementDayId: string | null = null;
-
-    setPlans((prev) =>
-      prev.map((plan) => {
-        if (plan.id !== selectedPlan.id) return plan;
-        const weeks = plan.weeks.map((week, index) => {
-          if (index === 0) return week;
-          const clonedDays = sourceWeek.days.map((day) => ({
-            id: uuid(),
-            name: day.name,
-            items: day.items.map((item) => ({
-              id: uuid(),
-              exerciseId: item.exerciseId,
-              exerciseName: item.exerciseName,
-              targetSets: item.targetSets,
-              targetReps: item.targetReps ?? '',
-            })),
-          }));
-          if (week.id === selectedWeekId) replacementDayId = clonedDays[0]?.id ?? null;
-          return { ...week, days: clonedDays };
-        });
-        return { ...plan, weeks };
-      })
-    );
-
-    if (replacementDayId) setSelectedDayId(replacementDayId);
+    if (!sourceWeek || sourceWeek.id === weekId) return;
+    const clonedDays = sourceWeek.days.map((day) => ({
+      id: uuid(),
+      name: day.name,
+      items: day.items.map((item) => ({
+        id: uuid(),
+        exerciseId: item.exerciseId,
+        exerciseName: item.exerciseName,
+        targetSets: item.targetSets,
+        targetReps: item.targetReps ?? '',
+      })),
+    }));
+    updatePlan(selectedPlan.id, (plan) => ({
+      ...plan,
+      weeks: plan.weeks.map((w) => w.id === weekId ? { ...w, days: clonedDays } : w),
+    }));
+    if (selectedWeekId === weekId) setSelectedDayId(clonedDays[0]?.id ?? null);
   };
 
   const handleRemoveWeek = (weekId: string) => {
@@ -5754,18 +5770,10 @@ function BuilderPage({
       {/* Divider */}
       <div className="border-t border-subtle mb-3" />
 
-      {/* Row 2: Structure actions — always visible together */}
+      {/* Row 2: Week action */}
       {selectedPlan && (
         <div className="flex items-center gap-2 mb-3">
           <Button onClick={handleAddWeek} size="sm">+ Week</Button>
-          <Button
-            onClick={handleCopyWeekOneToAll}
-            size="sm"
-            disabled={selectedPlan.weeks.length <= 1}
-            title={selectedPlan.weeks.length <= 1 ? 'Add more weeks first' : 'Copy Week 1 layout to all weeks'}
-          >
-            Copy Wk 1 → All
-          </Button>
         </div>
       )}
 
@@ -5834,9 +5842,36 @@ function BuilderPage({
                     {!isWeekCollapsed && (
                       <Button onClick={() => handleAddDay(week.id)} size="sm">+ Day</Button>
                     )}
-                    <Button onClick={() => handleRemoveWeek(week.id)} size="sm" disabled={selectedPlan.weeks.length <= 1}>
-                      Delete
-                    </Button>
+                    <div className="relative" ref={weekMenuOpenId === week.id ? weekMenuRef : undefined}>
+                      <button
+                        onClick={() => setWeekMenuOpenId(weekMenuOpenId === week.id ? null : week.id)}
+                        title="Week options"
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 16, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                      >
+                        ⋮
+                      </button>
+                      {weekMenuOpenId === week.id && (
+                        <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[180px] z-30 shadow-[var(--shadow-lg)]">
+                          {selectedPlan.weeks[0].id !== week.id && (
+                            <button
+                              onClick={() => { setWeekMenuOpenId(null); handleResetWeekToOne(week.id); }}
+                              className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                            >
+                              Reset to Week 1
+                            </button>
+                          )}
+                          <button
+                            onClick={() => { setWeekMenuOpenId(null); handleRemoveWeek(week.id); }}
+                            disabled={selectedPlan.weeks.length <= 1}
+                            className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                            style={{ background: 'none', border: 'none', cursor: selectedPlan.weeks.length <= 1 ? 'not-allowed' : 'pointer', color: selectedPlan.weeks.length <= 1 ? 'var(--text-muted)' : 'var(--color-error, #f87171)', opacity: selectedPlan.weeks.length <= 1 ? 0.5 : 1 }}
+                          >
+                            Delete Week
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {/* Collapsible week body */}
