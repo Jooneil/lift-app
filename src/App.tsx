@@ -4576,6 +4576,9 @@ function BuilderPage({
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const [weekMenuOpenId, setWeekMenuOpenId] = useState<string | null>(null);
   const weekMenuRef = useRef<HTMLDivElement>(null);
+  const [setWeeksOpen, setSetWeeksOpen] = useState(false);
+  const [setWeeksInput, setSetWeeksInput] = useState('');
+  const setWeeksInputRef = useRef<HTMLInputElement>(null);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -4724,34 +4727,38 @@ function BuilderPage({
     updatePlan(selectedPlan.id, (plan) => ({ ...plan, name }));
   };
 
-  const handleAddWeek = () => {
-    if (!selectedPlan) return;
+  const handleSetWeekCount = (count: number) => {
+    if (!selectedPlan || count < 1 || count > 52) return;
     const sourceWeek = selectedPlan.weeks[0];
-    const weekIndex = selectedPlan.weeks.length;
-    let newWeek: PlanWeek;
-    if (sourceWeek && sourceWeek.days.length > 0) {
-      // Auto-copy Week 1 structure
-      newWeek = {
+    const current = selectedPlan.weeks.length;
+
+    const cloneWeek = (index: number): PlanWeek => ({
+      id: uuid(),
+      name: `Week ${index + 1}`,
+      days: sourceWeek.days.map((day) => ({
         id: uuid(),
-        name: `Week ${weekIndex + 1}`,
-        days: sourceWeek.days.map((day) => ({
+        name: day.name,
+        items: day.items.map((item) => ({
           id: uuid(),
-          name: day.name,
-          items: day.items.map((item) => ({
-            id: uuid(),
-            exerciseId: item.exerciseId,
-            exerciseName: item.exerciseName,
-            targetSets: item.targetSets,
-            targetReps: item.targetReps ?? '',
-          })),
+          exerciseId: item.exerciseId,
+          exerciseName: item.exerciseName,
+          targetSets: item.targetSets,
+          targetReps: item.targetReps ?? '',
         })),
-      };
-    } else {
-      newWeek = createWeek(weekIndex);
-    }
-    updatePlan(selectedPlan.id, (plan) => ({ ...plan, weeks: [...plan.weeks, newWeek] }));
-    setSelectedWeekId(newWeek.id);
-    setSelectedDayId(newWeek.days[0]?.id ?? null);
+      })),
+    });
+
+    updatePlan(selectedPlan.id, (plan) => {
+      if (count > current) {
+        const added = Array.from({ length: count - current }, (_, i) => cloneWeek(current + i));
+        return { ...plan, weeks: [...plan.weeks, ...added] };
+      } else {
+        return { ...plan, weeks: plan.weeks.slice(0, count) };
+      }
+    });
+
+    setSetWeeksOpen(false);
+    setSetWeeksInput('');
   };
 
   const handleResetWeekToOne = (weekId: string) => {
@@ -5695,7 +5702,7 @@ function BuilderPage({
               <span className="hidden sm:inline">Manage </span>Plans <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
             </button>
             {plansMenuOpen && (
-              <div className="dropdown-menu absolute top-full left-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[170px] z-30 shadow-[var(--shadow-lg)]">
+              <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[170px] z-30 shadow-[var(--shadow-lg)]">
                 <button
                   onClick={() => { setPlansMenuOpen(false); setShowPlanList(true); }}
                   className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
@@ -5770,10 +5777,19 @@ function BuilderPage({
       {/* Divider */}
       <div className="border-t border-subtle mb-3" />
 
-      {/* Row 2: Week action */}
+      {/* Row 2: Week count */}
       {selectedPlan && (
         <div className="flex items-center gap-2 mb-3">
-          <Button onClick={handleAddWeek} size="sm">+ Week</Button>
+          <Button
+            onClick={() => {
+              setSetWeeksInput(String(selectedPlan.weeks.length));
+              setSetWeeksOpen(true);
+              setTimeout(() => setWeeksInputRef.current?.select(), 50);
+            }}
+            size="sm"
+          >
+            Weeks: {selectedPlan.weeks.length}
+          </Button>
         </div>
       )}
 
@@ -6330,6 +6346,46 @@ function BuilderPage({
           </div>
         </div>
       )}
+
+      {/* Set week count modal */}
+      <Modal open={setWeeksOpen} onClose={() => { setSetWeeksOpen(false); setSetWeeksInput(''); }} maxWidth={320}>
+        <h3 className="m-0 mb-1 text-[16px] font-bold">How many weeks?</h3>
+        <p className="text-[13px] text-muted mt-1 mb-4">
+          Week 1 will be copied to any new weeks. Reducing will remove weeks from the end.
+        </p>
+        <input
+          ref={setWeeksInputRef}
+          type="number"
+          min={1}
+          max={52}
+          value={setWeeksInput}
+          onChange={(e) => setSetWeeksInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const n = parseInt(setWeeksInput, 10);
+              if (n >= 1 && n <= 52) handleSetWeekCount(n);
+            }
+            if (e.key === 'Escape') { setSetWeeksOpen(false); setSetWeeksInput(''); }
+          }}
+          className="w-full text-center text-[24px] font-bold mb-4"
+          style={{ letterSpacing: '0.02em' }}
+          placeholder="4"
+          autoFocus
+        />
+        <div className="flex gap-2 justify-end">
+          <Button onClick={() => { setSetWeeksOpen(false); setSetWeeksInput(''); }}>Cancel</Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              const n = parseInt(setWeeksInput, 10);
+              if (n >= 1 && n <= 52) handleSetWeekCount(n);
+            }}
+            disabled={!setWeeksInput || parseInt(setWeeksInput, 10) < 1 || parseInt(setWeeksInput, 10) > 52}
+          >
+            Set Weeks
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={showPlanList} onClose={() => setShowPlanList(false)} maxWidth={480} maxHeight="80vh" zIndex={10}>
             <div className="flex justify-between items-center">
