@@ -2620,6 +2620,9 @@ function WorkoutPage({
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const sessionStartRef = useRef<number | null>(null);
   const [elapsedDisplay, setElapsedDisplay] = useState('');
+  const REST_DURATION = 90; // seconds
+  const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number } | null>(null);
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const formatElapsed = useCallback(() => {
     if (!sessionStartRef.current) return '';
@@ -2644,6 +2647,30 @@ function WorkoutPage({
     const id = setInterval(() => setElapsedDisplay(formatElapsed()), 30000);
     return () => clearInterval(id);
   }, [formatElapsed]);
+
+  const startRestTimer = useCallback(() => {
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
+    setRestTimer({ secondsLeft: REST_DURATION, total: REST_DURATION });
+    restTimerRef.current = setInterval(() => {
+      setRestTimer(prev => {
+        if (!prev) return null;
+        if (prev.secondsLeft <= 1) {
+          if (restTimerRef.current) clearInterval(restTimerRef.current);
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          return null;
+        }
+        return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+      });
+    }, 1000);
+  }, [REST_DURATION]);
+
+  const dismissRestTimer = useCallback(() => {
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
+    setRestTimer(null);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => { if (restTimerRef.current) clearInterval(restTimerRef.current); }, []);
 
   const loggedSets = useMemo(() =>
     session ? session.entries.reduce((acc, e) => acc + e.sets.filter(s => s.weight != null && s.reps != null).length, 0) : 0,
@@ -3603,6 +3630,38 @@ function WorkoutPage({
           <option key={name} value={name} />
         ))}
       </datalist>
+      {/* Rest timer */}
+      {restTimer && (
+        <div
+          onClick={dismissRestTimer}
+          className="mb-3 flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer select-none"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}
+        >
+          {/* Circular progress */}
+          <svg width="32" height="32" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+            <circle cx="16" cy="16" r="13" fill="none" stroke="var(--border-default)" strokeWidth="2.5" />
+            <circle
+              cx="16" cy="16" r="13"
+              fill="none"
+              stroke="var(--accent-blue)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 13}`}
+              strokeDashoffset={`${2 * Math.PI * 13 * (1 - restTimer.secondsLeft / restTimer.total)}`}
+              transform="rotate(-90 16 16)"
+              style={{ transition: 'stroke-dashoffset 1s linear' }}
+            />
+          </svg>
+          <div className="flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-0.5">Rest</div>
+            <div className="text-[20px] font-semibold tabular-nums leading-none" style={{ color: 'var(--text-primary)' }}>
+              {Math.floor(restTimer.secondsLeft / 60)}:{String(restTimer.secondsLeft % 60).padStart(2, '0')}
+            </div>
+          </div>
+          <div className="text-[12px] text-muted">tap to dismiss</div>
+        </div>
+      )}
+
       {totalSets > 0 && (
         <div className="mb-4">
           <div className="flex justify-between items-center mb-1.5">
@@ -3791,6 +3850,7 @@ function WorkoutPage({
                       onChange={(e) => {
                         const num = e.target.value === '' ? null : Number(e.target.value);
                         const repsValue = num !== null && Number.isNaN(num) ? null : num;
+                        const effectiveWeight = set.weight ?? (repsValue != null ? ghostSet.weight : null);
                         // Auto-populate weight from ghost if weight is empty and entering reps
                         if (set.weight == null && repsValue != null && ghostSet.weight != null) {
                           updateSet(entry.id, set.id, {
@@ -3801,6 +3861,10 @@ function WorkoutPage({
                           updateSet(entry.id, set.id, {
                             reps: repsValue,
                           });
+                        }
+                        // Start rest timer when set becomes complete
+                        if (repsValue != null && effectiveWeight != null) {
+                          startRestTimer();
                         }
                       }}
                       className="workout-input w-full min-w-0"
