@@ -3637,7 +3637,7 @@ function WorkoutPage({
         } as React.CSSProperties}>
           {/* Header: Name + ⋮ pinned top-right */}
           <div className="relative mb-1">
-            <h3 className="m-0 text-[16px] font-bold pr-10">
+            <h3 className="m-0 text-[15px] font-semibold pr-10">
               {entry.exerciseName}
             </h3>
             <div className="absolute top-0 right-0">
@@ -3752,8 +3752,8 @@ function WorkoutPage({
             </>
           ) : (
             <>
-              <div className="grid grid-cols-[50px_1fr_1fr] gap-2 mb-1 px-1 text-muted text-[13px] font-semibold uppercase tracking-[0.05em] text-center">
-                <div>Set</div>
+              <div className="grid grid-cols-[28px_1fr_1fr] gap-2 mb-1 px-1 text-muted text-[11px] font-semibold uppercase tracking-[0.05em] text-center">
+                <div></div>
                 <div>Weight</div>
                 <div style={{ color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-muted)' }}>
                   {entry.myoRepMatch ? 'Match' : 'Reps'}
@@ -3764,11 +3764,10 @@ function WorkoutPage({
                 const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
                 const hasValue = set.weight != null || set.reps != null;
                 return (
-                  <div key={set.id} className="grid grid-cols-[50px_1fr_1fr] gap-2 mb-1 p-1 rounded-md transition-colors duration-150" style={{
-                    background: hasValue ? 'var(--accent-filled)' : 'transparent',
-                    borderLeft: hasValue ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                  <div key={set.id} className="grid grid-cols-[28px_1fr_1fr] gap-2 mb-2 items-center" style={{
+                    borderBottom: hasValue ? '1px solid var(--accent-blue)' : '1px solid transparent',
                   }}>
-                    <div className="self-center text-center font-semibold text-secondary text-[15px]">{i + 1}</div>
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-elevated text-muted font-semibold text-[13px] shrink-0">{i + 1}</div>
                     <input
                       type="number"
                       step="any"
@@ -3783,8 +3782,7 @@ function WorkoutPage({
                           weight: num !== null && Number.isNaN(num) ? null : num,
                         });
                       }}
-                      className="w-full min-w-0 text-center"
-                      style={{ fontWeight: set.weight != null ? 600 : 400 }}
+                      className="workout-input w-full min-w-0"
                     />
                     <input
                       inputMode="numeric"
@@ -3805,8 +3803,7 @@ function WorkoutPage({
                           });
                         }
                       }}
-                      className="w-full min-w-0 text-center"
-                      style={{ fontWeight: set.reps != null ? 600 : 400 }}
+                      className="workout-input w-full min-w-0"
                     />
                   </div>
                 );

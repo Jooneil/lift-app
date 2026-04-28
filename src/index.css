@@ -384,6 +384,32 @@ input[type="checkbox"] {
   stroke-dashoffset: 0;
 }
 
+/* ── Workout grid inputs ── */
+.workout-input {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 44px;
+}
+.workout-input:focus {
+  border-bottom-color: var(--accent-blue);
+  box-shadow: 0 1px 0 0 var(--accent-blue);
+  background: transparent;
+}
+.workout-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.4;
+  font-weight: 400;
+  font-size: 16px;
+}
+
 /* ── Drag-and-drop exercise reorder ── */
 .drag-container {
   position: relative;
