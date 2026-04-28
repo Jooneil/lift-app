@@ -2029,6 +2029,11 @@ function WorkoutPage({
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const sessionStartRef = useRef<number | null>(null);
   const [elapsedDisplay, setElapsedDisplay] = useState('');
+  const timerPausedRef = useRef(false);
+  const [showTimerPopover, setShowTimerPopover] = useState(false);
+  const timerPopoverRef = useRef<HTMLDivElement>(null);
+  const [progressIsStuck, setProgressIsStuck] = useState(false);
+  const progressSentinelRef = useRef<HTMLDivElement>(null);
   const REST_DURATION = 90; // seconds
   const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string; done?: boolean } | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -2051,11 +2056,49 @@ function WorkoutPage({
     }
   }, [session, formatElapsed]);
 
-  // Refresh elapsed every 30s
+  // Refresh elapsed every 30s (skip when paused)
   useEffect(() => {
-    const id = setInterval(() => setElapsedDisplay(formatElapsed()), 30000);
+    const id = setInterval(() => {
+      if (!timerPausedRef.current) setElapsedDisplay(formatElapsed());
+    }, 30000);
     return () => clearInterval(id);
   }, [formatElapsed]);
+
+  // IntersectionObserver for sticky progress bar
+  useEffect(() => {
+    const el = progressSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setProgressIsStuck(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Close timer popover on outside click
+  useEffect(() => {
+    if (!showTimerPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (timerPopoverRef.current && !timerPopoverRef.current.contains(e.target as Node)) {
+        setShowTimerPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTimerPopover]);
+
+  const handleResetTimer = () => {
+    sessionStartRef.current = Date.now();
+    timerPausedRef.current = false;
+    setElapsedDisplay('0 min');
+    setShowTimerPopover(false);
+  };
+
+  const handleStopTimer = () => {
+    timerPausedRef.current = true;
+    setShowTimerPopover(false);
+  };
 
   const startRestTimer = useCallback((entryId: string) => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
@@ -3039,16 +3082,42 @@ function WorkoutPage({
           <option key={name} value={name} />
         ))}
       </datalist>
+      {/* Sticky progress sentinel — IntersectionObserver fires when this scrolls off-screen */}
+      <div ref={progressSentinelRef} aria-hidden="true" style={{ height: 1, marginTop: -1 }} />
       {totalSets > 0 && (
-        <div className="mb-4">
+        <div className={`progress-sticky${progressIsStuck ? ' is-stuck' : ''}`}>
           <div className="flex justify-between items-center mb-1.5">
             <span className="text-[12px] font-medium uppercase tracking-[0.05em] text-muted">
               {loggedSets} of {totalSets} sets logged
             </span>
             {elapsedDisplay && (
-              <span className="text-[12px] font-medium uppercase tracking-[0.05em] text-muted">
-                {elapsedDisplay}
-              </span>
+              <div className="relative" ref={timerPopoverRef}>
+                <button
+                  onClick={() => setShowTimerPopover(v => !v)}
+                  className="text-[12px] font-medium uppercase tracking-[0.05em] text-muted"
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}
+                >
+                  {timerPausedRef.current ? '⏸ ' : ''}{elapsedDisplay}
+                </button>
+                {showTimerPopover && (
+                  <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[120px] z-30 shadow-[var(--shadow-lg)]" style={{ whiteSpace: 'nowrap' }}>
+                    <button
+                      onClick={handleResetTimer}
+                      className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                    >
+                      Reset
+                    </button>
+                    <button
+                      onClick={handleStopTimer}
+                      className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                    >
+                      Stop
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <div style={{ height: 2, background: 'var(--bg-subtle, rgba(255,255,255,0.06))', borderRadius: 1 }}>

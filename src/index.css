@@ -410,6 +410,22 @@ input[type="checkbox"] {
   font-size: 16px;
 }
 
+/* ── Sticky progress bar ── */
+.progress-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -16px;
+  padding: 10px 16px 12px;
+  border-radius: 0;
+  transition: box-shadow 0.2s ease, background 0.15s ease, padding 0.15s ease;
+}
+.progress-sticky.is-stuck {
+  background: var(--bg-card);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  padding: 6px 16px 8px;
+}
+
 /* ── Drag-and-drop exercise reorder ── */
 .drag-container {
   position: relative;
