@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
-import { Badge, Button, Card, EmptyState, Modal, Skeleton, KebabIcon, XIcon, TimerIcon, FlameIcon } from "./components";
+import { Badge, Button, Card, EmptyState, Modal, Skeleton, KebabIcon, XIcon, TimerIcon, FlameIcon, ChevronLeftIcon } from "./components";
 import { api, aiApi, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
 import { getUserPrefs, upsertUserPrefs, type StreakConfig, type StreakState, type StreakScheduleMode, type UserPrefsData } from './api/userPrefs';
 import { supabase } from "./supabaseClient";
@@ -1341,6 +1341,7 @@ function AuthedApp({
           setSelectedDayId={setSelectedDayId}
           showPlanList={showPlanList}
           setShowPlanList={setShowPlanList}
+          onBack={() => setMode("workout")}
           exerciseLoading={exerciseLoading || catalogLoading}
           catalogExercises={searchCatalogExercises}
           catalogLoading={catalogLoading}
@@ -4082,6 +4083,7 @@ function BuilderPage({
   setSelectedDayId,
   showPlanList,
   setShowPlanList,
+  onBack,
   onSaved,
   exerciseLoading,
   catalogExercises,
@@ -4100,6 +4102,7 @@ function BuilderPage({
   setSelectedDayId: React.Dispatch<React.SetStateAction<string | null>>;
   showPlanList: boolean;
   setShowPlanList: React.Dispatch<React.SetStateAction<boolean>>;
+  onBack?: () => void;
   onSaved?: (savedPlan: Plan) => void;
   exerciseLoading: boolean;
   catalogExercises: CatalogExercise[];
@@ -4118,6 +4121,8 @@ function BuilderPage({
     () => plans.find((p) => p.id === selectedPlanId) || null,
     [plans, selectedPlanId]
   );
+  const builderInitialSnapshotRef = useRef<Plan | null>(null);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manageTab, setManageTab] = useState<"plans" | "templates">("plans");
@@ -4287,6 +4292,57 @@ function BuilderPage({
       loadTemplates();
     }
   }, [showPlanList, loadTemplates]);
+
+  // Snapshot the plan when it first loads into the builder for dirty tracking
+  useEffect(() => {
+    if (selectedPlan && !builderInitialSnapshotRef.current) {
+      builderInitialSnapshotRef.current = JSON.parse(JSON.stringify(selectedPlan));
+    }
+  }, [selectedPlan]);
+
+  const dirty = useMemo(() => {
+    if (!selectedPlan || !builderInitialSnapshotRef.current) return false;
+    return JSON.stringify(selectedPlan) !== JSON.stringify(builderInitialSnapshotRef.current);
+  }, [selectedPlan]);
+
+  const handleBack = () => {
+    if (dirty) {
+      setShowDiscardModal(true);
+    } else {
+      builderInitialSnapshotRef.current = null;
+      onBack?.();
+    }
+  };
+
+  const handleDiscard = () => {
+    const snapshot = builderInitialSnapshotRef.current;
+    builderInitialSnapshotRef.current = null;
+    if (snapshot) {
+      if (!snapshot.serverId) {
+        // New unsaved plan — remove it entirely
+        setPlans((prev) => prev.filter((p) => p.id !== snapshot.id));
+      } else {
+        // Existing plan — restore to snapshot
+        setPlans((prev) => prev.map((p) => p.id === snapshot.id ? snapshot : p));
+      }
+    }
+    setShowDiscardModal(false);
+    onBack?.();
+  };
+
+  // Wire browser/hardware back button while in builder
+  useEffect(() => {
+    history.pushState({ builder: true }, '');
+    const handler = (e: PopStateEvent) => {
+      e.preventDefault();
+      handleBack();
+    };
+    window.addEventListener('popstate', handler);
+    return () => {
+      window.removeEventListener('popstate', handler);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty]);
 
   const handleCreatePlan = () => {
     const newPlan: Plan = {
@@ -5249,6 +5305,23 @@ function BuilderPage({
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
+      {/* Back button */}
+      {onBack && (
+        <button
+          onClick={handleBack}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, padding: '0 0 12px 0' }}
+        >
+          <ChevronLeftIcon size={16} /> Back
+        </button>
+      )}
+      {/* Discard changes confirm modal */}
+      <Modal open={showDiscardModal} title="Discard changes?" onClose={() => setShowDiscardModal(false)}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 20px' }}>Your edits will be lost.</p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="secondary" onClick={() => setShowDiscardModal(false)}>Keep editing</Button>
+          <Button variant="danger" onClick={handleDiscard}>Discard</Button>
+        </div>
+      </Modal>
       {/* Row 1: Plan name + right-side controls */}
       <div className="flex items-center justify-between gap-3 pb-3">
         <div className="flex flex-col min-w-0 flex-1">
