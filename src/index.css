@@ -413,7 +413,7 @@ input[type="checkbox"] {
 /* ── Sticky progress bar ── */
 .progress-sticky {
   position: sticky;
-  top: env(safe-area-inset-top, 0px);
+  top: 0;
   z-index: 20;
   margin: 0 -16px;
   padding: 10px 16px 12px;
@@ -421,8 +421,10 @@ input[type="checkbox"] {
   transition: box-shadow 0.2s ease, padding 0.15s ease;
 }
 .progress-sticky.is-stuck {
+  /* padding-top includes safe-area-inset-top so content clears the Dynamic Island/notch.
+     The background covers the island area (a physical cutout, invisible behind it anyway). */
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 16px 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  padding: 6px 16px 8px;
 }
 
 /* ── Drag-and-drop exercise reorder ── */
