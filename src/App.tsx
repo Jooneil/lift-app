@@ -4576,18 +4576,7 @@ function BuilderPage({
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const [weekMenuOpenId, setWeekMenuOpenId] = useState<string | null>(null);
   const weekMenuRef = useRef<HTMLDivElement>(null);
-  const [setWeeksOpen, setSetWeeksOpen] = useState(false);
   const [setWeeksInput, setSetWeeksInput] = useState('');
-  const setWeeksInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!setWeeksOpen) return;
-    const t = setTimeout(() => {
-      setWeeksInputRef.current?.focus();
-      setWeeksInputRef.current?.select();
-    }, 50);
-    return () => clearTimeout(t);
-  }, [setWeeksOpen]);
 
   const primaryMuscles = useMemo(() => {
     const set = new Set<string>();
@@ -4766,7 +4755,6 @@ function BuilderPage({
       }
     });
 
-    setSetWeeksOpen(false);
     setSetWeeksInput('');
   };
 
@@ -5786,18 +5774,43 @@ function BuilderPage({
       {/* Divider */}
       <div className="border-t border-subtle mb-3" />
 
-      {/* Row 2: Week count */}
+      {/* Row 2: Week count inline input */}
       {selectedPlan && (
         <div className="flex items-center gap-2 mb-3">
-          <Button
-            onClick={() => {
-              setSetWeeksInput(String(selectedPlan.weeks.length));
-              setSetWeeksOpen(true);
-            }}
-            size="sm"
-          >
-            Weeks: {selectedPlan.weeks.length}
-          </Button>
+          <div className="flex items-center gap-2">
+            <label className="text-[13px] text-muted font-medium whitespace-nowrap">Weeks</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              min={1}
+              max={52}
+              value={setWeeksInput || String(selectedPlan.weeks.length)}
+              onFocus={(e) => {
+                setSetWeeksInput(String(selectedPlan.weeks.length));
+                e.target.select();
+              }}
+              onChange={(e) => setSetWeeksInput(e.target.value)}
+              onBlur={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (n >= 1 && n <= 52) handleSetWeekCount(n);
+                else setSetWeeksInput('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const n = parseInt(setWeeksInput, 10);
+                  if (n >= 1 && n <= 52) handleSetWeekCount(n);
+                  (e.currentTarget as HTMLInputElement).blur();
+                }
+                if (e.key === 'Escape') {
+                  setSetWeeksInput('');
+                  (e.currentTarget as HTMLInputElement).blur();
+                }
+              }}
+              className="text-center font-semibold"
+              style={{ width: 52, minHeight: 'auto', height: 32, fontSize: 14, padding: '4px 6px' }}
+            />
+          </div>
         </div>
       )}
 
@@ -6354,47 +6367,6 @@ function BuilderPage({
           </div>
         </div>
       )}
-
-      {/* Set week count modal */}
-      <Modal open={setWeeksOpen} onClose={() => { setSetWeeksOpen(false); setSetWeeksInput(''); }} maxWidth={320}>
-        <h3 className="m-0 mb-1 text-[16px] font-bold">How many weeks?</h3>
-        <p className="text-[13px] text-muted mt-1 mb-4">
-          Week 1 will be copied to any new weeks. Reducing will remove weeks from the end.
-        </p>
-        <input
-          ref={setWeeksInputRef}
-          type="number"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          min={1}
-          max={52}
-          value={setWeeksInput}
-          onChange={(e) => setSetWeeksInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              const n = parseInt(setWeeksInput, 10);
-              if (n >= 1 && n <= 52) handleSetWeekCount(n);
-            }
-            if (e.key === 'Escape') { setSetWeeksOpen(false); setSetWeeksInput(''); }
-          }}
-          className="w-full text-center text-[24px] font-bold mb-4"
-          style={{ letterSpacing: '0.02em' }}
-          placeholder="4"
-        />
-        <div className="flex gap-2 justify-end">
-          <Button onClick={() => { setSetWeeksOpen(false); setSetWeeksInput(''); }}>Cancel</Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              const n = parseInt(setWeeksInput, 10);
-              if (n >= 1 && n <= 52) handleSetWeekCount(n);
-            }}
-            disabled={!setWeeksInput || parseInt(setWeeksInput, 10) < 1 || parseInt(setWeeksInput, 10) > 52}
-          >
-            Set Weeks
-          </Button>
-        </div>
-      </Modal>
 
       <Modal open={showPlanList} onClose={() => setShowPlanList(false)} maxWidth={480} maxHeight="80vh" zIndex={10}>
             <div className="flex justify-between items-center">
