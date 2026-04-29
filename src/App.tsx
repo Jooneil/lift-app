@@ -2151,6 +2151,7 @@ function WorkoutPage({
   const sessionStartRef = useRef<number | null>(null);
   const [elapsedDisplay, setElapsedDisplay] = useState('');
   const timerPausedRef = useRef(false);
+  const [sessionTimerPaused, setSessionTimerPaused] = useState(false);
   const [showTimerPopover, setShowTimerPopover] = useState(false);
   const timerPopoverRef = useRef<HTMLDivElement>(null);
   const [progressIsStuck, setProgressIsStuck] = useState(false);
@@ -2226,6 +2227,7 @@ function WorkoutPage({
   const handleResetTimer = () => {
     sessionStartRef.current = Date.now();
     timerPausedRef.current = false;
+    setSessionTimerPaused(false);
     setElapsedDisplay('0 min');
     setShowTimerPopover(false);
   };
@@ -2233,6 +2235,15 @@ function WorkoutPage({
   const handleStopTimer = () => {
     sessionStartRef.current = Date.now();
     timerPausedRef.current = true;
+    setSessionTimerPaused(true);
+    setElapsedDisplay('0 min');
+    setShowTimerPopover(false);
+  };
+
+  const handleStartTimer = () => {
+    sessionStartRef.current = Date.now();
+    timerPausedRef.current = false;
+    setSessionTimerPaused(false);
     setElapsedDisplay('0 min');
     setShowTimerPopover(false);
   };
@@ -3299,21 +3310,31 @@ function WorkoutPage({
                   {timerPausedRef.current ? '⏸ ' : ''}{elapsedDisplay}
                 </button>
                 {showTimerPopover && (
-                  <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[120px] z-30 shadow-[var(--shadow-lg)]" style={{ whiteSpace: 'nowrap' }}>
+                  <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1 mt-1 z-30 shadow-[var(--shadow-lg)]" style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
                     <button
                       onClick={handleResetTimer}
-                      className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                      className="text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                      style={{ display: 'block', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}
                     >
                       Reset
                     </button>
-                    <button
-                      onClick={handleStopTimer}
-                      className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
-                    >
-                      Stop
-                    </button>
+                    {sessionTimerPaused ? (
+                      <button
+                        onClick={handleStartTimer}
+                        className="text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                        style={{ display: 'block', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}
+                      >
+                        Start
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleStopTimer}
+                        className="text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
+                        style={{ display: 'block', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}
+                      >
+                        Stop
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
