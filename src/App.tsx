@@ -19,9 +19,12 @@ import type { Plan, PlanWeek, PlanDay, PlanExercise, Exercise, CatalogExercise, 
 import { SET_COUNT_OPTIONS, MUSCLE_GROUPS } from './types';
 import { uuid, normalizeExerciseName, exerciseKey, parseBool, fixMojibake, getUserTimezone, toLocalDateString, isWorkoutDay, checkStreakStatus } from './lib/utils';
 import { buildCatalogByName, downloadCSV, exportPlanCSV, generateExerciseCatalogCSV, generateAIPrompt, calculateSetsPerMuscle, calculateWeekSetsPerMuscle } from './lib/csv';
-import { startSessionFromDay, mergeSessionWithDay, mapRowToWeeks, nextWeekDay, prevWeekDay } from './lib/plan';
+import { startSessionFromDay, mergeSessionWithDay, mapRowToWeeks, nextWeekDay } from './lib/plan';
 import AddExerciseSheet from './components/AddExercise/AddExerciseSheet';
 import PullToRefresh from './components/pullToRefresh/PullToRefresh';
+import DayPickerDropdown from './components/WorkoutHeader/DayPickerDropdown';
+import GearMenu from './components/WorkoutHeader/GearMenu';
+import AppMenu from './components/WorkoutHeader/AppMenu';
 
 
 export default function App() {
@@ -110,7 +113,7 @@ function AuthedApp({
   const [viewArchivedSessions, setViewArchivedSessions] = useState<ArchivedSessionMap>({});
   const [viewArchivedLoading, setViewArchivedLoading] = useState(false);
   const [finishingPlan, setFinishingPlan] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [openHeaderMenu, setOpenHeaderMenu] = useState<'day' | 'gear' | 'app' | null>(null);
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
   const [catalogExercises, setCatalogExercises] = useState<CatalogExercise[]>([]);
   const [customCatalogExercises, setCustomCatalogExercises] = useState<CatalogExercise[]>([]);
@@ -1135,21 +1138,25 @@ function AuthedApp({
               </span>
             </div>
           )}
-          <Button onClick={() => setUserMenuOpen((v) => !v)} aria-expanded={userMenuOpen} aria-haspopup="menu">Profile</Button>
-          {userMenuOpen && (
-            <div role="menu" className="dropdown-menu absolute top-full left-0 bg-elevated border border-subtle rounded-md p-3 mt-2 min-w-[220px] z-30 shadow-[var(--shadow-lg)]">
-              <div className="px-2 py-1 text-muted text-[13px] font-medium uppercase tracking-[0.05em]">Logged in as</div>
-              <div
-                className="px-2 pt-1 pb-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px] text-primary"
-                title={user.username}
-              >
-                <strong>{user.username}</strong>
+          <button
+            onClick={() => setOpenHeaderMenu(v => v === 'app' ? null : 'app')}
+            title="Settings"
+            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: openHeaderMenu === 'app' ? 'var(--text-primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="10" cy="4" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="10" cy="16" r="1.5" /></svg>
+          </button>
+          {openHeaderMenu === 'app' && (
+            <>
+              <div onClick={() => setOpenHeaderMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50 }}>
+                <AppMenu
+                  userEmail={user.username}
+                  onPreferences={() => { setOpenHeaderMenu(null); setShowWorkoutPrefs(true); }}
+                  onArchive={() => { setOpenHeaderMenu(null); handleOpenArchive(); }}
+                  onLogout={() => { setOpenHeaderMenu(null); onLogout(); }}
+                />
               </div>
-              <Button onClick={() => { setUserMenuOpen(false); setShowStreakSettings(true); }} size="sm" block className="mb-2" role="menuitem">Streak Settings</Button>
-              <Button onClick={() => { setUserMenuOpen(false); setShowWorkoutPrefs(true); }} size="sm" block className="mb-2" role="menuitem">Workout Preferences</Button>
-              <Button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} size="sm" block className="mb-2" role="menuitem">Archive</Button>
-              <Button onClick={() => { setUserMenuOpen(false); onLogout(); }} size="sm" block role="menuitem">Logout</Button>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -1191,39 +1198,30 @@ function AuthedApp({
       {mode === "workout" && (
         <div className="page-enter" key="workout-page">
         <Card>
-          <div className="flex flex-col gap-0 mb-4">
-            {/* Row 1: Plan name (22px bold) + gear */}
-            <div className="flex items-center justify-between pb-2.5">
-              <div className="flex flex-col min-w-0 flex-1 mr-3">
-                <select
-                  value={selectedPlanId ?? ''}
-                  onChange={(e) => {
-                    const newPlanId = e.target.value || null;
-                    selectPlan(newPlanId);
-                    setSession(null);
-                  }}
-                  className="font-bold bg-transparent border-none shadow-none px-0 pr-6 cursor-pointer"
-                  style={{ fontSize: 22, letterSpacing: '-0.02em', appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0 center', backgroundRepeat: 'no-repeat', backgroundSize: '18px', color: 'var(--text-primary)' }}
+          <div className="mb-4" style={{ position: 'relative' }}>
+            {/* Header row: plan name · day chip · gear */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 12 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedPlan?.name ?? 'No plan'}
+              </span>
+
+              {selectedPlan && selectedWeekId && selectedDayId && (
+                <button
+                  onClick={() => setOpenHeaderMenu(v => v === 'day' ? null : 'day')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', background: 'var(--accent-blue-muted)', border: '1px solid var(--accent-blue)', borderRadius: 9999, color: 'var(--accent-blue)', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', cursor: 'pointer', flexShrink: 0 }}
                 >
-                  {plans.length === 0 && <option value="">No plans yet</option>}
-                  {plans.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                {selectedWeekId && selectedDayId && selectedPlan && (
-                  <span className="text-[13px]" style={{ color: 'var(--text-secondary)', marginTop: 1 }}>
-                    {selectedPlan.weeks.find(w => w.id === selectedWeekId)?.name} · {selectedPlan.weeks.find(w => w.id === selectedWeekId)?.days.find(d => d.id === selectedDayId)?.name}
-                  </span>
-                )}
-              </div>
+                  W{selectedPlan.weeks.findIndex(w => w.id === selectedWeekId) + 1}·D{(selectedWeek?.days.findIndex(d => d.id === selectedDayId) ?? -1) + 1}
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ transform: openHeaderMenu === 'day' ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}><path d="M3 5l3 3 3-3" /></svg>
+                </button>
+              )}
+
               {selectedPlan && (
                 <button
-                  onClick={() => setShowPlanSettings(true)}
-                  title="Plan Settings"
-                  className="text-muted hover:text-secondary transition-colors duration-150"
-                  style={{ background: 'none', border: 'none', boxShadow: 'none', padding: '4px', minHeight: 'auto', cursor: 'pointer' }}
+                  onClick={() => setOpenHeaderMenu(v => v === 'gear' ? null : 'gear')}
+                  title="Plan settings"
+                  style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: openHeaderMenu === 'gear' ? 'var(--text-primary)' : 'var(--text-muted)', display: 'flex', flexShrink: 0 }}
                 >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
                     <path d="M16.2 12.2a1.4 1.4 0 0 0 .3 1.5l.05.05a1.7 1.7 0 1 1-2.4 2.4l-.05-.05a1.4 1.4 0 0 0-1.5-.3 1.4 1.4 0 0 0-.85 1.3v.13a1.7 1.7 0 1 1-3.4 0v-.07a1.4 1.4 0 0 0-.9-1.3 1.4 1.4 0 0 0-1.5.3l-.05.05a1.7 1.7 0 1 1-2.4-2.4l.05-.05a1.4 1.4 0 0 0 .3-1.5 1.4 1.4 0 0 0-1.3-.85H2.4a1.7 1.7 0 1 1 0-3.4h.07a1.4 1.4 0 0 0 1.3-.9 1.4 1.4 0 0 0-.3-1.5l-.05-.05a1.7 1.7 0 1 1 2.4-2.4l.05.05a1.4 1.4 0 0 0 1.5.3h.06a1.4 1.4 0 0 0 .85-1.3V2.4a1.7 1.7 0 0 1 3.4 0v.07a1.4 1.4 0 0 0 .85 1.3 1.4 1.4 0 0 0 1.5-.3l.05-.05a1.7 1.7 0 1 1 2.4 2.4l-.05.05a1.4 1.4 0 0 0-.3 1.5v.06a1.4 1.4 0 0 0 1.3.85h.13a1.7 1.7 0 0 1 0 3.4h-.07a1.4 1.4 0 0 0-1.3.85Z" />
                   </svg>
@@ -1231,77 +1229,43 @@ function AuthedApp({
               )}
             </div>
 
-            {/* Divider */}
-            <div className="border-t border-subtle mb-2.5" />
+            {/* Day picker dropdown */}
+            {openHeaderMenu === 'day' && selectedPlan && selectedWeekId && selectedDayId && (
+              <>
+                <div onClick={() => setOpenHeaderMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+                <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50 }}>
+                  <DayPickerDropdown
+                    plan={selectedPlan}
+                    selectedWeekId={selectedWeekId}
+                    selectedDayId={selectedDayId}
+                    onSelectDay={(weekId, dayId) => {
+                      setSelectedWeekId(weekId);
+                      setSelectedDayId(dayId);
+                      setSession(null);
+                      setShouldAutoNavigate(false);
+                    }}
+                    onClose={() => setOpenHeaderMenu(null)}
+                  />
+                </div>
+              </>
+            )}
 
-            {/* Row 2: Week/Day selectors + prev/next chevrons inside one bordered container */}
-            {selectedPlan && (
-              <div className="flex items-center bg-card rounded-md border border-subtle overflow-hidden">
-                {selectedWeekId && selectedDayId && (
-                  <button
-                    onClick={() => {
-                      const prev = prevWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                      setSelectedWeekId(prev.weekId);
-                      setSelectedDayId(prev.dayId);
-                      setSession(null);
-                      setShouldAutoNavigate(false);
-                    }}
-                    title="Previous day"
-                    className="text-secondary hover:text-primary transition-colors duration-150 flex-shrink-0"
-                    style={{ background: 'none', border: 'none', borderRight: '1px solid var(--border-subtle)', boxShadow: 'none', padding: '8px 10px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3L5 7l4 4" /></svg>
-                  </button>
-                )}
-                <select
-                  value={selectedWeekId ?? ''}
-                  onChange={(e) => {
-                    const newWeekId = e.target.value || null;
-                    setSelectedWeekId(newWeekId);
-                    const wk = selectedPlan.weeks.find((w) => w.id === newWeekId) || null;
-                    setSelectedDayId(wk?.days[0]?.id ?? null);
-                    setSession(null);
-                    setShouldAutoNavigate(false);
-                  }}
-                  className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
-                  style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
-                >
-                  {selectedPlan.weeks.map((w) => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </select>
-                <div className="w-px h-6 bg-subtle flex-shrink-0" />
-                <select
-                  value={selectedDayId ?? ''}
-                  onChange={(e) => {
-                    setSelectedDayId(e.target.value || null);
-                    setSession(null);
-                    setShouldAutoNavigate(false);
-                  }}
-                  className="text-[13px] font-medium bg-transparent border-none shadow-none rounded-none px-3 py-2 flex-1 cursor-pointer text-center"
-                  style={{ appearance: 'none', WebkitAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235c5c6e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 6px center', backgroundRepeat: 'no-repeat', backgroundSize: '14px', paddingRight: '24px' }}
-                >
-                  {(selectedWeek ?? { days: [] as PlanDay[] }).days.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-                {selectedWeekId && selectedDayId && (
-                  <button
-                    onClick={() => {
-                      const next = nextWeekDay(selectedPlan, selectedWeekId, selectedDayId);
-                      setSelectedWeekId(next.weekId);
-                      setSelectedDayId(next.dayId);
-                      setSession(null);
-                      setShouldAutoNavigate(false);
-                    }}
-                    title="Next day"
-                    className="text-secondary hover:text-primary transition-colors duration-150 flex-shrink-0"
-                    style={{ background: 'none', border: 'none', borderLeft: '1px solid var(--border-subtle)', boxShadow: 'none', padding: '8px 10px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center' }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3l4 4-4 4" /></svg>
-                  </button>
-                )}
-              </div>
+            {/* Gear menu dropdown */}
+            {openHeaderMenu === 'gear' && selectedPlan && (
+              <>
+                <div onClick={() => setOpenHeaderMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+                <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50 }}>
+                  <GearMenu
+                    planCount={plans.length}
+                    ghostMode={selectedPlan.ghostMode ?? 'default'}
+                    onGhostModeChange={handleGhostModeChange}
+                    onNewPlan={() => { setMode('builder'); setShowPlanList(false); setSelectedPlanId(null); }}
+                    onSwitchPlan={() => { setMode('builder'); setShowPlanList(true); }}
+                    onEditPlan={() => { setMode('builder'); setShowPlanList(false); }}
+                    onClose={() => setOpenHeaderMenu(null)}
+                  />
+                </div>
+              </>
             )}
           </div>
 

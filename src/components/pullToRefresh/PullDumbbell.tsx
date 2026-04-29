@@ -20,7 +20,8 @@ export default function PullDumbbell({ state }: Props) {
 
   if (pull === 0 && !springing) return null;
 
-  const y = pull - 50;
+  const TRIGGER = 80;
+  const y = Math.min(pull, TRIGGER) - 50; // locks at trigger position, doesn't slide into content
   const rotation = Math.min(progress, 1) * 180;
   const opacity = Math.min(progress * 1.2, 1);
   const color = progress >= 1 ? 'var(--accent-blue)' : 'var(--text-secondary)';
