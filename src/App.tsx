@@ -21,194 +21,13 @@ import { uuid, normalizeExerciseName, exerciseKey, parseBool, fixMojibake, getUs
 import { buildCatalogByName, downloadCSV, exportPlanCSV, generateExerciseCatalogCSV, generateAIPrompt, calculateSetsPerMuscle, calculateWeekSetsPerMuscle } from './lib/csv';
 import { startSessionFromDay, mergeSessionWithDay, mapRowToWeeks, nextWeekDay, prevWeekDay } from './lib/plan';
 import AddExerciseSheet from './components/AddExercise/AddExerciseSheet';
-
-
-
+import PullToRefresh from './components/pullToRefresh/PullToRefresh';
 
 
 export default function App() {
   const [user, setUser] = useState<{ id: number; username: string } | null>(null);
   const [checking, setChecking] = useState(true);
   const [forcePasswordReset, setForcePasswordReset] = useState(false);
-
-  // Pull-to-refresh functionality
-  useEffect(() => {
-    let startY = 0;
-    let active = false;
-    let triggered = false;
-    let progress = 0;
-    let wasReady = false;
-    const THRESHOLD = 80;
-    let el: HTMLDivElement | null = null;
-    const rootEl = document.getElementById('root');
-
-    if (!document.getElementById('ptr-styles')) {
-      const s = document.createElement('style');
-      s.id = 'ptr-styles';
-      s.textContent = `@keyframes ptr-spin{to{transform:rotate(360deg)}}`;
-      document.head.appendChild(s);
-    }
-
-    const atTop = () => (window.scrollY ?? window.pageYOffset ?? 0) <= 0;
-
-    // ── Indicator ──
-    const mount = () => {
-      const d = document.createElement('div');
-      d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) scale(0.4);z-index:9999;pointer-events:none;opacity:0;display:flex;flex-direction:column;align-items:center;';
-      d.innerHTML = `
-        <div data-bubble style="width:40px;height:40px;border-radius:50%;background:var(--bg-card);border:2px solid var(--border-default);box-shadow:0 2px 12px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
-          <svg data-arrow width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);transition:color .15s,transform .15s;">
-            <path d="M9 3A6 6 0 1 0 15 9"/>
-            <polyline points="12.8 11 15 9 17.2 11"/>
-          </svg>
-        </div>
-        <span data-label style="font-size:11px;margin-top:6px;color:var(--text-muted);white-space:nowrap;opacity:0;"></span>`;
-      document.body.appendChild(d);
-      return d;
-    };
-
-    const unmount = () => {
-      if (!el) return;
-      const ref = el;
-      ref.style.transition = 'opacity .2s, transform .2s';
-      ref.style.opacity = '0';
-      ref.style.transform = 'translateX(-50%) scale(0.4)';
-      setTimeout(() => ref.remove(), 250);
-      el = null;
-      // Snap page back up
-      if (rootEl) {
-        rootEl.style.transition = 'transform .25s ease-out';
-        rootEl.style.transform = '';
-      }
-    };
-
-    // ── Touch handlers ──
-    let startX = 0;
-    let decided = false;   // true once we've committed to pull-to-refresh or rejected it
-    const ACTIVATE_Y = 15; // min vertical px before we decide this is a pull gesture
-
-    const onStart = (e: TouchEvent) => {
-      if (triggered) return;
-      startY = e.touches[0].clientY;
-      startX = e.touches[0].clientX;
-      active = false;
-      decided = false;
-      progress = 0;
-      wasReady = false;
-    };
-
-    const onMove = (e: TouchEvent) => {
-      if (triggered) return;
-      const dy = e.touches[0].clientY - startY;
-      const dx = e.touches[0].clientX - startX;
-
-      // Decide once: is this a pull-to-refresh?
-      if (!active) {
-        if (decided) return; // already rejected this gesture
-        // Wait until the finger has moved enough to decide direction
-        if (Math.abs(dy) < ACTIVATE_Y && Math.abs(dx) < ACTIVATE_Y) return;
-        // Must be mostly vertical (downward), page at top, and not inside a scrollable sub-container
-        const isVertical = Math.abs(dy) > Math.abs(dx) * 1.5;
-        if (dy > 0 && isVertical && atTop()) {
-          // Check the touch didn't start inside a scrollable child (modals, menus, etc.)
-          const target = e.target as HTMLElement | null;
-          if (target?.closest?.('[data-no-ptr]')) { decided = true; return; }
-          active = true;
-        } else {
-          decided = true; // not a pull-to-refresh — ignore rest of this gesture
-          return;
-        }
-      }
-
-      // Once active, stay active — don't cancel on transient scrollY glitches.
-      // Just block native bounce and track the finger.
-      e.preventDefault();
-
-      if (!el) el = mount();
-
-      const raw = Math.max(0, dy);
-      progress = Math.min(raw / THRESHOLD, 1);
-      const ready = progress >= 1;
-
-      // Scale: 0.4 → 1.0 as progress goes 0 → 1 (immediately visible)
-      const scale = 0.4 + 0.6 * progress;
-      el.style.transition = 'none';
-      el.style.opacity = String(Math.min(progress * 3, 1));   // fully opaque by ~33%
-      el.style.transform = `translateX(-50%) scale(${ready ? 1.1 : scale})`;
-
-      // Slide page content down so indicator sits in the gap
-      if (rootEl) {
-        const nudge = Math.min(raw * 0.4, 60);
-        rootEl.style.transition = 'none';
-        rootEl.style.transform = `translateY(${nudge}px)`;
-      }
-
-      const arrow = el.querySelector('[data-arrow]') as HTMLElement | null;
-      const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
-      const label = el.querySelector('[data-label]') as HTMLElement | null;
-
-      // Arrow: counter-clockwise wind-up as you pull, snaps to success color at threshold
-      if (arrow) {
-        arrow.style.transform = ready ? 'rotate(-45deg)' : `rotate(${progress * -45}deg)`;
-        arrow.style.color = ready ? 'var(--success)' : 'var(--text-muted)';
-      }
-
-      if (bubble) {
-        bubble.style.borderColor = ready ? 'var(--success)' : 'var(--border-default)';
-        bubble.style.boxShadow = ready
-          ? '0 0 14px rgba(74,222,128,0.4), 0 2px 12px rgba(0,0,0,0.5)'
-          : '0 2px 12px rgba(0,0,0,0.5)';
-        // Spring pop on first reaching ready
-        if (ready && !wasReady) {
-          bubble.style.transition = 'border-color .15s, box-shadow .15s';
-        } else {
-          bubble.style.transition = 'none';
-        }
-      }
-
-      if (label) {
-        label.style.opacity = progress > 0.3 ? '1' : '0';
-        label.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
-        label.style.color = ready ? 'var(--success)' : 'var(--text-muted)';
-      }
-
-      wasReady = ready;
-    };
-
-    const onEnd = () => {
-      if (triggered || !active) { active = false; return; }
-      active = false;
-
-      if (progress >= 1 && el) {
-        triggered = true;
-        const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
-        const label = el.querySelector('[data-label]') as HTMLElement | null;
-        // Settle to scale(1)
-        if (el) {
-          el.style.transition = 'transform .2s';
-          el.style.transform = 'translateX(-50%) scale(1)';
-        }
-        if (bubble) {
-          bubble.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" style="animation:ptr-spin .6s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-dasharray="45 18" stroke-linecap="round"/></svg>';
-        }
-        if (label) { label.textContent = 'Refreshing...'; label.style.color = 'var(--success)'; }
-        setTimeout(() => window.location.reload(), 500);
-      } else {
-        unmount();
-      }
-      progress = 0;
-    };
-
-    document.addEventListener('touchstart', onStart, { passive: true });
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onEnd, { passive: true });
-    return () => {
-      document.removeEventListener('touchstart', onStart);
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onEnd);
-      el?.remove();
-    };
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -242,6 +61,7 @@ export default function App() {
 
   return (
     <div>
+      <PullToRefresh onRefresh={() => window.location.reload()} />
       {checking ? (
         <Skeleton lines={4} />
       ) : forcePasswordReset ? (
