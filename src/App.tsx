@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
 import { Badge, Button, Card, EmptyState, Modal, Skeleton, KebabIcon, XIcon, TimerIcon, FlameIcon, ChevronLeftIcon } from "./components";
 import { api, aiApi, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
@@ -4099,17 +4099,6 @@ function BuilderPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dirty]);
 
-  const handleCreatePlan = () => {
-    const newPlan: Plan = {
-      id: uuid(),
-      name: 'Untitled',
-      weeks: [createWeek(0)],
-    };
-    setPlans((prev) => [...prev, newPlan]);
-    onSelectPlan(newPlan.id, newPlan);
-    setShowPlanList(false);
-  };
-
   const handlePlanNameChange = (name: string) => {
     if (!selectedPlan) return;
     updatePlan(selectedPlan.id, (plan) => ({ ...plan, name }));
@@ -4266,66 +4255,6 @@ function BuilderPage({
 
   };
 
-  const handleExerciseNameCommit = async (
-    weekId: string,
-    dayId: string,
-    itemId: string,
-    rawName: string
-  ) => {
-    if (!selectedPlan) return;
-    const trimmed = normalizeExerciseName(rawName);
-    if (!trimmed) {
-      updatePlan(selectedPlan.id, (plan) => ({
-        ...plan,
-        weeks: plan.weeks.map((week) =>
-          week.id === weekId
-            ? {
-                ...week,
-                days: week.days.map((day) =>
-                  day.id === dayId
-                    ? {
-                        ...day,
-                        items: day.items.map((item) =>
-                          item.id === itemId ? { ...item, exerciseName: '', exerciseId: undefined } : item
-                        ),
-                      }
-                    : day
-                ),
-              }
-            : week
-        ),
-      }));
-      return;
-    }
-
-    const resolved = await onResolveExerciseName(trimmed);
-    const resolvedName = resolved?.name ?? trimmed;
-    const resolvedId = resolved?.id;
-
-    updatePlan(selectedPlan.id, (plan) => ({
-      ...plan,
-      weeks: plan.weeks.map((week) =>
-        week.id === weekId
-          ? {
-              ...week,
-              days: week.days.map((day) =>
-                day.id === dayId
-                  ? {
-                      ...day,
-                      items: day.items.map((item) =>
-                        item.id === itemId
-                          ? { ...item, exerciseName: resolvedName, exerciseId: resolvedId }
-                          : item
-                      ),
-                    }
-                  : day
-              ),
-            }
-          : week
-      ),
-    }));
-  };
-
   const openSearchForItem = (weekId: string, dayId: string, itemId: string) => {
     setAddSheetWeekId(weekId);
     setAddSheetDayId(dayId);
@@ -4414,57 +4343,6 @@ function BuilderPage({
       }),
     }));
   };
-
-  // --- Drag-and-drop reorder for days (pointer-based for mobile) ---
-  const [draggingDayId, setDraggingDayId] = useState<string | null>(null);
-  const [dayDragWeekId, setDayDragWeekId] = useState<string | null>(null);
-  const [dayDragInsertIndex, setDayDragInsertIndex] = useState<number | null>(null);
-  const [dayDragActive, setDayDragActive] = useState<boolean>(false);
-  const dayDragStartYRef = useRef<number>(0);
-  const dayDragTimerRef = useRef<number | null>(null);
-
-  const handleReorderDayAtIndex = (
-    weekId: string,
-    sourceDayId: string,
-    insertIndex: number,
-  ) => {
-    if (!selectedPlan) return;
-    updatePlan(selectedPlan.id, (plan) => ({
-      ...plan,
-      weeks: plan.weeks.map((week) => {
-        if (week.id !== weekId) return week;
-        const days = week.days.slice();
-        const from = days.findIndex((d) => d.id === sourceDayId);
-        if (from < 0) return week;
-        let at = Math.max(0, Math.min(insertIndex, days.length));
-        const [moved] = days.splice(from, 1);
-        if (at > from) at -= 1; // account for removal shift
-        days.splice(at, 0, moved);
-        return { ...week, days };
-      }),
-    }));
-  };
-
-  // While dragging days, disable text selection globally
-  useEffect(() => {
-    const shouldDisable = !!draggingDayId && dayDragActive;
-    const body = document?.body as any;
-    const prev = body && (body.style.userSelect || "");
-    const prevWebkit = body && (body.style.webkitUserSelect || "");
-    const prevMs = body && (body.style.msUserSelect || "");
-    if (shouldDisable && body) {
-      body.style.userSelect = "none";
-      body.style.webkitUserSelect = "none";
-      body.style.msUserSelect = "none";
-    }
-    return () => {
-      if (body) {
-        body.style.userSelect = prev;
-        body.style.webkitUserSelect = prevWebkit;
-        body.style.msUserSelect = prevMs;
-      }
-    };
-  }, [draggingDayId, dayDragActive]);
 
   // --- Drag-and-drop reorder for exercises (pointer-based for mobile) ---
   const [draggingExerciseId, setDraggingExerciseId] = useState<string | null>(null);
@@ -4579,21 +4457,6 @@ function BuilderPage({
 
   
   
-  const handleSaveAsTemplate = async () => {
-    if (!selectedPlan) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const payload = { weeks: selectedPlan.weeks };
-      await templateApi.create(selectedPlan.name, payload);
-      await loadTemplates();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const cloneTemplateToNewPlan = (tpl: Plan): Plan => {
     const weeks: PlanWeek[] = tpl.weeks.map((w) => ({
       id: uuid(),
@@ -5087,7 +4950,7 @@ function BuilderPage({
                     <div onClick={() => setFocusDayMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
                     <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50, background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden', minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
                       <button onClick={() => { setFocusDayMenuOpen(false); handleDuplicateDay(activeWeekId, activeDayId); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer' }}>Duplicate day</button>
-                      <button onClick={() => { setFocusDayMenuOpen(false); handleRemoveDay(activeWeekId, activeDayId); }} disabled={activeWeek.days.length <= 1} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--border-subtle)', color: activeWeek.days.length <= 1 ? 'var(--text-muted)' : 'var(--error)', fontSize: 14, cursor: activeWeek.days.length <= 1 ? 'not-allowed' : 'pointer', opacity: activeWeek.days.length <= 1 ? 0.5 : 1 }}>Delete day</button>
+                      <button onClick={() => { setFocusDayMenuOpen(false); handleRemoveDay(activeWeekId, activeDayId); }} disabled={(activeWeek?.days.length ?? 1) <= 1} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--border-subtle)', color: (activeWeek?.days.length ?? 1) <= 1 ? 'var(--text-muted)' : 'var(--error)', fontSize: 14, cursor: (activeWeek?.days.length ?? 1) <= 1 ? 'not-allowed' : 'pointer', opacity: (activeWeek?.days.length ?? 1) <= 1 ? 0.5 : 1 }}>Delete day</button>
                     </div>
                   </>)}
                 </div>
@@ -5184,7 +5047,7 @@ function BuilderPage({
                     ? SET_COUNT_OPTIONS
                     : [...SET_COUNT_OPTIONS, item.targetSets].sort((a, b) => a - b);
                   return (
-                    <React.Fragment key={item.id}>
+                    <Fragment key={item.id}>
                       {showPlaceholder && <div className="drag-placeholder" />}
                       <div
                         data-exercise-id={item.id}
@@ -5254,7 +5117,7 @@ function BuilderPage({
                         </button>
                       </div>
                       {isDragContext && draggingExerciseId !== item.id && dragInsertIndex === idx + 1 && <div className="drag-placeholder" />}
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })}
                 {dragActive && dragWeekId === activeWeekId && dragDayId === activeDayId && dragInsertIndex === activeDay.items.length && draggingExerciseId !== activeDay.items[activeDay.items.length - 1]?.id && (
