@@ -3533,15 +3533,17 @@ function WorkoutPage({
         <label style={{
           display: 'inline-flex',
           alignItems: 'center',
+          alignSelf: 'center',
           gap: 8,
           cursor: 'pointer',
           padding: '0 20px',
           height: 40,
           borderRadius: 9999,
-          background: completed ? 'var(--success-muted)' : 'transparent',
-          border: `1px solid ${completed ? 'var(--success)' : 'var(--border-subtle)'}`,
+          background: completed ? 'var(--success-muted)' : 'var(--bg-card)',
+          border: `1.5px solid ${completed ? 'var(--success)' : 'var(--border-default)'}`,
           transition: 'all 0.15s ease',
-          width: 'auto',
+          flexShrink: 0,
+          userSelect: 'none',
         }}>
           <input
             type="checkbox"
@@ -3559,13 +3561,13 @@ function WorkoutPage({
               <path d="M5.5 10.5L8.5 13.5L14.5 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--border-strong)" strokeWidth="1.5" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" aria-hidden="true">
               <circle cx="10" cy="10" r="9" />
               <path d="M5.5 10.5L8.5 13.5L14.5 7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
-          <span className="font-medium" style={{ color: completed ? 'var(--success)' : 'var(--text-secondary)' }}>
-            Completed
+          <span className="font-medium" style={{ color: completed ? 'var(--success)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+            {completed ? 'Completed' : 'Mark Complete'}
           </span>
         </label>
 
