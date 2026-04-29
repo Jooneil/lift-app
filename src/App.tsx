@@ -114,6 +114,7 @@ function AuthedApp({
   const [viewArchivedLoading, setViewArchivedLoading] = useState(false);
   const [finishingPlan, setFinishingPlan] = useState(false);
   const [openHeaderMenu, setOpenHeaderMenu] = useState<'day' | 'gear' | 'app' | null>(null);
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
   const [catalogExercises, setCatalogExercises] = useState<CatalogExercise[]>([]);
   const [customCatalogExercises, setCustomCatalogExercises] = useState<CatalogExercise[]>([]);
@@ -1260,7 +1261,7 @@ function AuthedApp({
                     ghostMode={selectedPlan.ghostMode ?? 'default'}
                     onGhostModeChange={handleGhostModeChange}
                     onNewPlan={() => { setMode('builder'); setShowPlanList(false); setSelectedPlanId(null); }}
-                    onSwitchPlan={() => { setMode('builder'); setShowPlanList(true); }}
+                    onSwitchPlan={() => { setShowPlanPicker(true); }}
                     onEditPlan={() => { setMode('builder'); setShowPlanList(false); }}
                     onClose={() => setOpenHeaderMenu(null)}
                   />
@@ -1326,6 +1327,32 @@ function AuthedApp({
         </Card>
         </div>
       )}
+      {/* Plan picker — shown from "Switch plan" in gear menu */}
+      <Modal open={showPlanPicker} onClose={() => setShowPlanPicker(false)} title="Switch plan" maxWidth={380}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {plans.length === 0 && <p style={{ color: 'var(--text-muted)', margin: 0 }}>No plans yet.</p>}
+          {plans.map(p => (
+            <button
+              key={p.id}
+              onClick={() => {
+                selectPlan(p.id);
+                setSession(null);
+                setShowPlanPicker(false);
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                background: p.id === selectedPlanId ? 'var(--accent-blue-muted)' : 'var(--bg-card)',
+                border: `1px solid ${p.id === selectedPlanId ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+              }}
+            >
+              <span style={{ fontWeight: 600, fontSize: 15, color: p.id === selectedPlanId ? 'var(--accent-blue)' : 'var(--text-primary)' }}>{p.name}</span>
+              {p.id === selectedPlanId && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-blue)' }}>ACTIVE</span>}
+            </button>
+          ))}
+        </div>
+      </Modal>
+
       <Modal open={showArchiveList} onClose={closeArchive} title="Archived Plans" maxWidth={950} maxHeight="80vh" zIndex={20}>
             {archivedError && <div className="text-error px-3 py-2 bg-error-muted rounded-sm">{archivedError}</div>}
             {archivedLoading ? (
