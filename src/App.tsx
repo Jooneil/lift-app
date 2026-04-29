@@ -57,7 +57,10 @@ export default function App() {
       d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) scale(0.4);z-index:9999;pointer-events:none;opacity:0;display:flex;flex-direction:column;align-items:center;';
       d.innerHTML = `
         <div data-bubble style="width:40px;height:40px;border-radius:50%;background:var(--bg-card);border:2px solid var(--border-default);box-shadow:0 2px 12px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
-          <span data-arrow style="display:block;font-size:18px;line-height:1;color:var(--text-muted);transition:color .15s;">↓</span>
+          <svg data-arrow width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);transition:color .15s,transform .15s;">
+            <path d="M9 3A6 6 0 1 0 15 9"/>
+            <polyline points="12.8 11 15 9 17.2 11"/>
+          </svg>
         </div>
         <span data-label style="font-size:11px;margin-top:6px;color:var(--text-muted);white-space:nowrap;opacity:0;"></span>`;
       document.body.appendChild(d);
@@ -144,10 +147,9 @@ export default function App() {
       const bubble = el.querySelector('[data-bubble]') as HTMLElement | null;
       const label = el.querySelector('[data-label]') as HTMLElement | null;
 
-      // Arrow: ↓ rotates to ↑ as you pull
+      // Arrow: counter-clockwise wind-up as you pull, snaps to success color at threshold
       if (arrow) {
-        arrow.style.display = 'block';
-        arrow.style.transform = `rotate(${progress * 180}deg)`;
+        arrow.style.transform = ready ? 'rotate(-45deg)' : `rotate(${progress * -45}deg)`;
         arrow.style.color = ready ? 'var(--success)' : 'var(--text-muted)';
       }
 
