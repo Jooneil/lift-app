@@ -1738,7 +1738,7 @@ function AuthedApp({
                 </>
               )}
 
-              <div className="flex justify-between items-center py-3">
+              <div className="flex justify-between items-center py-3 border-b border-b-subtle">
                 <div>
                   <div className="font-medium">Show Previous</div>
                   <div className="text-[13px] text-muted">Display last session's weights as placeholders</div>
@@ -1747,6 +1747,17 @@ function AuthedApp({
                   <input type="checkbox" checked={workoutPrefs.show_ghost} onChange={(e) => savePrefs({ show_ghost: e.target.checked })} className="w-5 h-5" />
                 </label>
               </div>
+
+              <button
+                onClick={() => { setShowWorkoutPrefs(false); setShowStreakSettings(true); }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 15, color: 'var(--text-primary)' }}>Streak</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Configure your workout streak schedule</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-muted)', flexShrink: 0 }}><path d="M6 3l5 5-5 5" /></svg>
+              </button>
             </>
           );
         })()}
