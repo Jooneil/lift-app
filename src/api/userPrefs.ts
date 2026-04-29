@@ -20,6 +20,22 @@ export type StreakState = {
   lastWorkoutDate: string | null  // ISO date of last completed workout
 }
 
+export type WorkoutPrefs = {
+  rest_timer_enabled?: boolean
+  rest_duration?: number
+  auto_start_rest?: boolean
+  show_ghost?: boolean
+  rest_sound?: boolean
+}
+
+export const DEFAULT_WORKOUT_PREFS: Required<WorkoutPrefs> = {
+  rest_timer_enabled: true,
+  rest_duration: 90,
+  auto_start_rest: true,
+  show_ghost: true,
+  rest_sound: false,
+}
+
 export type UserPrefsData = {
   last_plan_server_id?: string | null
   last_week_id?: string | null
@@ -28,6 +44,7 @@ export type UserPrefsData = {
   streak_state?: StreakState | null
   exercise_notes?: Record<string, string> | null
   exercise_instructions?: Record<string, string> | null
+  workout_prefs?: WorkoutPrefs | null
 }
 
 export type UserPrefs = {
@@ -64,6 +81,7 @@ export async function upsertUserPrefs(partial: {
   streak_state?: StreakState | null
   exercise_notes?: Record<string, string> | null
   exercise_instructions?: Record<string, string> | null
+  workout_prefs?: WorkoutPrefs | null
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
@@ -91,6 +109,7 @@ export async function upsertUserPrefs(partial: {
     ...(partial.streak_state !== undefined && { streak_state: partial.streak_state }),
     ...(partial.exercise_notes !== undefined && { exercise_notes: partial.exercise_notes }),
     ...(partial.exercise_instructions !== undefined && { exercise_instructions: partial.exercise_instructions }),
+    ...(partial.workout_prefs !== undefined && { workout_prefs: partial.workout_prefs }),
   }
 
   // Try update-first: if a row exists for this user, update it; otherwise insert.

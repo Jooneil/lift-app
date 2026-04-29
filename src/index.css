@@ -391,21 +391,20 @@ input[type="checkbox"] {
   font-variant-numeric: tabular-nums;
   text-align: center;
   padding: 8px 4px;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border-subtle);
-  border-radius: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
   box-shadow: none;
   min-height: 44px;
 }
 .workout-input:focus {
-  border-bottom-color: var(--accent-blue);
-  box-shadow: 0 1px 0 0 var(--accent-blue);
-  background: transparent;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px var(--accent-blue-muted);
+  background: var(--bg-elevated);
 }
 .workout-input::placeholder {
-  color: var(--text-muted);
-  opacity: 0.4;
+  color: oklch(from var(--text-muted) calc(l + 0.08) c h);
+  opacity: 0.55;
   font-weight: 400;
   font-size: 16px;
 }

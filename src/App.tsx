@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Auth from "./Auth";
 import { Badge, Button, Card, EmptyState, Modal, Skeleton, KebabIcon, XIcon, TimerIcon, FlameIcon, ChevronLeftIcon } from "./components";
 import { api, aiApi, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
-import { getUserPrefs, upsertUserPrefs, type StreakConfig, type StreakState, type StreakScheduleMode, type UserPrefsData } from './api/userPrefs';
+import { getUserPrefs, upsertUserPrefs, DEFAULT_WORKOUT_PREFS, type StreakConfig, type StreakState, type StreakScheduleMode, type UserPrefsData, type WorkoutPrefs } from './api/userPrefs';
 import { supabase } from "./supabaseClient";
 import type {
   ServerPlanRow,
@@ -302,6 +302,8 @@ function AuthedApp({
   const [currentStreak, setCurrentStreak] = useState(0);
   const [showStreakSettings, setShowStreakSettings] = useState(false);
   const [showStreakReconfigPrompt, setShowStreakReconfigPrompt] = useState(false);
+  const [workoutPrefs, setWorkoutPrefs] = useState<Required<WorkoutPrefs>>({ ...DEFAULT_WORKOUT_PREFS });
+  const [showWorkoutPrefs, setShowWorkoutPrefs] = useState(false);
   const [showPlanSettings, setShowPlanSettings] = useState(false);
 
   const exerciseByName = useMemo(() => {
@@ -658,6 +660,11 @@ function AuthedApp({
               upsertUserPrefs({ streak_state: resetState }).catch(() => {});
             }
           }
+        }
+
+        // Load workout preferences
+        if (p?.workout_prefs) {
+          setWorkoutPrefs({ ...DEFAULT_WORKOUT_PREFS, ...p.workout_prefs });
         }
 
         // One-time migration v3: pull notes from all sessions into global exercise_notes
@@ -1316,6 +1323,7 @@ function AuthedApp({
                 <strong>{user.username}</strong>
               </div>
               <Button onClick={() => { setUserMenuOpen(false); setShowStreakSettings(true); }} size="sm" block className="mb-2" role="menuitem">Streak Settings</Button>
+              <Button onClick={() => { setUserMenuOpen(false); setShowWorkoutPrefs(true); }} size="sm" block className="mb-2" role="menuitem">Workout Preferences</Button>
               <Button onClick={() => { setUserMenuOpen(false); handleOpenArchive(); }} size="sm" block className="mb-2" role="menuitem">Archive</Button>
               <Button onClick={() => { setUserMenuOpen(false); onLogout(); }} size="sm" block role="menuitem">Logout</Button>
             </div>
@@ -1517,6 +1525,7 @@ function AuthedApp({
                 finishingPlan={finishingPlan}
                 currentStreak={currentStreak}
                 streakEnabled={!!(streakConfig?.enabled)}
+                workoutPrefs={workoutPrefs}
                 onUpdatePlan={(updatedPlan) => {
                   setPlans(prev => prev.map(p => p.id === updatedPlan.id ? updatedPlan : p));
                   if (updatedPlan.serverId) {
@@ -1834,6 +1843,82 @@ function AuthedApp({
             )}
       </Modal>
 
+      {/* Workout Preferences Modal */}
+      <Modal open={showWorkoutPrefs} onClose={() => setShowWorkoutPrefs(false)} title="Workout Preferences" maxWidth={420}>
+        {(() => {
+          const savePrefs = (patch: Partial<Required<WorkoutPrefs>>) => {
+            const updated = { ...workoutPrefs, ...patch };
+            setWorkoutPrefs(updated);
+            upsertUserPrefs({ workout_prefs: updated });
+          };
+          const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+          return (
+            <>
+              <div className="flex justify-between items-center py-3 border-b border-b-subtle">
+                <div>
+                  <div className="font-medium">Rest Timer</div>
+                  <div className="text-[13px] text-muted">Show countdown after each set</div>
+                </div>
+                <label className="flex items-center cursor-pointer">
+                  <input type="checkbox" checked={workoutPrefs.rest_timer_enabled} onChange={(e) => savePrefs({ rest_timer_enabled: e.target.checked })} className="w-5 h-5" />
+                </label>
+              </div>
+
+              {workoutPrefs.rest_timer_enabled && (
+                <>
+                  <div className="py-3 border-b border-b-subtle">
+                    <div className="font-medium mb-2">Default Duration</div>
+                    <div className="flex gap-2">
+                      {[60, 90, 120, 180].map(s => (
+                        <Button
+                          key={s}
+                          onClick={() => savePrefs({ rest_duration: s })}
+                          className="flex-1"
+                          style={{
+                            background: workoutPrefs.rest_duration === s ? 'var(--accent-muted)' : 'var(--bg-card)',
+                            borderColor: workoutPrefs.rest_duration === s ? 'var(--border-strong)' : 'var(--border-default)',
+                          }}
+                        >
+                          {fmtDur(s)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-b-subtle">
+                    <div>
+                      <div className="font-medium">Auto-start</div>
+                      <div className="text-[13px] text-muted">Begin timer automatically after logging a set</div>
+                    </div>
+                    <label className="flex items-center cursor-pointer">
+                      <input type="checkbox" checked={workoutPrefs.auto_start_rest} onChange={(e) => savePrefs({ auto_start_rest: e.target.checked })} className="w-5 h-5" />
+                    </label>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-b-subtle">
+                    <div>
+                      <div className="font-medium">Sound</div>
+                      <div className="text-[13px] text-muted">Beep when rest is complete</div>
+                    </div>
+                    <label className="flex items-center cursor-pointer">
+                      <input type="checkbox" checked={workoutPrefs.rest_sound} onChange={(e) => savePrefs({ rest_sound: e.target.checked })} className="w-5 h-5" />
+                    </label>
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-between items-center py-3">
+                <div>
+                  <div className="font-medium">Show Previous</div>
+                  <div className="text-[13px] text-muted">Display last session's weights as placeholders</div>
+                </div>
+                <label className="flex items-center cursor-pointer">
+                  <input type="checkbox" checked={workoutPrefs.show_ghost} onChange={(e) => savePrefs({ show_ghost: e.target.checked })} className="w-5 h-5" />
+                </label>
+              </div>
+            </>
+          );
+        })()}
+      </Modal>
+
       {/* Plan Settings Modal */}
       <Modal open={!!(showPlanSettings && selectedPlan)} onClose={() => setShowPlanSettings(false)} title="Plan Settings" maxWidth={360}>
         {selectedPlan && (
@@ -1968,6 +2053,7 @@ function WorkoutPage({
   finishingPlan,
   currentStreak,
   streakEnabled,
+  workoutPrefs,
   onUpdatePlan,
 }: {
   plan: Plan;
@@ -1995,6 +2081,7 @@ function WorkoutPage({
   finishingPlan: boolean;
   currentStreak: number;
   streakEnabled: boolean;
+  workoutPrefs: Required<WorkoutPrefs>;
   onUpdatePlan: (plan: Plan) => void;
 }) {
   const [replaceSearchOpen, setReplaceSearchOpen] = useState(false);
@@ -2049,7 +2136,7 @@ function WorkoutPage({
   const timerPopoverRef = useRef<HTMLDivElement>(null);
   const [progressIsStuck, setProgressIsStuck] = useState(false);
   const progressSentinelRef = useRef<HTMLDivElement>(null);
-  const REST_DURATION = 90; // seconds
+  const REST_DURATION = workoutPrefs.rest_timer_enabled ? workoutPrefs.rest_duration : 90;
   const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string; done?: boolean } | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -2117,6 +2204,21 @@ function WorkoutPage({
     setShowTimerPopover(false);
   };
 
+  const playBeep = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.6);
+    } catch { /* ignore */ }
+  }, []);
+
   const startRestTimer = useCallback((entryId: string) => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
     setRestTimer({ secondsLeft: REST_DURATION, total: REST_DURATION, entryId });
@@ -2125,17 +2227,25 @@ function WorkoutPage({
         if (!prev) return null;
         if (prev.secondsLeft <= 1) {
           if (restTimerRef.current) clearInterval(restTimerRef.current);
-          setTimeout(() => setRestTimer(null), 1500);
+          if (workoutPrefs.rest_sound) playBeep();
+          setTimeout(() => setRestTimer(null), 3000);
           return { ...prev, secondsLeft: 0, done: true };
         }
         return { ...prev, secondsLeft: prev.secondsLeft - 1 };
       });
     }, 1000);
-  }, [REST_DURATION]);
+  }, [REST_DURATION, workoutPrefs.rest_sound, playBeep]);
 
   const dismissRestTimer = useCallback(() => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
     setRestTimer(null);
+  }, []);
+
+  const adjustRestTimer = useCallback((delta: number) => {
+    setRestTimer(prev => {
+      if (!prev || prev.done) return prev;
+      return { ...prev, secondsLeft: Math.max(1, prev.secondsLeft + delta) };
+    });
   }, []);
 
   // Cleanup on unmount
@@ -3184,58 +3294,105 @@ function WorkoutPage({
           borderRight: '1px solid var(--border-subtle)',
           borderBottom: '1px solid var(--border-subtle)',
         } as React.CSSProperties}>
-          {/* Header: Name + ⋮ pinned top-right */}
-          <div className="relative mb-1">
-            <h3 className="m-0 text-[15px] font-semibold pr-10">
+          {/* Header: Name + timer pill + kebab */}
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h3 className="m-0 text-[15px] font-semibold flex-1 min-w-0">
               {entry.exerciseName}
             </h3>
-            <div className="absolute top-0 right-0">
-              <Button
-                onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
-                size="sm"
-                style={{ padding: '4px 8px', minWidth: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                title="Options"
-              >
-                <KebabIcon size={16} />
-              </Button>
-              {openExerciseMenu === entry.id && (
-                <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-default rounded-md p-2 mt-1 min-w-[160px] z-20 shadow-[var(--shadow-lg)]">
-                  <Button
-                    onClick={() => {
-                      setOpenExerciseMenu(null);
-                      setEditingEntryId(entry.id);
-                      setEditDraftSets(entry.sets.map(s => ({ ...s })));
-                    }}
-                    size="sm" block className="text-left mb-1"
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Rest timer pill — always visible when rest timer enabled */}
+              {workoutPrefs.rest_timer_enabled && (() => {
+                const isActive = restTimer?.entryId === entry.id && !restTimer?.done;
+                const isDone = restTimer?.entryId === entry.id && restTimer?.done;
+                const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+                if (isDone) {
+                  return (
+                    <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--success)', background: 'var(--success-muted)', color: 'var(--success)', whiteSpace: 'nowrap' }}>
+                      Rest done
+                    </span>
+                  );
+                }
+                if (isActive) {
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <button
+                        onClick={() => adjustRestTimer(-15)}
+                        style={{ fontSize: 11, padding: '2px 6px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.4 }}
+                        title="–15 seconds"
+                      >–15</button>
+                      <button
+                        onClick={dismissRestTimer}
+                        style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--accent-blue)', background: 'var(--accent-blue-muted)', color: 'var(--accent-blue)', cursor: 'pointer', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+                        title="Tap to dismiss"
+                      >
+                        <TimerIcon size={12} /> {fmtDur(restTimer!.secondsLeft)}
+                      </button>
+                      <button
+                        onClick={() => adjustRestTimer(15)}
+                        style={{ fontSize: 11, padding: '2px 6px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.4 }}
+                        title="+15 seconds"
+                      >+15</button>
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => startRestTimer(entry.id)}
+                    style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
+                    title="Start rest timer"
                   >
-                    Edit Sets
-                  </Button>
-                  <Button
-                    onClick={() => { setOpenExerciseMenu(null); openReplaceSearch(entry, entryIndex); }}
-                    size="sm" block className="text-left mb-1"
-                  >
-                    Replace
-                  </Button>
-                  <Button
-                    onClick={() => { setOpenExerciseMenu(null); openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }); }}
-                    size="sm" block className="text-left mb-1"
-                  >
-                    History
-                  </Button>
-                  <Button
-                    onClick={() => openMyoScopeModal(entry.id)}
-                    size="sm" block
-                    style={{
-                      textAlign: 'left',
-                      background: entry.myoRepMatch ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
-                      borderColor: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--border-subtle)',
-                      color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-primary)',
-                    }}
-                  >
-                    Myo-Rep Match {entry.myoRepMatch ? '✓' : ''}
-                  </Button>
-                </div>
-              )}
+                    {fmtDur(REST_DURATION)}
+                  </button>
+                );
+              })()}
+              <div className="relative">
+                <Button
+                  onClick={() => setOpenExerciseMenu(openExerciseMenu === entry.id ? null : entry.id)}
+                  size="sm"
+                  style={{ padding: '4px 8px', minWidth: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Options"
+                >
+                  <KebabIcon size={16} />
+                </Button>
+                {openExerciseMenu === entry.id && (
+                  <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-default rounded-md p-2 mt-1 min-w-[160px] z-20 shadow-[var(--shadow-lg)]">
+                    <Button
+                      onClick={() => {
+                        setOpenExerciseMenu(null);
+                        setEditingEntryId(entry.id);
+                        setEditDraftSets(entry.sets.map(s => ({ ...s })));
+                      }}
+                      size="sm" block className="text-left mb-1"
+                    >
+                      Edit Sets
+                    </Button>
+                    <Button
+                      onClick={() => { setOpenExerciseMenu(null); openReplaceSearch(entry, entryIndex); }}
+                      size="sm" block className="text-left mb-1"
+                    >
+                      Replace
+                    </Button>
+                    <Button
+                      onClick={() => { setOpenExerciseMenu(null); openHistory({ exerciseId: entry.exerciseId, exerciseName: entry.exerciseName }); }}
+                      size="sm" block className="text-left mb-1"
+                    >
+                      History
+                    </Button>
+                    <Button
+                      onClick={() => openMyoScopeModal(entry.id)}
+                      size="sm" block
+                      style={{
+                        textAlign: 'left',
+                        background: entry.myoRepMatch ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
+                        borderColor: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--border-subtle)',
+                        color: entry.myoRepMatch ? 'var(--accent-purple)' : 'var(--text-primary)',
+                      }}
+                    >
+                      Myo-Rep Match {entry.myoRepMatch ? '✓' : ''}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -3321,7 +3478,7 @@ function WorkoutPage({
                       type="number"
                       step="any"
                       inputMode="decimal"
-                      placeholder={ghostSet.weight == null ? '' : String(ghostSet.weight)}
+                      placeholder={!workoutPrefs.show_ghost || ghostSet.weight == null ? '' : String(ghostSet.weight)}
                       value={set.weight ?? ''}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -3335,7 +3492,7 @@ function WorkoutPage({
                     />
                     <input
                       inputMode="numeric"
-                      placeholder={ghostSet.reps == null ? '' : String(ghostSet.reps)}
+                      placeholder={!workoutPrefs.show_ghost || ghostSet.reps == null ? '' : String(ghostSet.reps)}
                       value={set.reps ?? ''}
                       onChange={(e) => {
                         const num = e.target.value === '' ? null : Number(e.target.value);
@@ -3353,7 +3510,7 @@ function WorkoutPage({
                           });
                         }
                         // Start rest timer when set becomes complete
-                        if (repsValue != null && effectiveWeight != null) {
+                        if (repsValue != null && effectiveWeight != null && workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) {
                           startRestTimer(entry.id);
                         }
                       }}
@@ -3430,25 +3587,6 @@ function WorkoutPage({
               Notes
             </button>
 
-            {/* Rest timer — inline, right of Notes */}
-            {restTimer && restTimer.entryId === entry.id && (
-              <button
-                onClick={dismissRestTimer}
-                className="text-[12px] px-3 py-1.5 rounded-full border transition-all duration-150 flex items-center gap-1.5 ml-auto"
-                style={{
-                  borderColor: restTimer.done ? 'var(--success)' : 'var(--accent-blue)',
-                  background: restTimer.done ? 'var(--success-muted)' : 'var(--accent-blue-muted)',
-                  color: restTimer.done ? 'var(--success)' : 'var(--accent-blue)',
-                  boxShadow: 'none',
-                  minHeight: 'auto',
-                  fontVariantNumeric: 'tabular-nums',
-                  transition: 'all 0.2s ease',
-                }}
-                title="Tap to dismiss"
-              >
-                {restTimer.done ? 'Go!' : <><TimerIcon size={13} /> {Math.floor(restTimer.secondsLeft / 60)}:{String(restTimer.secondsLeft % 60).padStart(2, '0')}</>}
-              </button>
-            )}
           </div>
 
           {/* Expanded instructions */}
@@ -5850,7 +5988,15 @@ function BuilderPage({
                     )}
 
                     {day.items.length === 0 ? (
-                      <div className="text-muted text-[13px]">No exercises yet.</div>
+                      <button
+                        onClick={() => handleAddExercise(week.id, day.id)}
+                        className="w-full text-left"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px 16px', border: '1px solid var(--border-subtle)', borderRadius: 8, background: 'var(--bg-input)', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer', transition: 'all 0.15s ease' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-default)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+                      >
+                        <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Add Exercise
+                      </button>
                     ) : (
                       <div
                         className="drag-container flex flex-col gap-2" style={{ touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
