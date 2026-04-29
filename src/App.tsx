@@ -1868,7 +1868,7 @@ function AuthedApp({
                 <>
                   <div className="py-3 border-b border-b-subtle">
                     <div className="font-medium mb-2">Default Duration</div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-2">
                       {[60, 90, 120, 180].map(s => (
                         <Button
                           key={s}
@@ -1882,6 +1882,25 @@ function AuthedApp({
                           {fmtDur(s)}
                         </Button>
                       ))}
+                    </div>
+                    {![60, 90, 120, 180].includes(workoutPrefs.rest_duration) && (
+                      <div className="text-[13px] text-muted mb-1">Custom: {fmtDur(workoutPrefs.rest_duration)}</div>
+                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[13px] text-muted shrink-0">Custom (s):</span>
+                      <input
+                        type="number"
+                        min={10}
+                        max={600}
+                        value={workoutPrefs.rest_duration}
+                        onChange={(e) => {
+                          const val = Math.max(10, Math.min(600, parseInt(e.target.value) || 90));
+                          savePrefs({ rest_duration: val });
+                        }}
+                        className="w-20 text-center"
+                        style={{ fontSize: 14, padding: '4px 8px', borderRadius: 8 }}
+                      />
+                      <span className="text-[13px] text-muted">{fmtDur(workoutPrefs.rest_duration)}</span>
                     </div>
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-b-subtle">
@@ -2137,8 +2156,10 @@ function WorkoutPage({
   const [progressIsStuck, setProgressIsStuck] = useState(false);
   const progressSentinelRef = useRef<HTMLDivElement>(null);
   const REST_DURATION = workoutPrefs.rest_timer_enabled ? workoutPrefs.rest_duration : 90;
-  const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string; done?: boolean } | null>(null);
+  const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string; done?: boolean; paused?: boolean } | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [restTimerPopoverOpen, setRestTimerPopoverOpen] = useState(false);
+  const restTimerPopoverRef = useRef<HTMLDivElement>(null);
 
   const formatElapsed = useCallback(() => {
     if (!sessionStartRef.current) return '';
@@ -2178,7 +2199,7 @@ function WorkoutPage({
     return () => observer.disconnect();
   }, []);
 
-  // Close timer popover on outside click
+  // Close session timer popover on outside click
   useEffect(() => {
     if (!showTimerPopover) return;
     const handler = (e: MouseEvent) => {
@@ -2189,6 +2210,18 @@ function WorkoutPage({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showTimerPopover]);
+
+  // Close rest timer popover on outside click
+  useEffect(() => {
+    if (!restTimerPopoverOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (restTimerPopoverRef.current && !restTimerPopoverRef.current.contains(e.target as Node)) {
+        setRestTimerPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [restTimerPopoverOpen]);
 
   const handleResetTimer = () => {
     sessionStartRef.current = Date.now();
@@ -2239,7 +2272,19 @@ function WorkoutPage({
   const dismissRestTimer = useCallback(() => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
     setRestTimer(null);
+    setRestTimerPopoverOpen(false);
   }, []);
+
+  const stopRestTimer = useCallback(() => {
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
+    setRestTimer(prev => prev ? { ...prev, paused: true } : null);
+    setRestTimerPopoverOpen(false);
+  }, []);
+
+  const resetRestTimer = useCallback((entryId: string) => {
+    setRestTimerPopoverOpen(false);
+    startRestTimer(entryId);
+  }, [startRestTimer]);
 
   const adjustRestTimer = useCallback((delta: number) => {
     setRestTimer(prev => {
@@ -3302,9 +3347,12 @@ function WorkoutPage({
             <div className="flex items-center gap-1 shrink-0">
               {/* Rest timer pill — always visible when rest timer enabled */}
               {workoutPrefs.rest_timer_enabled && (() => {
-                const isActive = restTimer?.entryId === entry.id && !restTimer?.done;
-                const isDone = restTimer?.entryId === entry.id && restTimer?.done;
+                const thisTimer = restTimer?.entryId === entry.id ? restTimer : null;
+                const isDone = thisTimer?.done;
+                const isPaused = thisTimer?.paused;
+                const isActive = thisTimer && !isDone && !isPaused;
                 const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
                 if (isDone) {
                   return (
                     <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--success)', background: 'var(--success-muted)', color: 'var(--success)', whiteSpace: 'nowrap' }}>
@@ -3312,18 +3360,28 @@ function WorkoutPage({
                     </span>
                   );
                 }
+                if (isPaused) {
+                  return (
+                    <button
+                      onClick={dismissRestTimer}
+                      style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+                      title="Tap to dismiss"
+                    >
+                      ⏸ {fmtDur(thisTimer!.secondsLeft)}
+                    </button>
+                  );
+                }
                 if (isActive) {
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative' }} ref={restTimerPopoverRef}>
                       <button
                         onClick={() => adjustRestTimer(-15)}
                         style={{ fontSize: 11, padding: '2px 6px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.4 }}
                         title="–15 seconds"
                       >–15</button>
                       <button
-                        onClick={dismissRestTimer}
+                        onClick={() => setRestTimerPopoverOpen(v => !v)}
                         style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--accent-blue)', background: 'var(--accent-blue-muted)', color: 'var(--accent-blue)', cursor: 'pointer', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
-                        title="Tap to dismiss"
                       >
                         <TimerIcon size={12} /> {fmtDur(restTimer!.secondsLeft)}
                       </button>
@@ -3332,17 +3390,30 @@ function WorkoutPage({
                         style={{ fontSize: 11, padding: '2px 6px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.4 }}
                         title="+15 seconds"
                       >+15</button>
+                      {restTimerPopoverOpen && (
+                        <div className="dropdown-menu" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '4px', minWidth: 110, zIndex: 30, boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <button onClick={() => resetRestTimer(entry.id)} style={{ width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 13, borderRadius: 6, background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-muted)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                          >Reset</button>
+                          <button onClick={stopRestTimer} style={{ width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 13, borderRadius: 6, background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-muted)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                          >Stop</button>
+                          <button onClick={dismissRestTimer} style={{ width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 13, borderRadius: 6, background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-muted)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                          >Dismiss</button>
+                        </div>
+                      )}
                     </div>
                   );
                 }
+                // Inactive: faint, no interaction
                 return (
-                  <button
-                    onClick={() => startRestTimer(entry.id)}
-                    style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
-                    title="Start rest timer"
-                  >
+                  <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, border: '1px solid var(--border-subtle)', background: 'transparent', color: 'var(--text-secondary)', opacity: 0.4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', userSelect: 'none' }}>
                     {fmtDur(REST_DURATION)}
-                  </button>
+                  </span>
                 );
               })()}
               <div className="relative">
