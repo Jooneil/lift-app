@@ -18,9 +18,10 @@ import type {
 import type { Plan, PlanWeek, PlanDay, PlanExercise, Exercise, CatalogExercise, ImportedExerciseMeta, PlanImportResult, Session, SessionEntry, SessionSet, ArchivedSessionMap, GhostSet, Mode } from './types';
 import { SET_COUNT_OPTIONS, MUSCLE_GROUPS } from './types';
 import { uuid, normalizeExerciseName, exerciseKey, parseBool, fixMojibake, getUserTimezone, toLocalDateString, isWorkoutDay, checkStreakStatus } from './lib/utils';
-import { buildCatalogByName, downloadCSV, exportPlanCSV, generateExerciseCatalogCSV, generateAIPrompt, calculateSetsPerMuscle, calculateWeekSetsPerMuscle } from './lib/csv';
+import { buildCatalogByName, downloadCSV, exportPlanCSV, generateExerciseCatalogCSV, generateAIPrompt, calculateSetsPerMuscle } from './lib/csv';
 import { startSessionFromDay, mergeSessionWithDay, mapRowToWeeks, nextWeekDay } from './lib/plan';
 import AddExerciseSheet from './components/AddExercise/AddExerciseSheet';
+import EquipmentIcon, { getEquipmentType } from './components/AddExercise/EquipmentIcon';
 import PullToRefresh from './components/pullToRefresh/PullToRefresh';
 import DayPickerDropdown from './components/WorkoutHeader/DayPickerDropdown';
 import GearMenu from './components/WorkoutHeader/GearMenu';
@@ -3998,38 +3999,10 @@ function BuilderPage({
   const [addSheetWeekId, setAddSheetWeekId] = useState<string | null>(null);
   const [addSheetDayId, setAddSheetDayId] = useState<string | null>(null);
   const [addSheetItemId, setAddSheetItemId] = useState<string | null>(null);
-  const [collapsedWeeks, setCollapsedWeeks] = useState<Set<string>>(new Set());
-  const [dayMenuOpenId, setDayMenuOpenId] = useState<string | null>(null);
-  const dayMenuRef = useRef<HTMLDivElement>(null);
-  const [plansMenuOpen, setPlansMenuOpen] = useState(false);
-  const plansMenuRef = useRef<HTMLDivElement>(null);
-  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
-  const saveMenuRef = useRef<HTMLDivElement>(null);
-  const [weekMenuOpenId, setWeekMenuOpenId] = useState<string | null>(null);
-  const weekMenuRef = useRef<HTMLDivElement>(null);
-  const [setWeeksInput, setSetWeeksInput] = useState('');
-
-  // Close builder menus on outside click
-  useEffect(() => {
-    if (!dayMenuOpenId && !plansMenuOpen && !saveMenuOpen && !weekMenuOpenId) return;
-    const handler = (e: MouseEvent) => {
-      if (dayMenuRef.current && !dayMenuRef.current.contains(e.target as Node)) setDayMenuOpenId(null);
-      if (plansMenuRef.current && !plansMenuRef.current.contains(e.target as Node)) setPlansMenuOpen(false);
-      if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) setSaveMenuOpen(false);
-      if (weekMenuRef.current && !weekMenuRef.current.contains(e.target as Node)) setWeekMenuOpenId(null);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [dayMenuOpenId, plansMenuOpen, saveMenuOpen, weekMenuOpenId]);
-
-  const toggleWeek = (weekId: string) => {
-    setCollapsedWeeks((prev) => {
-      const next = new Set(prev);
-      if (next.has(weekId)) next.delete(weekId);
-      else next.add(weekId);
-      return next;
-    });
-  };
+  const [editWeeksMode, setEditWeeksMode] = useState(false);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  const [exMenuOpenId, setExMenuOpenId] = useState<string | null>(null);
+  const [focusDayMenuOpen, setFocusDayMenuOpen] = useState(false);
 
   const createDay = (index: number): PlanDay => ({
     id: uuid(),
@@ -4142,14 +4115,13 @@ function BuilderPage({
     updatePlan(selectedPlan.id, (plan) => ({ ...plan, name }));
   };
 
-  const handleSetWeekCount = (count: number) => {
-    if (!selectedPlan || count < 1 || count > 52) return;
+  const handleAddWeek = () => {
+    if (!selectedPlan) return;
+    const idx = selectedPlan.weeks.length;
     const sourceWeek = selectedPlan.weeks[0];
-    const current = selectedPlan.weeks.length;
-
-    const cloneWeek = (index: number): PlanWeek => ({
+    const newWeek: PlanWeek = {
       id: uuid(),
-      name: `Week ${index + 1}`,
+      name: `Week ${idx + 1}`,
       days: sourceWeek.days.map((day) => ({
         id: uuid(),
         name: day.name,
@@ -4161,40 +4133,8 @@ function BuilderPage({
           targetReps: item.targetReps ?? '',
         })),
       })),
-    });
-
-    updatePlan(selectedPlan.id, (plan) => {
-      if (count > current) {
-        const added = Array.from({ length: count - current }, (_, i) => cloneWeek(current + i));
-        return { ...plan, weeks: [...plan.weeks, ...added] };
-      } else {
-        return { ...plan, weeks: plan.weeks.slice(0, count) };
-      }
-    });
-
-    setSetWeeksInput('');
-  };
-
-  const handleResetWeekToOne = (weekId: string) => {
-    if (!selectedPlan) return;
-    const sourceWeek = selectedPlan.weeks[0];
-    if (!sourceWeek || sourceWeek.id === weekId) return;
-    const clonedDays = sourceWeek.days.map((day) => ({
-      id: uuid(),
-      name: day.name,
-      items: day.items.map((item) => ({
-        id: uuid(),
-        exerciseId: item.exerciseId,
-        exerciseName: item.exerciseName,
-        targetSets: item.targetSets,
-        targetReps: item.targetReps ?? '',
-      })),
-    }));
-    updatePlan(selectedPlan.id, (plan) => ({
-      ...plan,
-      weeks: plan.weeks.map((w) => w.id === weekId ? { ...w, days: clonedDays } : w),
-    }));
-    if (selectedWeekId === weekId) setSelectedDayId(clonedDays[0]?.id ?? null);
+    };
+    updatePlan(selectedPlan.id, (plan) => ({ ...plan, weeks: [...plan.weeks, newWeek] }));
   };
 
   const handleRemoveWeek = (weekId: string) => {
@@ -4210,14 +4150,6 @@ function BuilderPage({
       }
       return nextPlan;
     });
-  };
-
-  const handleWeekNameChange = (weekId: string, name: string) => {
-    if (!selectedPlan) return;
-    updatePlan(selectedPlan.id, (plan) => ({
-      ...plan,
-      weeks: plan.weeks.map((week) => (week.id === weekId ? { ...week, name } : week)),
-    }));
   };
 
   const handleAddDay = (weekId: string) => {
@@ -4450,6 +4382,36 @@ function BuilderPage({
             }
           : week
       ),
+    }));
+  };
+
+  const handleDuplicateExercise = (weekId: string, dayId: string, itemId: string) => {
+    if (!selectedPlan) return;
+    updatePlan(selectedPlan.id, (plan) => ({
+      ...plan,
+      weeks: plan.weeks.map((week) => {
+        if (week.id !== weekId) return week;
+        return {
+          ...week,
+          days: week.days.map((day) => {
+            if (day.id !== dayId) return day;
+            const idx = day.items.findIndex((it) => it.id === itemId);
+            if (idx < 0) return day;
+            const source = day.items[idx];
+            const cloned: PlanExercise = {
+              id: uuid(),
+              exerciseId: source.exerciseId,
+              exerciseName: source.exerciseName,
+              targetSets: source.targetSets,
+              targetReps: source.targetReps ?? '',
+              myoReps: source.myoReps,
+            };
+            const items = day.items.slice();
+            items.splice(idx + 1, 0, cloned);
+            return { ...day, items };
+          }),
+        };
+      }),
     }));
   };
 
@@ -4979,22 +4941,30 @@ function BuilderPage({
     }
   };
 
+  // Active week/day derived from selected state
+  const activeWeekId = selectedWeekId ?? selectedPlan?.weeks[0]?.id ?? null;
+  const activeWeek = selectedPlan?.weeks.find(w => w.id === activeWeekId) ?? selectedPlan?.weeks[0] ?? null;
+  const activeDay = activeWeek?.days.find(d => d.id === selectedDayId) ?? activeWeek?.days[0] ?? null;
+  const activeDayId = activeDay?.id ?? null;
+  const activeSetSum = activeDay?.items.reduce((s, i) => s + i.targetSets, 0) ?? 0;
+
+  const switchWeek = (weekId: string) => {
+    const currentWeek = selectedPlan?.weeks.find(w => w.id === activeWeekId);
+    const nextWeek = selectedPlan?.weeks.find(w => w.id === weekId);
+    if (!nextWeek) return;
+    const currentDayIdx = Math.max(0, currentWeek?.days.findIndex(d => d.id === activeDayId) ?? 0);
+    const nextDay = nextWeek.days[Math.min(currentDayIdx, nextWeek.days.length - 1)] ?? nextWeek.days[0];
+    setSelectedWeekId(weekId);
+    setSelectedDayId(nextDay?.id ?? null);
+  };
+
   return (
-    <Card>
+    <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
       <datalist id="exercise-options">
         {catalogExercises.map((exercise) => (
           <option key={exercise.id} value={exercise.name} />
         ))}
       </datalist>
-      {/* Back button */}
-      {onBack && (
-        <button
-          onClick={handleBack}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, padding: '0 0 12px 0' }}
-        >
-          <ChevronLeftIcon size={16} /> Back
-        </button>
-      )}
       {/* Discard changes confirm modal */}
       <Modal open={showDiscardModal} title="Discard changes?" onClose={() => setShowDiscardModal(false)}>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 20px' }}>Your edits will be lost.</p>
@@ -5003,714 +4973,311 @@ function BuilderPage({
           <Button variant="danger" onClick={handleDiscard}>Discard</Button>
         </div>
       </Modal>
-      {/* Row 1: Plan name + right-side controls */}
-      <div className="flex items-center justify-between gap-3 pb-3">
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted mb-0.5">Plan</span>
-          <div className="flex items-center gap-2 min-w-0">
-            {selectedPlan ? (
-              <input
-                value={selectedPlan.name}
-                onChange={(e) => handlePlanNameChange(e.target.value)}
-                className="text-[18px] font-bold tracking-[-0.02em] bg-transparent border-none shadow-none px-0 min-w-0 flex-1"
-                style={{ outline: 'none' }}
-                placeholder="Untitled"
-              />
-            ) : (
-              <h2 className="text-[18px] font-bold tracking-[-0.02em] m-0">Plan Builder</h2>
+      {/* === Day Focus Builder === */}
+      {!selectedPlan ? (
+        <div style={{ padding: 24 }}>
+          <EmptyState message="Create a plan to get started." />
+        </div>
+      ) : (<>
+        {/* 1. Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+          {onBack && (
+            <button onClick={handleBack} style={{ width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'var(--text-secondary)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }} aria-label="Back">
+              <ChevronLeftIcon size={18} />
+            </button>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <input
+              value={selectedPlan.name}
+              onChange={(e) => handlePlanNameChange(e.target.value)}
+              style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)', background: 'transparent', border: 'none', outline: 'none', width: '100%', padding: 0 }}
+              placeholder="Untitled"
+            />
+          </div>
+          {(exerciseLoading || catalogLoading) && <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Loading…</span>}
+          <button
+            onClick={handleSavePlan}
+            disabled={saving}
+            style={{ background: 'var(--accent-blue)', color: '#0a0a0c', fontWeight: 600, fontSize: 13, border: 'none', borderRadius: 8, padding: '8px 14px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, flexShrink: 0 }}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+
+        {/* 2. Week selector — segmented control */}
+        <div style={{ padding: '12px 16px 8px' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 3, gap: 2 }}>
+            {selectedPlan.weeks.map((w, i) => {
+              const isActive = w.id === activeWeekId;
+              const canDelete = selectedPlan.weeks.length > 1 && !isActive;
+              return (
+                <div key={w.id} style={{ position: 'relative', flex: 1, borderRadius: 7, display: 'flex', ...(isActive ? { background: 'var(--bg-elevated)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' } : {}) }}>
+                  <button
+                    onClick={() => { if (!editWeeksMode) switchWeek(w.id); }}
+                    style={{ flex: 1, background: 'transparent', border: 'none', color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: 12.5, fontWeight: 600, padding: '7px 10px', borderRadius: 7, cursor: editWeeksMode ? 'default' : 'pointer' }}
+                  >
+                    Wk {i + 1}
+                  </button>
+                  {editWeeksMode && canDelete && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRemoveWeek(w.id); if (selectedPlan.weeks.length <= 2) setEditWeeksMode(false); }}
+                      style={{ position: 'absolute', top: -6, right: -4, width: 18, height: 18, borderRadius: 999, background: 'var(--error)', border: '2px solid var(--bg-card)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' }}
+                      aria-label={`Delete week ${i + 1}`}
+                    >
+                      <svg viewBox="0 0 10 10" width="9" height="9" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {!editWeeksMode && (
+              <button onClick={handleAddWeek} style={{ width: 32, background: 'transparent', border: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', flexShrink: 0 }} aria-label="Add week">
+                <svg viewBox="0 0 16 16" width="12" height="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+              </button>
             )}
-            {(exerciseLoading || catalogLoading) && (
-              <span className="text-muted text-[12px] whitespace-nowrap">Loading…</span>
-            )}
+            <button
+              onClick={() => setEditWeeksMode(v => !v)}
+              style={{ background: 'transparent', border: 'none', color: editWeeksMode ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: 11.5, fontWeight: 600, padding: '0 10px', borderRadius: 7, cursor: 'pointer', flexShrink: 0 }}
+            >
+              {editWeeksMode ? 'Done' : 'Edit'}
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Plans dropdown — single button on mobile, expanded on desktop */}
-          <div className="relative" ref={plansMenuRef}>
-            <button
-              onClick={() => setPlansMenuOpen((v) => !v)}
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-primary)' }}
-            >
-              <span className="hidden sm:inline">Manage </span>Plans <span style={{ fontSize: 13, opacity: 0.8 }}>▾</span>
-            </button>
-            {plansMenuOpen && (
-              <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[170px] z-30 shadow-[var(--shadow-lg)]">
-                <button
-                  onClick={() => { setPlansMenuOpen(false); setShowPlanList(true); }}
-                  className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
-                >
-                  Manage Plans
-                </button>
-                <button
-                  onClick={() => { setPlansMenuOpen(false); handleCreatePlan(); }}
-                  className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
-                >
-                  + New Plan
-                </button>
-              </div>
-            )}
+        {/* 3. Day chip strip */}
+        {activeWeek && (
+          <div style={{ padding: '0 12px 4px' }}>
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', padding: '6px 4px 8px' } as React.CSSProperties}>
+              {activeWeek.days.map(d => {
+                const isActive = d.id === activeDayId;
+                return (
+                  <button key={d.id} onClick={() => setSelectedDayId(d.id)}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '8px 12px', background: isActive ? 'var(--accent-blue-muted)' : 'var(--bg-card)', border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, borderRadius: 10, color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)', flexShrink: 0, minWidth: 84, cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>{d.name}</span>
+                    <span style={{ fontSize: 10.5, opacity: 0.75, fontWeight: 500 }}>{d.items.length > 0 ? `${d.items.length} ex` : 'Empty'}</span>
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => { if (activeWeekId) handleAddDay(activeWeekId); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 12px', background: 'transparent', border: '1px dashed var(--border-default)', borderRadius: 10, color: 'var(--text-muted)', flexShrink: 0, cursor: 'pointer' }}
+              >
+                <svg viewBox="0 0 16 16" width="13" height="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+                <span style={{ fontSize: 11, fontWeight: 500 }}>Day</span>
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* Split save button */}
-          {selectedPlan && (
-            <div className="relative flex" ref={saveMenuRef}>
-              <button
-                onClick={async () => { setSaveMenuOpen(false); await handleSavePlan(); }}
-                disabled={saving}
-                style={{
-                  background: 'var(--accent)', color: '#0a0a0c', fontWeight: 600, fontSize: 13,
-                  border: 'none', borderRadius: '8px 0 0 8px', padding: '7px 14px',
-                  cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-                  borderRight: '1px solid rgba(0,0,0,0.15)',
-                }}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                onClick={() => setSaveMenuOpen((v) => !v)}
-                disabled={saving}
-                style={{
-                  background: 'var(--accent)', color: '#0a0a0c',
-                  border: 'none', borderRadius: '0 8px 8px 0', padding: '7px 10px',
-                  cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-                  fontSize: 13,
-                }}
-                title="More save options"
-              >
-                ▾
-              </button>
-              {saveMenuOpen && (
-                <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[200px] z-30 shadow-[var(--shadow-lg)]">
-                  <button
-                    onClick={async () => { setSaveMenuOpen(false); await handleSavePlan(); await handleSaveAsTemplate(); }}
-                    className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
-                    disabled={saving}
-                  >
-                    Save + Save as Template
-                  </button>
-                  <button
-                    onClick={async () => { setSaveMenuOpen(false); await handleSaveAsTemplate(); }}
-                    className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
-                    disabled={saving}
-                  >
-                    Save as Template only
-                  </button>
+        {/* Body: day hero + exercise list */}
+        {activeDay && activeDayId && activeWeekId && (
+          <div style={{ padding: '8px 12px 88px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* 4. Day hero card */}
+            <div style={{ padding: '14px 16px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  value={activeDay.name}
+                  onChange={(e) => handleDayNameChange(activeWeekId, activeDayId, e.target.value)}
+                  style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', padding: 0, outline: 'none', minWidth: 0 }}
+                />
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button onClick={() => setFocusDayMenuOpen(v => !v)} style={{ width: 30, height: 30, background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 18, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Day options">⋯</button>
+                  {focusDayMenuOpen && (<>
+                    <div onClick={() => setFocusDayMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50, background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden', minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                      <button onClick={() => { setFocusDayMenuOpen(false); handleDuplicateDay(activeWeekId, activeDayId); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer' }}>Duplicate day</button>
+                      <button onClick={() => { setFocusDayMenuOpen(false); handleRemoveDay(activeWeekId, activeDayId); }} disabled={activeWeek.days.length <= 1} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--border-subtle)', color: activeWeek.days.length <= 1 ? 'var(--text-muted)' : 'var(--error)', fontSize: 14, cursor: activeWeek.days.length <= 1 ? 'not-allowed' : 'pointer', opacity: activeWeek.days.length <= 1 ? 0.5 : 1 }}>Delete day</button>
+                    </div>
+                  </>)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+                <span>{activeDay.items.length === 0 ? 'No exercises yet' : `${activeDay.items.length} exercises · ${activeSetSum} sets`}</span>
+                {activeDay.items.length > 0 && (
+                  <button onClick={() => setVolumeOpen(v => !v)} style={{ background: volumeOpen ? 'var(--accent-blue-muted)' : 'transparent', border: `1px solid ${volumeOpen ? 'var(--accent-blue)' : 'var(--border-default)'}`, color: volumeOpen ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: 11.5, fontWeight: 500, padding: '4px 10px', borderRadius: 999, cursor: 'pointer' }}>Volume</button>
+                )}
+              </div>
+              {/* 5. Volume drawer */}
+              {volumeOpen && activeDay.items.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {Object.entries(calculateSetsPerMuscle(activeDay.items, catalogExercises)).sort((a, b) => b[1] - a[1]).map(([m, s]) => (
+                      <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '4px 10px', fontSize: 12 }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>{m}</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{s}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Divider */}
-      <div className="border-t border-subtle mb-3" />
-
-      {/* Row 2: Week count inline input */}
-      {selectedPlan && (
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <label className="text-[13px] text-muted font-medium whitespace-nowrap">Weeks</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              min={1}
-              max={52}
-              value={setWeeksInput || String(selectedPlan.weeks.length)}
-              onFocus={(e) => {
-                setSetWeeksInput(String(selectedPlan.weeks.length));
-                e.target.select();
-              }}
-              onChange={(e) => setSetWeeksInput(e.target.value)}
-              onBlur={(e) => {
-                const n = parseInt(e.target.value, 10);
-                if (n >= 1 && n <= 52) handleSetWeekCount(n);
-                else setSetWeeksInput('');
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const n = parseInt(setWeeksInput, 10);
-                  if (n >= 1 && n <= 52) handleSetWeekCount(n);
-                  (e.currentTarget as HTMLInputElement).blur();
-                }
-                if (e.key === 'Escape') {
-                  setSetWeeksInput('');
-                  (e.currentTarget as HTMLInputElement).blur();
-                }
-              }}
-              className="text-center font-semibold"
-              style={{ width: 52, minHeight: 'auto', height: 32, fontSize: 14, padding: '4px 6px' }}
-            />
-          </div>
-        </div>
-      )}
-
-      {error && <div className="text-error mt-2 px-3 py-2.5 bg-error-muted rounded-sm">{error}</div>}
-
-      {!selectedPlan ? (
-        <EmptyState message="Create a plan to get started." className="mt-4" />
-      ) : (
-        <div className="flex flex-col gap-4">
-          {/* Plan type toggle */}
-          <div>
-            <label className="block mb-2 font-semibold text-[13px] text-muted uppercase tracking-[0.04em]">Plan Type</label>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'default' }))}
-                size="sm"
-                style={{
-                  flex: 1,
-                  background: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--accent-muted)' : 'var(--bg-card)',
-                  borderColor: (selectedPlan.ghostMode ?? 'default') === 'default' ? 'var(--border-strong)' : 'var(--border-default)',
-                }}
-              >
-                Default
-              </Button>
-              <Button
-                onClick={() => updatePlan(selectedPlan.id, (p) => ({ ...p, ghostMode: 'full-body' }))}
-                size="sm"
-                style={{
-                  flex: 1,
-                  background: selectedPlan.ghostMode === 'full-body' ? 'var(--accent-muted)' : 'var(--bg-card)',
-                  borderColor: selectedPlan.ghostMode === 'full-body' ? 'var(--border-strong)' : 'var(--border-default)',
-                }}
-              >
-                Full Body
-              </Button>
-            </div>
-            <p className="text-[12px] text-muted mt-1.5 leading-snug">
-              {(selectedPlan.ghostMode ?? 'default') === 'default'
-                ? 'Ghost shows your most recent performance regardless of day.'
-                : 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).'}
-            </p>
-          </div>
-
-
-          <div className="flex flex-col gap-4">
-            {selectedPlan.weeks.map((week) => {
-              const isWeekCollapsed = collapsedWeeks.has(week.id);
-              return (
-              <div key={week.id} className="bg-elevated border border-subtle rounded-md overflow-hidden">
-                {/* Week header — always visible, tappable to collapse */}
-                <div
-                  className="flex justify-between items-center gap-3 p-3 cursor-pointer select-none"
-                  onClick={() => toggleWeek(week.id)}
-                >
-                  <div className="flex gap-2 items-center min-w-0 flex-1">
-                    <span className="text-muted text-[13px] transition-transform duration-200" style={{ display: 'inline-block', transform: isWeekCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-                    <input
-                      value={week.name}
-                      onChange={(e) => { e.stopPropagation(); handleWeekNameChange(week.id, e.target.value); }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="min-w-0 flex-1 font-semibold bg-transparent border-none shadow-none px-1"
-                      style={{ outline: 'none' }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {!isWeekCollapsed && (
-                      <Button onClick={() => handleAddDay(week.id)} size="sm">+ Day</Button>
-                    )}
-                    <div className="relative" ref={weekMenuOpenId === week.id ? weekMenuRef : undefined}>
-                      <button
-                        onClick={() => setWeekMenuOpenId(weekMenuOpenId === week.id ? null : week.id)}
-                        title="Week options"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}
-                      >
-                        <KebabIcon size={16} />
-                      </button>
-                      {weekMenuOpenId === week.id && (
-                        <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-1.5 mt-1 min-w-[180px] z-30 shadow-[var(--shadow-lg)]">
-                          {selectedPlan.weeks[0].id !== week.id && (
-                            <button
-                              onClick={() => { setWeekMenuOpenId(null); handleResetWeekToOne(week.id); }}
-                              className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
-                            >
-                              Reset to Week 1
-                            </button>
-                          )}
-                          <button
-                            onClick={() => { setWeekMenuOpenId(null); handleRemoveWeek(week.id); }}
-                            disabled={selectedPlan.weeks.length <= 1}
-                            className="w-full text-left px-3 py-2 text-[13px] rounded hover:bg-accent-muted transition-colors duration-100"
-                            style={{ background: 'none', border: 'none', cursor: selectedPlan.weeks.length <= 1 ? 'not-allowed' : 'pointer', color: selectedPlan.weeks.length <= 1 ? 'var(--text-muted)' : 'var(--color-error, #f87171)', opacity: selectedPlan.weeks.length <= 1 ? 0.5 : 1 }}
-                          >
-                            Delete Week
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+            {/* 6. Exercise list or empty state */}
+            {activeDay.items.length === 0 ? (
+              <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'var(--bg-elevated)', border: '1px dashed var(--border-default)', borderRadius: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 999, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', marginBottom: 12 }}>
+                  <svg viewBox="0 0 16 16" width="20" height="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
                 </div>
-                {/* Collapsible week body */}
-                {!isWeekCollapsed && (
-                <div className="px-3 pb-3">
-
-                {week.days.some((d) => d.items.length > 0) && (
-                  <div className="flex flex-wrap gap-2 mb-3 px-3 py-2 bg-card rounded-md text-[13px] text-secondary">
-                    <span className="font-semibold mr-1">Week Total:</span>
-                    {Object.entries(calculateWeekSetsPerMuscle(week, catalogExercises))
-                      .sort((a, b) => b[1] - a[1])
-                      .map(([muscle, sets]) => (
-                        <span key={muscle}>
-                          <strong>{muscle}:</strong> {sets}
-                        </span>
-                      ))
-                    }
-                  </div>
-                )}
-
-                <div
-                  className="flex flex-col gap-3" style={{ touchAction: draggingDayId && dayDragActive ? 'none' as any : 'auto' }}
-                  onPointerMove={(e) => {
-                    if (!draggingDayId || dayDragWeekId !== week.id) return;
-                    const dy = Math.abs(e.clientY - dayDragStartYRef.current);
-                    if (!dayDragActive && dy > 8) setDayDragActive(true);
-                    if (!dayDragActive) return;
-                    e.preventDefault();
-                    const container = e.currentTarget as HTMLElement;
-                    const rows = Array.from(container.querySelectorAll('[data-day-id]')) as HTMLElement[];
-                    if (rows.length === 0) return;
-                    const y = e.clientY;
-                    let insert = rows.length;
-                    for (let i = 0; i < rows.length; i++) {
-                      const r = rows[i].getBoundingClientRect();
-                      const mid = r.top + r.height / 2;
-                      if (y < mid) { insert = i; break; }
-                    }
-                    setDayDragInsertIndex(insert);
-                  }}
-                  onPointerUp={() => {
-                    if (!draggingDayId || dayDragWeekId !== week.id) return;
-                    if (dayDragTimerRef.current) { window.clearTimeout(dayDragTimerRef.current); dayDragTimerRef.current = null; }
-                    if (!dayDragActive) {
-                      setDraggingDayId(null);
-                      setDayDragWeekId(null);
-                      setDayDragInsertIndex(null);
-                      return;
-                    }
-                    const insert = dayDragInsertIndex == null ? week.days.length : dayDragInsertIndex;
-                    handleReorderDayAtIndex(week.id, draggingDayId, insert);
-                    setDraggingDayId(null);
-                    setDayDragWeekId(null);
-                    setDayDragInsertIndex(null);
-                    setDayDragActive(false);
-                  }}
-                >
-                {week.days.map((day, dayIdx) => (
-                  <div key={day.id} data-day-id={day.id} style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 12,
-                    padding: 12,
-                    transition: 'all 0.15s ease',
-                  }}>
-                    <div className="flex justify-between items-center gap-2 mb-3">
-                      <div className="flex gap-2 items-center min-w-0 flex-1">
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>No exercises yet</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4, marginBottom: 16 }}>Add your first exercise to {activeDay.name}.</div>
+                <button onClick={() => handleAddExercise(activeWeekId, activeDayId)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-blue)', color: '#0a0a0c', fontWeight: 600, fontSize: 13, border: 'none', borderRadius: 10, padding: '10px 16px', cursor: 'pointer' }}>
+                  <svg viewBox="0 0 16 16" width="14" height="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+                  <span>Add exercise</span>
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{ display: 'flex', flexDirection: 'column', gap: 6, touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto' } as React.CSSProperties}
+                onPointerMove={(e) => {
+                  if (!draggingExerciseId || dragWeekId !== activeWeekId || dragDayId !== activeDayId) return;
+                  const dy = Math.abs(e.clientY - dragStartYRef.current);
+                  if (!dragActive && dy > 8) setDragActive(true);
+                  if (!dragActive) return;
+                  e.preventDefault();
+                  dragOffsetYRef.current = e.clientY - dragStartYRef.current;
+                  if (draggedElRef.current) draggedElRef.current.style.transform = `translateY(${dragOffsetYRef.current}px) scale(1.02)`;
+                  const container = e.currentTarget as HTMLElement;
+                  const allRows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
+                  const seen = new Set<string>();
+                  const rows: HTMLElement[] = [];
+                  for (const row of allRows) {
+                    const id = row.getAttribute('data-exercise-id')!;
+                    if (!seen.has(id) && row.offsetParent !== null) { seen.add(id); rows.push(row); }
+                  }
+                  if (rows.length === 0) return;
+                  const y = e.clientY;
+                  let insert = rows.length;
+                  for (let i = 0; i < rows.length; i++) {
+                    const r = rows[i].getBoundingClientRect();
+                    if (y < r.top + r.height / 2) { insert = i; break; }
+                  }
+                  setDragInsertIndex(insert);
+                }}
+                onPointerUp={() => {
+                  if (!draggingExerciseId || dragWeekId !== activeWeekId || dragDayId !== activeDayId) return;
+                  if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
+                  if (!dragActive) { setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); return; }
+                  if (draggedElRef.current) draggedElRef.current.style.transform = '';
+                  const insert = dragInsertIndex == null ? activeDay.items.length : dragInsertIndex;
+                  handleReorderExerciseAtIndex(activeWeekId, activeDayId, draggingExerciseId, insert);
+                  setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); setDragActive(false);
+                  dragOffsetYRef.current = 0; draggedElRef.current = null;
+                }}
+                onPointerCancel={() => {
+                  if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
+                  if (draggedElRef.current) draggedElRef.current.style.transform = '';
+                  setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); setDragActive(false);
+                  dragOffsetYRef.current = 0; draggedElRef.current = null;
+                }}
+              >
+                {activeDay.items.map((item, idx) => {
+                  const catalog = catalogExercises.find(c =>
+                    (item.exerciseId && c.id === item.exerciseId) ||
+                    c.name.toLowerCase() === item.exerciseName.toLowerCase()
+                  );
+                  const equipType = catalog ? getEquipmentType(catalog) : null;
+                  const isDragging = draggingExerciseId === item.id && dragActive;
+                  const isDragContext = dragActive && dragWeekId === activeWeekId && dragDayId === activeDayId;
+                  const showPlaceholder = isDragContext && draggingExerciseId !== item.id && dragInsertIndex === idx;
+                  const options = SET_COUNT_OPTIONS.includes(item.targetSets)
+                    ? SET_COUNT_OPTIONS
+                    : [...SET_COUNT_OPTIONS, item.targetSets].sort((a, b) => a - b);
+                  return (
+                    <React.Fragment key={item.id}>
+                      {showPlaceholder && <div className="drag-placeholder" />}
+                      <div
+                        data-exercise-id={item.id}
+                        ref={isDragging ? (el) => { draggedElRef.current = el; } : undefined}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 4px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto', userSelect: (draggingExerciseId && dragActive) ? 'none' : 'auto', opacity: isDragging ? 0.7 : 1 } as React.CSSProperties}
+                      >
+                        {/* Grip col */}
                         <div
                           onPointerDown={(e) => {
                             e.preventDefault();
-                            setDraggingDayId(day.id);
-                            setDayDragWeekId(week.id);
-                            setDayDragActive(false);
-                            dayDragStartYRef.current = e.clientY;
-                            setDayDragInsertIndex(dayIdx);
-                            if (dayDragTimerRef.current) window.clearTimeout(dayDragTimerRef.current);
-                            dayDragTimerRef.current = window.setTimeout(() => setDayDragActive(true), 150);
-                            try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+                            const exerciseRow = (e.currentTarget as HTMLElement).closest('[data-exercise-id]') as HTMLElement | null;
+                            draggedElRef.current = exerciseRow;
+                            setDraggingExerciseId(item.id); setDragWeekId(activeWeekId); setDragDayId(activeDayId);
+                            setDragActive(false); dragStartYRef.current = e.clientY; dragOffsetYRef.current = 0; setDragInsertIndex(idx);
+                            if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
+                            dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
+                            try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
                           }}
-                          className="text-center text-lg leading-[18px] px-2 py-1 select-none touch-none cursor-grab bg-elevated rounded-sm text-muted flex-shrink-0"
-                          aria-label="Drag day handle"
-                          title="Drag to reorder day"
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 22, flexShrink: 0, cursor: 'grab', paddingLeft: 4 }}
                         >
-                          ≡
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>{idx + 1}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1 }}>≡</div>
                         </div>
-                        <input
-                          value={day.name}
-                          onChange={(e) => handleDayNameChange(week.id, day.id, e.target.value)}
-                          className="min-w-0 flex-1 font-medium"
-                        />
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <Button onClick={() => handleAddExercise(week.id, day.id)} size="sm">+ Exercise</Button>
-                        {/* Day ⋮ menu for secondary actions */}
-                        <div className="relative" ref={dayMenuOpenId === day.id ? dayMenuRef : undefined}>
-                          <button
-                            onClick={() => setDayMenuOpenId(dayMenuOpenId === day.id ? null : day.id)}
-                            title="Day options"
-                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}
+                        {/* Name + meta */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            onClick={() => openSearchForItem(activeWeekId, activeDayId, item.id)}
+                            role="button" tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === 'Enter') openSearchForItem(activeWeekId, activeDayId, item.id); }}
+                            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', cursor: 'pointer' }}
+                            title="Tap to replace"
                           >
-                            <KebabIcon size={16} />
-                          </button>
-                          {dayMenuOpenId === day.id && (
-                            <div className="dropdown-menu absolute top-full right-0 bg-elevated border border-subtle rounded-md p-2 mt-1 min-w-[160px] z-30 shadow-[var(--shadow-lg)]">
-                              <Button onClick={() => { setDayMenuOpenId(null); handleDuplicateDay(week.id, day.id); }} size="sm" block className="mb-1 text-left">
-                                Duplicate Day
-                              </Button>
-                              <Button
-                                onClick={() => { setDayMenuOpenId(null); handleRemoveDay(week.id, day.id); }}
-                                size="sm"
-                                block
-                                disabled={week.days.length <= 1}
-                                className="text-left"
-                                style={{ color: week.days.length <= 1 ? undefined : 'var(--color-error, #f87171)' }}
-                              >
-                                Delete Day
-                              </Button>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.exerciseName || <span style={{ color: 'var(--text-muted)' }}>Unnamed</span>}</span>
+                            {item.myoReps && <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', color: '#c7a4ff', background: 'rgba(199,164,255,0.12)', padding: '1px 5px', borderRadius: 3, flexShrink: 0 }}>MYO</span>}
+                          </div>
+                          {catalog && (
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
+                              {equipType && <EquipmentIcon type={equipType} size={11} />}
+                              <span>{catalog.primaryMuscle}</span>
+                              {catalog.isCompound && <><span style={{ color: 'var(--border-strong)' }}>·</span><span>Compound</span></>}
                             </div>
                           )}
                         </div>
+                        {/* Sets box */}
+                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 42, padding: '5px 8px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', cursor: 'pointer', flexShrink: 0 }}>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{item.targetSets}</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>sets</span>
+                          <select value={String(item.targetSets)} onChange={(e) => handleExerciseChange(activeWeekId, activeDayId, item.id, { targetSets: Number(e.target.value) })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}>
+                            {options.map((count) => <option key={count} value={count}>{count}</option>)}
+                          </select>
+                        </div>
+                        {/* ⋯ menu */}
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <button onClick={() => setExMenuOpenId(exMenuOpenId === item.id ? null : item.id)} style={{ width: 26, height: 26, background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 15, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Exercise options">⋯</button>
+                          {exMenuOpenId === item.id && (<>
+                            <div onClick={() => setExMenuOpenId(null)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+                            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50, background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden', minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                              <button onClick={() => { setExMenuOpenId(null); openSearchForItem(activeWeekId, activeDayId, item.id); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer' }}>Replace exercise</button>
+                              <button onClick={() => { setExMenuOpenId(null); handleExerciseChange(activeWeekId, activeDayId, item.id, { myoReps: !item.myoReps }); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--border-subtle)', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer' }}>{item.myoReps ? 'Remove Myo-rep' : 'Toggle Myo-rep'}</button>
+                              <button onClick={() => { setExMenuOpenId(null); handleDuplicateExercise(activeWeekId, activeDayId, item.id); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', borderTop: '1px solid var(--border-subtle)', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer' }}>Duplicate exercise</button>
+                            </div>
+                          </>)}
+                        </div>
+                        {/* Delete ✕ */}
+                        <button onClick={() => handleRemoveExercise(activeWeekId, activeDayId, item.id)} style={{ width: 26, height: 26, background: 'transparent', border: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, padding: 0, cursor: 'pointer', flexShrink: 0 }} aria-label="Delete exercise">
+                          <svg viewBox="0 0 12 12" width="12" height="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg>
+                        </button>
                       </div>
-                    </div>
-
-                    {day.items.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-3 px-3 py-2 bg-elevated rounded-md text-[13px] text-secondary">
-                        {Object.entries(calculateSetsPerMuscle(day.items, catalogExercises))
-                          .sort((a, b) => b[1] - a[1])
-                          .map(([muscle, sets]) => (
-                            <span key={muscle}>
-                              <strong>{muscle}:</strong> {sets}
-                            </span>
-                          ))
-                        }
-                      </div>
-                    )}
-
-                    {day.items.length === 0 ? (
-                      <button
-                        onClick={() => handleAddExercise(week.id, day.id)}
-                        className="w-full text-left"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px 16px', border: '1px solid var(--border-subtle)', borderRadius: 8, background: 'var(--bg-input)', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer', transition: 'all 0.15s ease' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-default)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
-                      >
-                        <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Add Exercise
-                      </button>
-                    ) : (
-                      <div
-                        className="drag-container flex flex-col gap-2" style={{ touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto' }}
-                        onPointerMove={(e) => {
-                          if (!draggingExerciseId || dragWeekId !== week.id || dragDayId !== day.id) return;
-                          const dy = Math.abs(e.clientY - dragStartYRef.current);
-                          if (!dragActive && dy > 8) setDragActive(true);
-                          if (!dragActive) return;
-                          e.preventDefault();
-                          // Move the dragged element visually
-                          dragOffsetYRef.current = e.clientY - dragStartYRef.current;
-                          if (draggedElRef.current) {
-                            draggedElRef.current.style.transform = `translateY(${dragOffsetYRef.current}px) scale(1.02)`;
-                          }
-                          // Calculate insert position from non-dragged items
-                          const container = e.currentTarget as HTMLElement;
-                          const allRows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
-                          // Get unique items (desktop+mobile share same data-exercise-id, take first visible)
-                          const seen = new Set<string>();
-                          const rows: HTMLElement[] = [];
-                          for (const row of allRows) {
-                            const id = row.getAttribute('data-exercise-id')!;
-                            if (!seen.has(id) && row.offsetParent !== null) {
-                              seen.add(id);
-                              rows.push(row);
-                            }
-                          }
-                          if (rows.length === 0) return;
-                          const y = e.clientY;
-                          let insert = rows.length;
-                          for (let i = 0; i < rows.length; i++) {
-                            const r = rows[i].getBoundingClientRect();
-                            const mid = r.top + r.height / 2;
-                            if (y < mid) { insert = i; break; }
-                          }
-                          setDragInsertIndex(insert);
-                        }}
-                        onPointerUp={() => {
-                          if (!draggingExerciseId || dragWeekId !== week.id || dragDayId !== day.id) return;
-                          if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
-                          if (!dragActive) {
-                            setDraggingExerciseId(null);
-                            setDragWeekId(null);
-                            setDragDayId(null);
-                            setDragInsertIndex(null);
-                            return;
-                          }
-                          // Snap back: remove inline transform before reorder
-                          if (draggedElRef.current) {
-                            draggedElRef.current.style.transform = '';
-                          }
-                          const insert = dragInsertIndex == null ? day.items.length : dragInsertIndex;
-                          handleReorderExerciseAtIndex(week.id, day.id, draggingExerciseId, insert);
-                          setDraggingExerciseId(null);
-                          setDragWeekId(null);
-                          setDragDayId(null);
-                          setDragInsertIndex(null);
-                          setDragActive(false);
-                          dragOffsetYRef.current = 0;
-                          draggedElRef.current = null;
-                        }}
-                        onPointerCancel={() => {
-                          if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
-                          if (draggedElRef.current) {
-                            draggedElRef.current.style.transform = '';
-                          }
-                          setDraggingExerciseId(null);
-                          setDragWeekId(null);
-                          setDragDayId(null);
-                          setDragInsertIndex(null);
-                          setDragActive(false);
-                          dragOffsetYRef.current = 0;
-                          draggedElRef.current = null;
-                        }}
-                      >
-                        {day.items.map((item, idx) => {
-                          const options = SET_COUNT_OPTIONS.includes(item.targetSets)
-                            ? SET_COUNT_OPTIONS
-                            : [...SET_COUNT_OPTIONS, item.targetSets].sort((a, b) => a - b);
-
-                          const isDragging = draggingExerciseId === item.id && dragActive;
-                          const isDragContext = dragActive && dragWeekId === week.id && dragDayId === day.id;
-                          const showPlaceholder = isDragContext && draggingExerciseId !== item.id && dragInsertIndex === idx;
-
-                          return (
-                            <>
-                              {showPlaceholder && (
-                                <div className="drag-placeholder" />
-                              )}
-                              <div
-                                key={item.id}
-                                data-exercise-id={item.id}
-                                ref={isDragging ? (el) => { draggedElRef.current = el; } : undefined}
-                                className={`drag-item hidden sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 items-center border border-default rounded-sm p-2 cursor-grab${isDragging ? ' dragging' : ''}`}
-                                style={{
-                                  touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
-                                  userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
-                                }}
-                                title="Drag to reorder"
-                              >
-                                <div
-                                  onPointerDown={(e) => {
-                                    e.preventDefault();
-                                    const exerciseRow = (e.currentTarget as HTMLElement).closest('[data-exercise-id]') as HTMLElement | null;
-                                    draggedElRef.current = exerciseRow;
-                                    setDraggingExerciseId(item.id);
-                                    setDragWeekId(week.id);
-                                    setDragDayId(day.id);
-                                    setDragActive(false);
-                                    dragStartYRef.current = e.clientY;
-                                    dragOffsetYRef.current = 0;
-                                    setDragInsertIndex(idx);
-                                    if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
-                                    dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
-                                    try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-                                  }}
-                                  className="text-center text-lg leading-[18px] px-1.5 select-none touch-none cursor-grab"
-                                  aria-label="Drag handle"
-                                  title="Drag to reorder"
-                                >
-                                  ≡
-                                </div>
-                              <input
-                                value={item.exerciseName}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) =>
-                                  handleExerciseChange(week.id, day.id, item.id, {
-                                    exerciseName: e.target.value,
-                                    exerciseId: undefined,
-                                    })
-                                  }
-                                  onBlur={(e) => {
-                                    void handleExerciseNameCommit(week.id, day.id, item.id, e.target.value);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      (e.currentTarget as HTMLInputElement).blur();
-                                    }
-                                  }}
-                                list="exercise-options"
-                                className="p-2 flex-1 min-w-0"
-                                placeholder="Exercise name"
-                              />
-                              <Button
-                                onClick={() => openSearchForItem(week.id, day.id, item.id)}
-                                size="sm"
-                              >
-                                Search
-                              </Button>
-                              <select
-                                value={String(item.targetSets)}
-                                onChange={(e) =>
-                                  handleExerciseChange(week.id, day.id, item.id, {
-                                    targetSets: Number(e.target.value),
-                                  })
-                                }
-                                className="py-2 pl-3 pr-7 w-[62px]"
-                                title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
-                              >
-                                {options.map((count) => (
-                                  <option key={count} value={count}>
-                                    {count}
-                                  </option>
-                                ))}
-                              </select>
-                              <Button
-                                onClick={() => handleExerciseChange(week.id, day.id, item.id, { myoReps: !item.myoReps })}
-                                size="sm"
-                                style={{
-                                  padding: '4px 8px',
-                                  fontSize: 11,
-                                  background: item.myoReps ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
-                                  borderColor: item.myoReps ? 'var(--accent-purple)' : 'var(--border-subtle)',
-                                  color: item.myoReps ? 'var(--accent-purple)' : 'var(--text-muted)',
-                                }}
-                                title="Myo-Rep Match"
-                              >
-                                MYO
-                              </Button>
-                              <Button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} size="xs" title="Remove exercise">
-                                X
-                              </Button>
-                              </div>
-                              {/* Mobile: two-row layout */}
-                              <div
-                                data-exercise-id={item.id}
-                                ref={isDragging ? (el) => { draggedElRef.current = el; } : undefined}
-                                className={`drag-item flex flex-col gap-1.5 sm:hidden border border-default rounded-sm p-2 cursor-grab${isDragging ? ' dragging' : ''}`}
-                                style={{
-                                  touchAction: draggingExerciseId && dragActive ? 'none' as any : 'auto',
-                                  userSelect: draggingExerciseId && dragActive ? 'none' as any : 'auto',
-                                }}
-                                title="Drag to reorder"
-                              >
-                                {/* Row 1: drag handle + full-width name */}
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    onPointerDown={(e) => {
-                                      e.preventDefault();
-                                      const exerciseRow = (e.currentTarget as HTMLElement).closest('[data-exercise-id]') as HTMLElement | null;
-                                      draggedElRef.current = exerciseRow;
-                                      setDraggingExerciseId(item.id);
-                                      setDragWeekId(week.id);
-                                      setDragDayId(day.id);
-                                      setDragActive(false);
-                                      dragStartYRef.current = e.clientY;
-                                      dragOffsetYRef.current = 0;
-                                      setDragInsertIndex(idx);
-                                      if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
-                                      dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
-                                      try { (e.currentTarget as HTMLElement).setPointerCapture && (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-                                    }}
-                                    className="text-center text-lg leading-[18px] px-1 select-none touch-none cursor-grab"
-                                    aria-label="Drag handle"
-                                    title="Drag to reorder"
-                                  >
-                                    ≡
-                                  </div>
-                                  <input
-                                    value={item.exerciseName}
-                                    onFocus={(e) => e.target.select()}
-                                    onChange={(e) =>
-                                      handleExerciseChange(week.id, day.id, item.id, {
-                                        exerciseName: e.target.value,
-                                        exerciseId: undefined,
-                                      })
-                                    }
-                                    onBlur={(e) => {
-                                      void handleExerciseNameCommit(week.id, day.id, item.id, e.target.value);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        (e.currentTarget as HTMLInputElement).blur();
-                                      }
-                                    }}
-                                    list="exercise-options"
-                                    className="p-1.5 text-[13px] flex-1 min-w-0"
-                                    style={{ minHeight: 'auto', height: 36 }}
-                                    placeholder="Exercise name"
-                                  />
-                                </div>
-                                {/* Row 2: sets + actions */}
-                                <div className="flex items-center gap-2 pl-6">
-                                  <div className="flex items-center gap-1">
-                                    <select
-                                      value={String(item.targetSets)}
-                                      onChange={(e) =>
-                                        handleExerciseChange(week.id, day.id, item.id, {
-                                          targetSets: Number(e.target.value),
-                                        })
-                                      }
-                                      className="pl-2 pr-6 w-[56px]"
-                                      style={{ minHeight: 36, fontSize: 13 }}
-                                      title={`${item.targetSets} ${item.targetSets === 1 ? 'set' : 'sets'}`}
-                                    >
-                                      {options.map((count) => (
-                                        <option key={count} value={count}>
-                                          {count}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <span className="text-[12px] text-secondary">sets</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 ml-auto">
-                                    <Button
-                                      onClick={() => openSearchForItem(week.id, day.id, item.id)}
-                                      size="sm"
-                                      style={{ padding: '5px 8px', fontSize: 12, minHeight: 34 }}
-                                    >
-                                      Search
-                                    </Button>
-                                    <Button
-                                      onClick={() => handleExerciseChange(week.id, day.id, item.id, { myoReps: !item.myoReps })}
-                                      size="sm"
-                                      style={{
-                                        padding: '5px 8px',
-                                        fontSize: 12,
-                                        minHeight: 34,
-                                        background: item.myoReps ? 'var(--accent-purple-muted)' : 'var(--bg-card)',
-                                        borderColor: item.myoReps ? 'var(--accent-purple)' : 'var(--border-subtle)',
-                                        color: item.myoReps ? 'var(--accent-purple)' : 'var(--text-muted)',
-                                      }}
-                                      title="Myo-Rep Match"
-                                    >
-                                      MYO
-                                    </Button>
-                                    <Button onClick={() => handleRemoveExercise(week.id, day.id, item.id)} size="xs" style={{ minHeight: 34, padding: '5px 8px', fontSize: 12 }} title="Remove exercise">
-                                      X
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                              {isDragContext && draggingExerciseId !== item.id && dragInsertIndex === idx + 1 && (
-                                <div className="drag-placeholder" />
-                              )}
-                            </>
-                          );
-                        })}
-                        {dragActive && dragWeekId === week.id && dragDayId === day.id && dragInsertIndex === day.items.length && draggingExerciseId !== day.items[day.items.length - 1]?.id && (
-                          <div className="drag-placeholder" />
-                        )}
-                      </div>
-                    )}
-                    {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === dayIdx + 1 && (
-                      <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm my-2.5" />
-                    )}
-                  </div>
-                ))}
-                {draggingDayId && dayDragActive && dayDragWeekId === week.id && dayDragInsertIndex === week.days.length && (
-                  <div className="h-2 border-t-2 border-dashed border-t-strong rounded-sm" />
-                )}
-                </div>
-                </div>
+                      {isDragContext && draggingExerciseId !== item.id && dragInsertIndex === idx + 1 && <div className="drag-placeholder" />}
+                    </React.Fragment>
+                  );
+                })}
+                {dragActive && dragWeekId === activeWeekId && dragDayId === activeDayId && dragInsertIndex === activeDay.items.length && draggingExerciseId !== activeDay.items[activeDay.items.length - 1]?.id && (
+                  <div className="drag-placeholder" />
                 )}
               </div>
-            );
-            })}
+            )}
           </div>
-        </div>
-      )}
+        )}
+
+        {/* 7. Sticky Add CTA */}
+        {activeDay && activeDay.items.length > 0 && activeDayId && activeWeekId && (
+          <div style={{ position: 'sticky', bottom: 0, padding: '10px 14px 14px', background: 'linear-gradient(180deg, rgba(10,10,12,0) 0%, var(--bg-base) 30%)', display: 'flex' }}>
+            <button onClick={() => handleAddExercise(activeWeekId, activeDayId)} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-default)', borderRadius: 12, padding: '13px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <svg viewBox="0 0 16 16" width="15" height="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+              <span>Add exercise</span>
+            </button>
+          </div>
+        )}
+
+        {error && <div style={{ margin: '0 12px 12px', padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontSize: 13, color: 'var(--error)' }}>{error}</div>}
+      </>)}
+
 
       <Modal open={showPlanList} onClose={() => setShowPlanList(false)} maxWidth={480} maxHeight="80vh" zIndex={10}>
             <div className="flex justify-between items-center">
@@ -5822,7 +5389,7 @@ function BuilderPage({
           />
         );
       })()}
-    </Card>
+    </div>
   );
 }
 
