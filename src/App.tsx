@@ -116,6 +116,7 @@ function AuthedApp({
   const [finishingPlan, setFinishingPlan] = useState(false);
   const [openHeaderMenu, setOpenHeaderMenu] = useState<'day' | 'gear' | 'app' | null>(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
   const [pendingAIBuilder, setPendingAIBuilder] = useState(false);
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
   const [catalogExercises, setCatalogExercises] = useState<CatalogExercise[]>([]);
@@ -1358,28 +1359,79 @@ function AuthedApp({
         </div>
       )}
       {/* Plan picker — shown from "Switch plan" in gear menu */}
-      <Modal open={showPlanPicker} onClose={() => setShowPlanPicker(false)} title="Switch plan" maxWidth={380}>
+      <Modal open={showPlanPicker} onClose={() => { setShowPlanPicker(false); setConfirmDeletePlanId(null); }} title="Switch plan" maxWidth={380}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {plans.length === 0 && <p style={{ color: 'var(--text-muted)', margin: 0 }}>No plans yet.</p>}
-          {plans.map(p => (
-            <button
-              key={p.id}
-              onClick={() => {
-                selectPlan(p.id);
-                setSession(null);
-                setShowPlanPicker(false);
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                background: p.id === selectedPlanId ? 'var(--accent-blue-muted)' : 'var(--bg-card)',
-                border: `1px solid ${p.id === selectedPlanId ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
-              }}
-            >
-              <span style={{ fontWeight: 600, fontSize: 15, color: p.id === selectedPlanId ? 'var(--accent-blue)' : 'var(--text-primary)' }}>{p.name}</span>
-              {p.id === selectedPlanId && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-blue)' }}>ACTIVE</span>}
-            </button>
-          ))}
+          {plans.map(p => {
+            const isActive = p.id === selectedPlanId;
+            const isConfirming = confirmDeletePlanId === p.id;
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Delete / confirm area */}
+                {isConfirming ? (
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={async () => {
+                        setConfirmDeletePlanId(null);
+                        try {
+                          if (p.serverId) await planApi.remove(p.serverId);
+                          setPlans(prev => prev.filter(x => x.id !== p.id));
+                          if (isActive) {
+                            const remaining = plans.filter(x => x.id !== p.id);
+                            if (remaining.length > 0) selectPlan(remaining[0].id);
+                            else { setSelectedPlanId(null); setShowPlanPicker(false); }
+                          }
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : String(err));
+                        }
+                      }}
+                      style={{ padding: '6px 10px', borderRadius: 8, background: 'var(--error)', border: 'none', boxShadow: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeletePlanId(null)}
+                      style={{ padding: '6px 10px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeletePlanId(p.id)}
+                    style={{ width: 28, height: 28, padding: 0, borderRadius: 7, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                    aria-label={`Delete ${p.name}`}
+                  >
+                    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 5 4 13 12 13 13 5" />
+                      <line x1="2" y1="5" x2="14" y2="5" />
+                      <path d="M6 5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" />
+                    </svg>
+                  </button>
+                )}
+                {/* Plan row */}
+                <button
+                  onClick={() => {
+                    if (isConfirming) return;
+                    selectPlan(p.id);
+                    setSession(null);
+                    setShowPlanPicker(false);
+                    setConfirmDeletePlanId(null);
+                  }}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                    background: isActive ? 'var(--accent-blue-muted)' : 'var(--bg-card)',
+                    border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+                    boxShadow: 'none',
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 15, color: isActive ? 'var(--accent-blue)' : 'var(--text-primary)' }}>{p.name}</span>
+                  {isActive && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-blue)' }}>ACTIVE</span>}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </Modal>
 
