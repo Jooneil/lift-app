@@ -1367,7 +1367,7 @@ function AuthedApp({
             const isConfirming = confirmDeletePlanId === p.id;
             return (
               <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {/* Delete / confirm area */}
+                {/* Action buttons */}
                 {isConfirming ? (
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button
@@ -1397,17 +1397,33 @@ function AuthedApp({
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setConfirmDeletePlanId(p.id)}
-                    style={{ width: 28, height: 28, padding: 0, borderRadius: 7, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-                    aria-label={`Delete ${p.name}`}
-                  >
-                    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 5 4 13 12 13 13 5" />
-                      <line x1="2" y1="5" x2="14" y2="5" />
-                      <path d="M6 5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" />
-                    </svg>
-                  </button>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <button
+                      onClick={() => {
+                        selectPlan(p.id);
+                        setMode('builder');
+                        setShowPlanPicker(false);
+                        setConfirmDeletePlanId(null);
+                      }}
+                      style={{ width: 28, height: 28, padding: 0, borderRadius: 7, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                      aria-label={`Edit ${p.name}`}
+                    >
+                      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeletePlanId(p.id)}
+                      style={{ width: 28, height: 28, padding: 0, borderRadius: 7, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                      aria-label={`Delete ${p.name}`}
+                    >
+                      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 5 4 13 12 13 13 5" />
+                        <line x1="2" y1="5" x2="14" y2="5" />
+                        <path d="M6 5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" />
+                      </svg>
+                    </button>
+                  </div>
                 )}
                 {/* Plan row */}
                 <button
