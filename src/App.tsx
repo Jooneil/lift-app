@@ -4906,13 +4906,13 @@ function BuilderPage({
               );
             })}
             {!editWeeksMode && (
-              <button onClick={handleAddWeek} style={{ width: 32, height: 32, background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', flexShrink: 0 }} aria-label="Add week">
-                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+              <button onClick={handleAddWeek} style={{ width: 32, height: 32, background: 'transparent', border: 'none', boxShadow: 'none', padding: 0, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 20, fontWeight: 300, lineHeight: 1 }} aria-label="Add week">
+                +
               </button>
             )}
             <button
               onClick={() => setEditWeeksMode(v => !v)}
-              style={{ background: 'transparent', border: 'none', color: editWeeksMode ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: 11.5, fontWeight: 600, padding: '0 10px', borderRadius: 7, cursor: 'pointer', flexShrink: 0 }}
+              style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: editWeeksMode ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: 11.5, fontWeight: 600, padding: '0 10px', borderRadius: 7, cursor: 'pointer', flexShrink: 0 }}
             >
               {editWeeksMode ? 'Done' : 'Edit'}
             </button>
