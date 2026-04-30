@@ -4098,6 +4098,49 @@ function BuilderPage({
     [plans, selectedPlanId]
   );
   const builderInitialSnapshotRef = useRef<Plan | null>(null);
+
+  // Propagate week 1 changes to all subsequent weeks
+  const propPlanIdRef = useRef<string | null>(null);
+  const propWeek1SigRef = useRef<string>('');
+  useEffect(() => {
+    if (!selectedPlan || selectedPlan.weeks.length <= 1) return;
+    const planId = selectedPlan.id;
+    const week1Sig = JSON.stringify(selectedPlan.weeks[0]?.days);
+    if (propPlanIdRef.current !== planId) {
+      propPlanIdRef.current = planId;
+      propWeek1SigRef.current = week1Sig;
+      return;
+    }
+    if (propWeek1SigRef.current === week1Sig) return;
+    propWeek1SigRef.current = week1Sig;
+    setPlans((prev) => prev.map((p) => {
+      if (p.id !== planId) return p;
+      const [firstWeek, ...rest] = p.weeks;
+      return {
+        ...p,
+        weeks: [
+          firstWeek,
+          ...rest.map((week) => ({
+            ...week,
+            days: firstWeek.days.map((srcDay, dayIdx) => {
+              const existingDay = week.days[dayIdx];
+              return {
+                id: existingDay?.id ?? uuid(),
+                name: srcDay.name,
+                items: srcDay.items.map((srcItem, itemIdx) => ({
+                  id: existingDay?.items[itemIdx]?.id ?? uuid(),
+                  exerciseId: srcItem.exerciseId,
+                  exerciseName: srcItem.exerciseName,
+                  targetSets: srcItem.targetSets,
+                  targetReps: srcItem.targetReps ?? '',
+                })),
+              };
+            }),
+          })),
+        ],
+      };
+    }));
+  }, [selectedPlan, setPlans]);
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -4983,15 +5026,15 @@ function BuilderPage({
 
         {/* 2. Week selector — segmented control */}
         <div style={{ padding: '12px 16px 8px' }}>
-          <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 3, gap: 2 }}>
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'stretch', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 3, gap: 2 }}>
             {selectedPlan.weeks.map((w, i) => {
               const isActive = w.id === activeWeekId;
               const canDelete = selectedPlan.weeks.length > 1 && !isActive;
               return (
-                <div key={w.id} style={{ position: 'relative', flex: 1, borderRadius: 7, display: 'flex', ...(isActive ? { background: 'var(--bg-elevated)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' } : {}) }}>
+                <div key={w.id} style={{ position: 'relative', flex: 1, minWidth: 0, borderRadius: 7, ...(isActive ? { background: 'var(--bg-elevated)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' } : {}) }}>
                   <button
                     onClick={() => { if (!editWeeksMode) switchWeek(w.id); }}
-                    style={{ flex: 1, background: 'transparent', border: 'none', color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: 12.5, fontWeight: 600, padding: '7px 10px', borderRadius: 7, cursor: editWeeksMode ? 'default' : 'pointer' }}
+                    style={{ width: '100%', height: '100%', background: 'transparent', border: 'none', boxShadow: 'none', color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: 12.5, fontWeight: 600, padding: '7px 10px', borderRadius: 7, cursor: editWeeksMode ? 'default' : 'pointer' }}
                   >
                     Wk {i + 1}
                   </button>
