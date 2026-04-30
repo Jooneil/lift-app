@@ -15,7 +15,7 @@ export default function PullDumbbell({ state }: Props) {
     if (springing) {
       el.getBoundingClientRect(); // force reflow so browser sees old transform before transition
       el.style.transition = `transform ${SPRING_BEZIER} 0.5s, opacity 0.25s ease`;
-      el.style.transform = `translateX(-50%) translateY(-120px) rotate(180deg)`;
+      el.style.transform = `translateX(-50%) translateY(-80px) rotate(180deg)`;
       el.style.opacity = '0';
     } else {
       el.style.transition = 'none';
@@ -24,10 +24,11 @@ export default function PullDumbbell({ state }: Props) {
 
   if (pull === 0 && !springing) return null;
 
-  const TRIGGER = 110;
-  const y = Math.min(pull, TRIGGER) - 50; // locks at trigger position, doesn't slide into content
+  // y travels from -40px (hidden above viewport) to 22px (in nav bar) as progress 0→1.
+  // Keeps the dumbbell out of the card content regardless of card top position.
+  const y = Math.min(progress, 1) * 62 - 40;
   const rotation = Math.min(progress, 1) * 180;
-  const opacity = Math.min(progress * 1.2, 1);
+  const opacity = Math.min(progress * 1.5, 1);
   const color = progress >= 1 ? 'var(--accent-blue)' : 'var(--text-secondary)';
 
   return (
