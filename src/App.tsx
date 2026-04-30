@@ -116,6 +116,7 @@ function AuthedApp({
   const [finishingPlan, setFinishingPlan] = useState(false);
   const [openHeaderMenu, setOpenHeaderMenu] = useState<'day' | 'gear' | 'app' | null>(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [pendingAIBuilder, setPendingAIBuilder] = useState(false);
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
   const [catalogExercises, setCatalogExercises] = useState<CatalogExercise[]>([]);
   const [customCatalogExercises, setCustomCatalogExercises] = useState<CatalogExercise[]>([]);
@@ -1176,6 +1177,8 @@ function AuthedApp({
           showPlanList={showPlanList}
           setShowPlanList={setShowPlanList}
           onBack={() => setMode("workout")}
+          openAIBuilder={pendingAIBuilder}
+          onAIBuilderOpened={() => setPendingAIBuilder(false)}
           exerciseLoading={exerciseLoading || catalogLoading}
           catalogExercises={searchCatalogExercises}
           catalogLoading={catalogLoading}
@@ -1271,6 +1274,20 @@ function AuthedApp({
                       };
                       setPlans((prev) => [...prev, newPlan]);
                       selectPlan(newPlan.id, newPlan);
+                      setMode('builder');
+                      setOpenHeaderMenu(null);
+                    }}
+                    onAIBuilder={() => {
+                      const newWeekId = uuid();
+                      const newDayId = uuid();
+                      const newPlan: Plan = {
+                        id: uuid(),
+                        name: 'New Plan',
+                        weeks: [{ id: newWeekId, name: 'Week 1', days: [{ id: newDayId, name: 'Day 1', items: [] }] }],
+                      };
+                      setPlans((prev) => [...prev, newPlan]);
+                      selectPlan(newPlan.id, newPlan);
+                      setPendingAIBuilder(true);
                       setMode('builder');
                       setOpenHeaderMenu(null);
                     }}
@@ -3630,14 +3647,29 @@ function WorkoutPage({
   );
 }
 
+const AI_EXPERIENCES = [
+  { id: 'beginner' as const, label: 'Beginner', sub: 'New to lifting or under 1 year of consistent training.' },
+  { id: 'intermediate' as const, label: 'Intermediate', sub: '1–3 years of structured training.' },
+  { id: 'advanced' as const, label: 'Advanced', sub: '3+ years and familiar with periodization.' },
+];
+const AI_GOALS = [
+  { id: 'strength' as const, label: 'Strength', sub: 'Build raw power — focus on heavy compound lifts.' },
+  { id: 'hypertrophy' as const, label: 'Size (Hypertrophy)', sub: 'Maximize muscle growth with volume.' },
+  { id: 'both' as const, label: 'Both', sub: 'A balanced mix of strength and size.' },
+];
+const AI_DURATIONS = ['30', '45', '60', '75', '90+'];
+const AI_GEN_PHASES = ['Designing your split…', 'Picking your exercises…', 'Balancing volume…', 'Finalizing your plan…'];
+type AIStepId = 'experience' | 'starter-type' | 'goal' | 'days' | 'duration' | 'injuries' | 'priority' | 'deprioritize' | 'myo-reps' | 'review';
+
 function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
   catalogExercises: CatalogExercise[];
   onClose: () => void;
   onImportCSV: (csv: string) => void;
 }) {
-  const [step, setStep] = useState<'form' | 'generating' | 'result' | 'manual'>('form');
+  const [step, setStep] = useState<'form' | 'generating' | 'manual'>('form');
   const [experience, setExperience] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [beginnerRandom, setBeginnerRandom] = useState(false);
+  const [stepIdx, setStepIdx] = useState(0);
   const [trainingGoal, setTrainingGoal] = useState<'strength' | 'hypertrophy' | 'both'>('both');
   const [daysPerWeek, setDaysPerWeek] = useState(4);
   const [sessionMinutes, setSessionMinutes] = useState('60');
@@ -3645,19 +3677,50 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
   const [priorityMuscles, setPriorityMuscles] = useState<string[]>([]);
   const [deprioritizedMuscles, setDeprioritizedMuscles] = useState<string[]>([]);
   const [knowsMyoReps, setKnowsMyoReps] = useState(false);
-  const [showPrioMuscles, setShowPrioMuscles] = useState(false);
-  const [showDeprioMuscles, setShowDeprioMuscles] = useState(false);
   const [copied, setCopied] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [genProgress, setGenProgress] = useState(0);
+  const [genPhase, setGenPhase] = useState(0);
   const [limitReached, setLimitReached] = useState(false);
   const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('anthropic_api_key') || '');
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [remaining, setRemaining] = useState<{ used: number; limit: number; remaining: number } | null>(null);
 
-  // Load remaining generations on mount
+  useEffect(() => { aiApi.remaining().then(setRemaining).catch(() => {}); }, []);
+
+  // Generating animation
   useEffect(() => {
-    aiApi.remaining().then(setRemaining).catch(() => {});
-  }, []);
+    if (step !== 'generating') return;
+    setGenProgress(0); setGenPhase(0);
+    const phaseT = setInterval(() => setGenPhase(p => p + 1), 3500);
+    const progT = setInterval(() => setGenProgress(p => Math.min(p + 95 / 60, 95)), 500);
+    return () => { clearInterval(phaseT); clearInterval(progT); };
+  }, [step]);
+
+  const stepKeys = useMemo<AIStepId[]>(() => {
+    const list: AIStepId[] = ['experience'];
+    if (experience === 'beginner') list.push('starter-type');
+    if (!(experience === 'beginner' && beginnerRandom)) {
+      list.push('goal', 'days', 'duration', 'injuries');
+      if (experience !== 'beginner') list.push('priority', 'deprioritize', 'myo-reps');
+    }
+    list.push('review');
+    return list;
+  }, [experience, beginnerRandom]);
+
+  useEffect(() => { setStepIdx(i => Math.min(i, stepKeys.length - 1)); }, [stepKeys.length]);
+
+  const currentStep = stepKeys[Math.min(stepIdx, stepKeys.length - 1)];
+  const isReview = currentStep === 'review';
+
+  const goNext = () => {
+    if (isReview) { handleGenerate(); return; }
+    setStepIdx(i => Math.min(i + 1, stepKeys.length - 1));
+  };
+  const goBack = () => {
+    if (stepIdx === 0) { onClose(); return; }
+    setStepIdx(i => Math.max(i - 1, 0));
+  };
 
   const togglePriority = (m: string) => {
     setPriorityMuscles(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
@@ -3682,15 +3745,13 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
       const fullPrompt = promptText + '\n\n--- EXERCISE CATALOG CSV ---\n' + catalogCSV;
       const key = userApiKey.trim() || undefined;
       const { csv } = await aiApi.generate(fullPrompt, key);
-      onImportCSV(csv);
-      onClose();
+      setGenProgress(100);
+      setTimeout(() => { onImportCSV(csv); onClose(); }, 400);
     } catch (err: any) {
-      if (err.limitReached) {
-        setLimitReached(true);
-        setShowKeyInput(true);
-      }
+      if (err.limitReached) { setLimitReached(true); setShowKeyInput(true); }
       setGenError(err.message || 'Generation failed. Please try again.');
       setStep('form');
+      setStepIdx(stepKeys.length - 1);
     }
   };
 
@@ -3716,235 +3777,240 @@ function AIProgramBuilder({ catalogExercises, onClose, onImportCSV }: {
     else localStorage.removeItem('anthropic_api_key');
   };
 
-  const showDetails = !(experience === 'beginner' && beginnerRandom);
+  const BigOption = ({ active, onClick, title, sub }: { active: boolean; onClick: () => void; title: string; sub?: string }) => (
+    <button onClick={onClick} style={{ background: active ? 'var(--accent-blue-muted)' : 'var(--bg-card)', border: `1.5px solid ${active ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, borderRadius: 14, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer', textAlign: 'left', width: '100%', boxShadow: 'none', transition: 'all 0.12s' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+        <span style={{ fontSize: 16, fontWeight: 600, color: active ? 'var(--accent-blue)' : 'var(--text-primary)', letterSpacing: '-0.01em' }}>{title}</span>
+        {sub && <span style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>{sub}</span>}
+      </div>
+      <span style={{ width: 22, height: 22, borderRadius: 999, border: `1.5px solid ${active ? 'var(--accent-blue)' : 'var(--border-strong)'}`, background: active ? 'var(--accent-blue)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {active && <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="#0a0a0c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6.5l2.5 2.5 5.5-5" /></svg>}
+      </span>
+    </button>
+  );
+
+  const StepHeader = ({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent-blue)' }}>{eyebrow}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.022em', color: 'var(--text-primary)' }}>{title}</div>
+      {sub && <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{sub}</div>}
+    </div>
+  );
+
+  const PillButton = ({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
+    <button onClick={onClick} style={{ background: active ? 'var(--accent-blue-muted)' : 'var(--bg-card)', border: `1.5px solid ${active ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', borderRadius: 999, padding: '10px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer', boxShadow: 'none' }}>
+      {label}
+    </button>
+  );
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 'experience':
+        return (<>
+          <StepHeader eyebrow="About you" title="How experienced are you?" sub="We'll tune the volume and exercise selection to match." />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {AI_EXPERIENCES.map(o => <BigOption key={o.id} active={experience === o.id} onClick={() => { setExperience(o.id); if (o.id !== 'beginner') setBeginnerRandom(false); }} title={o.label} sub={o.sub} />)}
+          </div>
+        </>);
+      case 'starter-type':
+        return (<>
+          <StepHeader eyebrow="Beginner setup" title="Start with a proven plan, or build from scratch?" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <BigOption active={!beginnerRandom} onClick={() => setBeginnerRandom(false)} title="Build mine from scratch" sub="Answer a few more questions and we'll tailor it to you." />
+            <BigOption active={beginnerRandom} onClick={() => setBeginnerRandom(true)} title="Use a starter template" sub="A simple full-body plan that's worked for thousands of beginners. Skip the rest." />
+          </div>
+        </>);
+      case 'goal':
+        return (<>
+          <StepHeader eyebrow="Your goal" title="What are you training for?" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {AI_GOALS.map(o => <BigOption key={o.id} active={trainingGoal === o.id} onClick={() => setTrainingGoal(o.id)} title={o.label} sub={o.sub} />)}
+          </div>
+        </>);
+      case 'days':
+        return (<>
+          <StepHeader eyebrow="Schedule" title="How many days per week can you train?" sub="Be realistic — more isn't always better." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            {[1,2,3,4,5,6,7].map(d => (
+              <button key={d} onClick={() => setDaysPerWeek(d)} style={{ aspectRatio: '1', borderRadius: 14, background: daysPerWeek === d ? 'var(--accent-blue-muted)' : 'var(--bg-card)', border: `1.5px solid ${daysPerWeek === d ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, color: daysPerWeek === d ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: 24, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '-0.02em', padding: 0, boxShadow: 'none' }}>{d}</button>
+            ))}
+          </div>
+        </>);
+      case 'duration':
+        return (<>
+          <StepHeader eyebrow="Schedule" title="How long are your sessions?" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {AI_DURATIONS.map(t => <BigOption key={t} active={sessionMinutes === t} onClick={() => setSessionMinutes(t)} title={`${t} minutes`} sub={t==='30'?'Quick & focused — fewer exercises per day':t==='45'?'A solid lunch-break session':t==='60'?'The sweet spot for most lifters':t==='75'?'Room for full warmups and accessory work':'No time limit — full sessions with isolation work'} />)}
+          </div>
+        </>);
+      case 'injuries':
+        return (<>
+          <StepHeader eyebrow="Almost there" title="Any injuries or limitations?" sub="We'll work around them. Leave blank if none." />
+          <textarea value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="e.g. bad left shoulder, lower back issues, can't squat deep…" style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 14, padding: '14px 16px', fontSize: 15, color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical', minHeight: 110, outline: 'none', lineHeight: 1.5, boxSizing: 'border-box' }} />
+        </>);
+      case 'priority':
+        return (<>
+          <StepHeader eyebrow="Optional" title="Anything you want to prioritize?" sub="Tap muscles you want extra volume on. Skip if not sure." />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {[...MUSCLE_GROUPS].sort((a,b)=>a.localeCompare(b)).map(m => <PillButton key={m} active={priorityMuscles.includes(m)} onClick={() => togglePriority(m)} label={m} />)}
+          </div>
+        </>);
+      case 'deprioritize':
+        return (<>
+          <StepHeader eyebrow="Optional" title="Anything you want to skip or go light on?" sub="Tap muscles you want lower volume on." />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {[...MUSCLE_GROUPS].sort((a,b)=>a.localeCompare(b)).map(m => <PillButton key={m} active={deprioritizedMuscles.includes(m)} onClick={() => toggleDepriority(m)} label={m} />)}
+          </div>
+        </>);
+      case 'myo-reps':
+        return (<>
+          <StepHeader eyebrow="Last detail" title="Familiar with myo-rep sets?" sub="If not, we'll explain them in your plan." />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <BigOption active={knowsMyoReps} onClick={() => setKnowsMyoReps(true)} title="Yes" sub="Include myo-rep sets in my program." />
+            <BigOption active={!knowsMyoReps} onClick={() => setKnowsMyoReps(false)} title="No" sub="Stick to straight sets with instructions." />
+          </div>
+        </>);
+      case 'review': {
+        const reviewItems: { label: string; value: string; stepKey: AIStepId }[] = [
+          { label: 'Experience', value: (AI_EXPERIENCES.find(e => e.id === experience)?.label ?? '') + (experience === 'beginner' ? (beginnerRandom ? ' · starter template' : ' · personalized') : ''), stepKey: 'experience' },
+          ...(!(experience === 'beginner' && beginnerRandom) ? [
+            { label: 'Goal', value: AI_GOALS.find(g => g.id === trainingGoal)?.label ?? '', stepKey: 'goal' as AIStepId },
+            { label: 'Days / week', value: `${daysPerWeek} day${daysPerWeek > 1 ? 's' : ''}`, stepKey: 'days' as AIStepId },
+            { label: 'Session', value: `${sessionMinutes} min`, stepKey: 'duration' as AIStepId },
+            { label: 'Injuries', value: injuries.trim() || '—', stepKey: 'injuries' as AIStepId },
+          ] : []),
+          ...(experience !== 'beginner' ? [
+            { label: 'Prioritize', value: priorityMuscles.length ? priorityMuscles.join(', ') : 'None', stepKey: 'priority' as AIStepId },
+            { label: 'Deprioritize', value: deprioritizedMuscles.length ? deprioritizedMuscles.join(', ') : 'None', stepKey: 'deprioritize' as AIStepId },
+            { label: 'Myo-reps', value: knowsMyoReps ? 'Yes' : 'No', stepKey: 'myo-reps' as AIStepId },
+          ] : []),
+        ];
+        return (<>
+          <StepHeader eyebrow="Last step" title="Ready to build your plan?" sub="Tap any row to edit." />
+          {genError && <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, fontSize: 13, color: 'var(--error)' }}>{genError}</div>}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+            {reviewItems.map((it, i) => (
+              <button key={it.label} onClick={() => { const idx = stepKeys.indexOf(it.stepKey); if (idx >= 0) setStepIdx(idx); }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', background: 'transparent', border: 'none', boxShadow: 'none', borderTop: i ? '1px solid var(--border-subtle)' : 'none', cursor: 'pointer', gap: 12, textAlign: 'left' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0 }}>{it.label}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-primary)', textAlign: 'right', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.value}</span>
+              </button>
+            ))}
+          </div>
+          {(limitReached || showKeyInput) && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Anthropic API Key{limitReached && <span style={{ color: 'var(--error)', fontWeight: 400 }}> (free generations used up)</span>}</div>
+              <input type="password" value={userApiKey} onChange={e => saveApiKey(e.target.value)} placeholder="sk-ant-..." style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 8, color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>Get a key at console.anthropic.com. Stored locally in your browser only.</div>
+            </div>
+          )}
+          {!showKeyInput && !limitReached && <button onClick={() => setShowKeyInput(true)} style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: 0, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', marginBottom: 12, textDecoration: 'underline' }}>Use your own API key</button>}
+          {remaining && !userApiKey.trim() && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>{remaining.remaining} of {remaining.limit} free generation{remaining.limit !== 1 ? 's' : ''} remaining</div>}
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, marginBottom: 12 }}>
+            Disclaimer: Programs generated by AI are not reviewed by a certified trainer. Neither the AI, this app, nor its creator are liable for any injuries resulting from following a generated program.
+          </div>
+          <button onClick={() => setStep('manual')} style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: 0, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>Copy prompt to use elsewhere</button>
+        </>);
+      }
+      default: return null;
+    }
+  };
+
+  if (step === 'manual') {
+    return (
+      <Modal open onClose={onClose} title="AI Program Builder" maxWidth={540} zIndex={35}>
+        <div className="flex flex-col gap-3">
+          <div className="text-[13px] text-secondary leading-relaxed">
+            <strong className="text-primary">How to use:</strong><br/>
+            1. Copy the prompt below<br/>
+            2. Download the exercise list CSV<br/>
+            3. Paste the prompt into ChatGPT, Claude, or any AI<br/>
+            4. Attach the exercise list CSV to the same message<br/>
+            5. The AI will give you a CSV file to download<br/>
+            6. Import that file here with "Import Plan (CSV)"
+          </div>
+          <textarea data-prompt-output="" readOnly value={promptText} className="w-full min-h-[200px] resize-y font-mono text-[11px]" />
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleCopy} variant="primary" className="flex-1 text-center min-w-[140px]">{copied ? 'Copied!' : 'Copy Prompt'}</Button>
+            <Button onClick={handleDownloadCatalog} className="flex-1 text-center min-w-[140px]">Download Exercise List</Button>
+          </div>
+          <Button onClick={() => setStep('form')} size="sm" className="self-start">← Back</Button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
-    <Modal open={true} onClose={onClose} title="AI Program Builder" maxWidth={540} zIndex={35}>
+    <Modal open onClose={onClose} chrome="none" maxWidth={540} maxHeight="85vh" zIndex={35}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: 'var(--bg-elevated)' }}>
 
-        {step === 'form' ? (
-          <div className="flex flex-col gap-4">
-            {/* Experience */}
-            <div>
-              <div className="text-[13px] font-semibold mb-2 text-secondary">Experience Level</div>
-              <div className="flex flex-wrap gap-2">
-                {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => (
-                  <Button key={lvl} variant="pill" active={experience === lvl} onClick={() => { setExperience(lvl); if (lvl !== 'beginner') setBeginnerRandom(false); }}>
-                    {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
-                  </Button>
-                ))}
-              </div>
+        {/* Header + progress bar */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={goBack} style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: 6, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer', margin: '-6px 0 -6px -6px' }}>
+              {stepIdx > 0
+                ? <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 4 6 8 10 12" /></svg>
+                : <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+              }
+            </button>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', textAlign: 'center' }}>
+              {step === 'generating' ? 'Generating…' : `Step ${stepIdx + 1} of ${stepKeys.length}`}
             </div>
-
-            {/* Training goal */}
-            <div>
-              <div className="text-[13px] font-semibold mb-2 text-secondary">Training Goal</div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="pill" active={trainingGoal === 'strength'} onClick={() => setTrainingGoal('strength')}>Strength</Button>
-                <Button variant="pill" active={trainingGoal === 'hypertrophy'} onClick={() => setTrainingGoal('hypertrophy')}>Size (Hypertrophy)</Button>
-                <Button variant="pill" active={trainingGoal === 'both'} onClick={() => setTrainingGoal('both')}>Both</Button>
-              </div>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: 6, color: 'var(--text-muted)', display: 'flex', cursor: 'pointer', margin: '-6px -6px -6px 0' }}>
+              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+            </button>
+          </div>
+          {/* Progress segments */}
+          {step === 'generating' ? (
+            <div style={{ height: 3, borderRadius: 999, background: 'var(--border-subtle)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', background: 'var(--accent-blue)', borderRadius: 999, width: `${genProgress}%`, transition: genProgress === 0 ? 'none' : 'width 0.5s linear' }} />
             </div>
-
-            {/* Beginner: random or personalized */}
-            {experience === 'beginner' && (
-              <div>
-                <div className="text-[13px] font-semibold mb-2 text-secondary">Plan Type</div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="pill" active={!beginnerRandom} onClick={() => setBeginnerRandom(false)}>Personalized Plan</Button>
-                  <Button variant="pill" active={beginnerRandom} onClick={() => setBeginnerRandom(true)}>Random Starter Plan</Button>
-                </div>
-              </div>
-            )}
-
-            {/* Days per week */}
-            <div>
-              <div className="text-[13px] font-semibold mb-2 text-secondary">Days Per Week</div>
-              <div className="flex flex-wrap gap-2">
-                {[1,2,3,4,5,6,7].map(d => (
-                  <Button key={d} variant="pill" active={daysPerWeek === d} onClick={() => setDaysPerWeek(d)} style={{ minWidth: 36, justifyContent: 'center' }}>
-                    {d}
-                  </Button>
-                ))}
-              </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 4 }}>
+              {stepKeys.map((_, i) => (
+                <div key={i} style={{ flex: 1, height: 3, borderRadius: 999, background: i <= stepIdx ? 'var(--accent-blue)' : 'var(--border-subtle)', transition: 'background 0.2s' }} />
+              ))}
             </div>
+          )}
+        </div>
 
-            {/* Session duration */}
-            <div>
-              <div className="text-[13px] font-semibold mb-2 text-secondary">Session Duration</div>
-              <div className="flex flex-wrap gap-2">
-                {['30','45','60','75','90+'].map(t => (
-                  <Button key={t} variant="pill" active={sessionMinutes === t} onClick={() => setSessionMinutes(t)}>
-                    {t} min
-                  </Button>
-                ))}
-              </div>
+        {/* Body */}
+        {step === 'generating' ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', gap: 24 }}>
+            <div style={{ width: 72, height: 72, borderRadius: 999, background: 'var(--accent-blue-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(99,102,241,0.25)' }}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="var(--accent-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="36" height="36">
+                <rect x="0.75" y="4.25" width="2.5" height="7.5" rx="0.7" />
+                <rect x="3.25" y="6" width="1.25" height="4" rx="0.4" />
+                <rect x="11.5" y="6" width="1.25" height="4" rx="0.4" />
+                <rect x="12.75" y="4.25" width="2.5" height="7.5" rx="0.7" />
+                <line x1="4.5" y1="8" x2="11.5" y2="8" />
+              </svg>
             </div>
-
-            {/* Injuries (shown for all except beginner random) */}
-            {showDetails && (
-              <div>
-                <div className="text-[13px] font-semibold mb-2 text-secondary">Injuries or Limitations (optional)</div>
-                <textarea
-                  value={injuries}
-                  onChange={e => setInjuries(e.target.value)}
-                  placeholder="e.g., bad left shoulder, lower back issues"
-                  className="w-full min-h-[60px] resize-y"
-                />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 8 }}>
+                {AI_GEN_PHASES[genPhase % AI_GEN_PHASES.length]}
               </div>
-            )}
-
-            {/* Priority/depriority/myo-reps only for intermediate+ */}
-            {showDetails && experience !== 'beginner' && (
-              <>
-                {/* Priority muscles (collapsible) */}
-                <div>
-                  <button
-                    onClick={() => setShowPrioMuscles(p => !p)}
-                    className="bg-transparent border-none p-0 cursor-pointer flex items-center gap-2 text-[13px] font-semibold shadow-none" style={{ color: priorityMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
-                  >
-                    <span className="text-[11px] transition-transform duration-150" style={{ transform: showPrioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
-                    Muscles to Prioritize{priorityMuscles.length > 0 && ` (${priorityMuscles.length})`}
-                  </button>
-                  {showPrioMuscles && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
-                        <Button key={m} variant="pill" active={priorityMuscles.includes(m)} onClick={() => togglePriority(m)}>
-                          {m}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* De-priority muscles (collapsible) */}
-                <div>
-                  <button
-                    onClick={() => setShowDeprioMuscles(p => !p)}
-                    className="bg-transparent border-none p-0 cursor-pointer flex items-center gap-2 text-[13px] font-semibold shadow-none" style={{ color: deprioritizedMuscles.length ? 'var(--accent)' : 'var(--text-secondary)' }}
-                  >
-                    <span className="text-[11px] transition-transform duration-150" style={{ transform: showDeprioMuscles ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
-                    Muscles to De-prioritize{deprioritizedMuscles.length > 0 && ` (${deprioritizedMuscles.length})`}
-                  </button>
-                  {showDeprioMuscles && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {[...MUSCLE_GROUPS].sort((a, b) => a.localeCompare(b)).map(m => (
-                        <Button key={m} variant="pill" active={deprioritizedMuscles.includes(m)} onClick={() => toggleDepriority(m)}>
-                          {m}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Myo reps */}
-                <div>
-                  <div className="text-[13px] font-semibold mb-2 text-secondary">Do you know what myo-rep sets are?</div>
-                  <div className="flex gap-2">
-                    <Button variant="pill" active={knowsMyoReps} onClick={() => setKnowsMyoReps(true)}>Yes</Button>
-                    <Button variant="pill" active={!knowsMyoReps} onClick={() => setKnowsMyoReps(false)}>No</Button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Error message */}
-            {genError && (
-              <div className="text-[13px] text-error px-3 py-2.5 bg-error-muted border border-error rounded-md">
-                {genError}
-              </div>
-            )}
-
-            {/* API Key section */}
-            {(limitReached || showKeyInput) && (
-              <div>
-                <div className="text-[13px] font-semibold mb-2 text-secondary">
-                  Anthropic API Key {limitReached && <span className="text-error font-normal">(free generations used up)</span>}
-                </div>
-                <input
-                  type="password"
-                  value={userApiKey}
-                  onChange={e => saveApiKey(e.target.value)}
-                  placeholder="sk-ant-..."
-                  className="w-full font-mono text-[13px]"
-                />
-                <div className="text-[11px] text-muted mt-1">
-                  Get a key at console.anthropic.com. Stored locally in your browser only.
-                </div>
-              </div>
-            )}
-
-            {!showKeyInput && !limitReached && (
-              <Button onClick={() => setShowKeyInput(true)} size="sm" className="self-start text-[11px]">
-                Use your own API key
-              </Button>
-            )}
-
-            {/* Remaining count */}
-            {remaining && !userApiKey.trim() && (
-              <div className="text-[11px] text-muted">
-                {remaining.remaining} of {remaining.limit} free generation{remaining.limit !== 1 ? 's' : ''} remaining
-              </div>
-            )}
-
-            {/* Disclaimer */}
-            <div className="text-[11px] text-muted leading-normal px-3 py-2.5 bg-card border border-subtle rounded-md">
-              Disclaimer: Programs generated by AI are not reviewed by a certified trainer. Neither the AI, this app, nor its creator are liable for any injuries resulting from following a generated program. Consult a medical professional before starting any exercise program, especially if you have existing injuries or health conditions.
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>This usually takes 20–30 seconds.</div>
             </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 18px' }}>
+            {renderStep()}
+          </div>
+        )}
 
-            {/* Generate */}
-            <Button
-              onClick={handleGenerate}
-              variant="primary"
-              block
-              className="text-center"
-              disabled={catalogExercises.length === 0 || (limitReached && !userApiKey.trim())}
+        {/* Sticky CTA */}
+        {step !== 'generating' && (
+          <div style={{ padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', flexShrink: 0 }}>
+            <button
+              onClick={goNext}
+              disabled={isReview && (catalogExercises.length === 0 || (limitReached && !userApiKey.trim()))}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: 12, background: 'var(--accent-blue)', color: '#0a0a0c', fontSize: 15, fontWeight: 600, border: 'none', boxShadow: 'none', letterSpacing: '-0.01em', cursor: 'pointer', opacity: (isReview && (catalogExercises.length === 0 || (limitReached && !userApiKey.trim()))) ? 0.5 : 1 }}
             >
-              {catalogExercises.length === 0 ? 'Loading exercises...' : 'Generate Program'}
-            </Button>
-
-            <Button onClick={() => setStep('manual')} size="sm" className="self-center text-[11px] text-muted">
-              Or copy prompt manually for any AI
-            </Button>
+              {isReview ? (catalogExercises.length === 0 ? 'Loading exercises…' : 'Generate program') : 'Continue'}
+            </button>
           </div>
-        ) : step === 'generating' ? (
-          <div className="flex flex-col items-center gap-4 py-10">
-            <div className="w-10 h-10 border-[3px] border-subtle border-t-accent rounded-full animate-[ptr-spin_0.8s_linear_infinite]" />
-            <div className="text-[15px] text-secondary">Generating your program...</div>
-            <div className="text-[13px] text-muted">This usually takes 15-30 seconds</div>
-          </div>
-        ) : step === 'manual' ? (
-          <div className="flex flex-col gap-3">
-            <div className="text-[13px] text-secondary leading-relaxed">
-              <strong className="text-primary">How to use:</strong><br/>
-              1. Copy the prompt below<br/>
-              2. Download the exercise list CSV<br/>
-              3. Paste the prompt into ChatGPT, Claude, or any AI<br/>
-              4. Attach the exercise list CSV to the same message<br/>
-              5. The AI will give you a CSV file to download<br/>
-              6. Import that file here with "Import Plan (CSV)"
-            </div>
-
-            <textarea
-              data-prompt-output=""
-              readOnly
-              value={promptText}
-              className="w-full min-h-[200px] resize-y font-mono text-[11px]"
-            />
-
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={handleCopy} variant="primary" className="flex-1 text-center min-w-[140px]">
-                {copied ? 'Copied!' : 'Copy Prompt'}
-              </Button>
-              <Button onClick={handleDownloadCatalog} className="flex-1 text-center min-w-[140px]">
-                Download Exercise List
-              </Button>
-            </div>
-
-            <Button onClick={() => setStep('form')} size="sm" className="self-start">
-              ← Back
-            </Button>
-          </div>
-        ) : null}
+        )}
+      </div>
     </Modal>
   );
 }
@@ -3962,6 +4028,8 @@ function BuilderPage({
   setShowPlanList,
   onBack,
   onSaved,
+  openAIBuilder,
+  onAIBuilderOpened,
   exerciseLoading,
   catalogExercises,
   catalogLoading,
@@ -3981,6 +4049,8 @@ function BuilderPage({
   setShowPlanList: React.Dispatch<React.SetStateAction<boolean>>;
   onBack?: () => void;
   onSaved?: (savedPlan: Plan) => void;
+  openAIBuilder?: boolean;
+  onAIBuilderOpened?: () => void;
   exerciseLoading: boolean;
   catalogExercises: CatalogExercise[];
   catalogLoading: boolean;
@@ -4004,6 +4074,9 @@ function BuilderPage({
   const [error, setError] = useState<string | null>(null);
   const [manageTab, setManageTab] = useState<"plans" | "templates">("plans");
   const [showAIProgramBuilder, setShowAIProgramBuilder] = useState(false);
+  useEffect(() => {
+    if (openAIBuilder) { setShowAIProgramBuilder(true); onAIBuilderOpened?.(); }
+  }, [openAIBuilder, onAIBuilderOpened]);
   const [templates, setTemplates] = useState<Plan[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -4857,7 +4930,7 @@ function BuilderPage({
         {/* 1. Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
           {onBack && (
-            <button onClick={handleBack} style={{ width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'var(--text-secondary)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }} aria-label="Back">
+            <button onClick={handleBack} style={{ width: 32, height: 32, padding: 0, boxShadow: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'var(--text-secondary)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }} aria-label="Back">
               <ChevronLeftIcon size={18} />
             </button>
           )}
@@ -4957,7 +5030,7 @@ function BuilderPage({
                   style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', padding: 0, outline: 'none', minWidth: 0 }}
                 />
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <button onClick={() => setFocusDayMenuOpen(v => !v)} style={{ width: 30, height: 30, background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 18, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Day options">⋯</button>
+                  <button onClick={() => setFocusDayMenuOpen(v => !v)} style={{ width: 30, height: 30, padding: 0, boxShadow: 'none', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 18, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Day options">⋯</button>
                   {focusDayMenuOpen && (<>
                     <div onClick={() => setFocusDayMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
                     <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50, background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden', minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>

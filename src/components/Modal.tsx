@@ -8,6 +8,7 @@ export type ModalProps = {
   maxHeight?: string;
   zIndex?: number;
   children: React.ReactNode;
+  chrome?: 'default' | 'none';
 };
 
 const EXIT_DURATION = 180; // matches CSS modal-overlay-out duration
@@ -20,6 +21,7 @@ export default function Modal({
   maxHeight = "85vh",
   zIndex = 30,
   children,
+  chrome = 'default',
 }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(open);
@@ -79,11 +81,11 @@ export default function Modal({
     >
       <div
         ref={contentRef}
-        className="modal-content bg-elevated border border-subtle rounded-none sm:rounded-lg p-4 sm:p-6 shadow-modal w-full overflow-y-auto flex flex-col gap-4"
-        style={{ maxHeight, maxWidth }}
+        className={`modal-content bg-elevated border border-subtle rounded-none sm:rounded-lg shadow-modal w-full flex flex-col ${chrome === 'none' ? 'p-0 overflow-hidden' : 'p-4 sm:p-6 overflow-y-auto gap-4'}`}
+        style={{ maxHeight, maxWidth, ...(chrome === 'none' ? { height: maxHeight } : {}) }}
         onClick={(e) => e.stopPropagation()}
       >
-        {title && (
+        {chrome !== 'none' && title && (
           <div className="flex justify-between items-center">
             <h3 className="m-0 text-lg font-bold">{title}</h3>
             <button

@@ -9,12 +9,14 @@ type Props = {
   ghostMode: GhostMode;
   onGhostModeChange: (mode: GhostMode) => void;
   onNewPlan: () => void;
+  onAIBuilder: () => void;
   onSwitchPlan: () => void;
   onEditPlan: () => void;
   onClose: () => void;
 };
 
 const plus = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg>;
+const sparkle = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v2M8 12v2M2 8h2M12 8h2M4.1 4.1l1.4 1.4M10.5 10.5l1.4 1.4M4.1 11.9l1.4-1.4M10.5 5.5l1.4-1.4"/><circle cx="8" cy="8" r="2"/></svg>;
 const swap = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h9l-2-2M13 11H4l2 2" /></svg>;
 const edit = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" /></svg>;
 const ghost = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 13V7a5 5 0 0 1 10 0v6l-2-1.5-2 1.5-2-1.5-2 1.5z" /><circle cx="6.5" cy="7.5" r="0.5" fill="currentColor" /><circle cx="9.5" cy="7.5" r="0.5" fill="currentColor" /></svg>;
@@ -26,7 +28,7 @@ const GHOST_OPTS: { id: GhostMode; label: string; desc: string }[] = [
   { id: 'full-body', label: 'Full body', desc: 'Ghost only shows performance from the same day (e.g., Tuesday vs Tuesday).' },
 ];
 
-export default function GearMenu({ planCount, ghostMode, onGhostModeChange, onNewPlan, onSwitchPlan, onEditPlan, onClose }: Props) {
+export default function GearMenu({ planCount, ghostMode, onGhostModeChange, onNewPlan, onAIBuilder, onSwitchPlan, onEditPlan, onClose }: Props) {
   const [view, setView] = useState<'main' | 'ghosting'>('main');
 
   if (view === 'ghosting') {
@@ -63,6 +65,7 @@ export default function GearMenu({ planCount, ghostMode, onGhostModeChange, onNe
     <MenuShell minWidth={260}>
       <div style={{ padding: '10px 14px 6px', fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Plan</div>
       <MenuRow icon={plus} label="New plan" sub="Start a blank plan" onClick={() => { onNewPlan(); onClose(); }} />
+      <MenuRow icon={sparkle} label="AI Builder" sub="Generate a plan with AI" onClick={() => { onAIBuilder(); onClose(); }} bordered />
       <MenuRow icon={swap} label="Switch plan" sub={`${planCount} plan${planCount !== 1 ? 's' : ''} saved`} onClick={() => { onSwitchPlan(); onClose(); }} bordered />
       <div style={{ borderTop: '4px solid var(--bg-card)' }}>
         <MenuRow icon={edit} label="Edit plan" sub="Rename, manage weeks & days" onClick={() => { onEditPlan(); onClose(); }} />
