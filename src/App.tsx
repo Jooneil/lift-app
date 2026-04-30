@@ -3311,7 +3311,7 @@ function WorkoutPage({
           )}
 
           {/* Pill toggles: Instructions + Notes + Timer */}
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex gap-2 mt-3">
             <button
               onClick={() => {
                 if (openInstructions[entry.id]) {
@@ -3328,8 +3328,9 @@ function WorkoutPage({
                   setInstructionsDraft((prev) => ({ ...prev, [entry.id]: getEntryInstruction(entry) }));
                 }
               }}
-              className="text-[12px] rounded-full border transition-all duration-150 flex items-center gap-1.5"
+              className="text-[12px] rounded-full border transition-all duration-150 flex items-center justify-center gap-1.5"
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 borderColor: openInstructions[entry.id] ? '#60a5fa' : 'var(--border-subtle)',
                 background: openInstructions[entry.id] ? 'rgba(96,165,250,0.15)' : 'var(--bg-card)',
@@ -3357,8 +3358,9 @@ function WorkoutPage({
                   setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
                 }
               }}
-              className="text-[12px] rounded-full border transition-all duration-150 flex items-center gap-1.5"
+              className="text-[12px] rounded-full border transition-all duration-150 flex items-center justify-center gap-1.5"
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 borderColor: openNotes[entry.id] ? 'var(--success)' : 'var(--border-subtle)',
                 background: openNotes[entry.id] ? 'var(--success-muted)' : 'var(--bg-card)',
@@ -3378,8 +3380,8 @@ function WorkoutPage({
               const isPaused = thisTimer?.paused;
               const isActive = thisTimer && !isDone && !isPaused;
               const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-              const pillCls = "text-[12px] rounded-full border flex items-center gap-1.5";
-              const pillBase: React.CSSProperties = { padding: '6px 12px', boxShadow: 'none', minHeight: 0, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
+              const pillCls = "text-[12px] rounded-full border flex items-center justify-center gap-1.5";
+              const pillBase: React.CSSProperties = { flex: 1, padding: '6px 12px', boxShadow: 'none', minHeight: 0, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
               if (isDone) {
                 return (
