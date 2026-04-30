@@ -1210,7 +1210,7 @@ function AuthedApp({
           <div className="mb-4" style={{ position: 'relative' }}>
             {/* Header row: plan name · day chip · gear */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 12 }}>
-              <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {selectedPlan?.name ?? 'No plan'}
               </span>
 
@@ -3328,13 +3328,14 @@ function WorkoutPage({
                   setInstructionsDraft((prev) => ({ ...prev, [entry.id]: getEntryInstruction(entry) }));
                 }
               }}
-              className="text-[12px] px-3 py-1.5 rounded-full border transition-all duration-150 flex items-center gap-1.5"
+              className="text-[12px] rounded-full border transition-all duration-150 flex items-center gap-1.5"
               style={{
+                padding: '6px 12px',
                 borderColor: openInstructions[entry.id] ? '#60a5fa' : 'var(--border-subtle)',
                 background: openInstructions[entry.id] ? 'rgba(96,165,250,0.15)' : 'var(--bg-card)',
                 color: openInstructions[entry.id] ? '#60a5fa' : 'var(--text-secondary)',
                 boxShadow: 'none',
-                minHeight: 'auto',
+                minHeight: 0,
               }}
             >
               <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: '#60a5fa', opacity: getEntryInstruction(entry) ? 1 : 0 }} />
@@ -3356,13 +3357,14 @@ function WorkoutPage({
                   setNotesDraft((prev) => ({ ...prev, [entry.id]: entry.note ?? '' }));
                 }
               }}
-              className="text-[12px] px-3 py-1.5 rounded-full border transition-all duration-150 flex items-center gap-1.5"
+              className="text-[12px] rounded-full border transition-all duration-150 flex items-center gap-1.5"
               style={{
+                padding: '6px 12px',
                 borderColor: openNotes[entry.id] ? 'var(--success)' : 'var(--border-subtle)',
                 background: openNotes[entry.id] ? 'var(--success-muted)' : 'var(--bg-card)',
                 color: openNotes[entry.id] ? 'var(--success)' : 'var(--text-secondary)',
                 boxShadow: 'none',
-                minHeight: 'auto',
+                minHeight: 0,
               }}
             >
               <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: 'var(--success)', opacity: entry.note && String(entry.note).trim() !== '' ? 1 : 0 }} />
@@ -3376,8 +3378,8 @@ function WorkoutPage({
               const isPaused = thisTimer?.paused;
               const isActive = thisTimer && !isDone && !isPaused;
               const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-              const pillCls = "text-[12px] px-3 py-1.5 rounded-full border flex items-center gap-1.5";
-              const pillBase: React.CSSProperties = { boxShadow: 'none', minHeight: 'auto', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
+              const pillCls = "text-[12px] rounded-full border flex items-center gap-1.5";
+              const pillBase: React.CSSProperties = { padding: '6px 12px', boxShadow: 'none', minHeight: 0, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
               if (isDone) {
                 return (
