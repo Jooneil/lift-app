@@ -459,27 +459,51 @@ function AuthedApp({
       try {
         const rows = await planApi.list();
         const loaded: Plan[] = rows.map((row) => mapServerPlan(row));
-        setPlans(loaded);
 
+        // ── Phase 1: instant restore from localStorage ──────────────────────
+        // All state is set synchronously here so React batches it into ONE
+        // render — the secondary auto-navigate effect sees shouldAutoNavigate=false
+        // immediately and never flashes W1D1.
+        const cachedServerId = localStorage.getItem('lift:lastPlanServerId');
+        const cachedWeekId  = localStorage.getItem('lift:lastWeekId');
+        const cachedDayId   = localStorage.getItem('lift:lastDayId');
+
+        let plan = cachedServerId
+          ? loaded.find((p) => String(p.serverId ?? '') === cachedServerId) ?? null
+          : null;
+        if (!plan) plan = loaded[0] ?? null;
+
+        if (!plan) {
+          setPlans(loaded);
+          return;
+        }
+
+        const weekValid = cachedWeekId ? plan.weeks.some((w) => w.id === cachedWeekId) : false;
+        const dayValid  = cachedDayId  ? plan.weeks.some((w) => w.days.some((d) => d.id === cachedDayId)) : false;
+        const phase1WeekId = weekValid ? cachedWeekId! : plan.weeks[0]?.id ?? null;
+        const phase1DayId  = dayValid  ? cachedDayId!  : plan.weeks[0]?.days[0]?.id ?? null;
+
+        // One batch → one render, no flash
+        setPlans(loaded);
+        setSelectedPlanId(plan.id);
+        setSelectedWeekId(phase1WeekId);
+        setSelectedDayId(phase1DayId);
+        selectionOriginRef.current = "auto";
+        setShouldAutoNavigate(false);
+
+        // ── Phase 2: background — prefs + completedList ─────────────────────
         const up = await getUserPrefs().catch(() => null);
         const p = (up?.prefs as UserPrefsData | null) || null;
-        const prefs = {
-          lastPlanServerId: p?.last_plan_server_id ?? null,
-          lastWeekId: p?.last_week_id ?? null,
-          lastDayId: p?.last_day_id ?? null,
-        };
 
         // Load streak config/state
         if (p?.streak_config) {
           setStreakConfig(p.streak_config);
           if (p.streak_state) {
             setStreakState(p.streak_state);
-            // Check streak status on load
             const now = new Date();
             const status = checkStreakStatus(p.streak_config, p.streak_state, now);
             setCurrentStreak(status.currentStreak);
             setStreakHitToday(status.isHitToday);
-            // If streak was broken, persist the reset
             if (status.streakBroken && status.currentStreak !== p.streak_state.currentStreak) {
               const resetState: StreakState = {
                 currentStreak: status.currentStreak,
@@ -495,6 +519,21 @@ function AuthedApp({
         // Load workout preferences
         if (p?.workout_prefs) {
           setWorkoutPrefs({ ...DEFAULT_WORKOUT_PREFS, ...p.workout_prefs });
+        }
+
+        // Validate position with server completedList — update only if it disagrees
+        if (plan.serverId) {
+          try {
+            const all = await sessionApi.completedList(plan.serverId);
+            const done = new Set(all.map((r) => `${String(r.week_id)}::${String(r.day_id)}`));
+            const ordered: Array<{ weekId: string; dayId: string }> = [];
+            for (const w of plan.weeks) for (const d of w.days) ordered.push({ weekId: w.id, dayId: d.id });
+            const firstIncomplete = ordered.find((d) => !done.has(`${d.weekId}::${d.dayId}`)) ?? ordered[ordered.length - 1] ?? null;
+            if (firstIncomplete && (firstIncomplete.weekId !== phase1WeekId || firstIncomplete.dayId !== phase1DayId)) {
+              setSelectedWeekId(firstIncomplete.weekId);
+              setSelectedDayId(firstIncomplete.dayId);
+            }
+          } catch { /* keep phase1 position */ }
         }
 
         // One-time migration v3: pull notes from all sessions into global exercise_notes
@@ -585,48 +624,6 @@ function AuthedApp({
           })();
         }
 
-        let plan = prefs.lastPlanServerId
-          ? loaded.find((p) => String(p.serverId ?? '') === String(prefs.lastPlanServerId)) || null
-          : null;
-        if (!plan) plan = loaded[0] ?? null;
-        if (!plan) {
-          setSelectedPlanId(null);
-          setSelectedWeekId(null);
-          setSelectedDayId(null);
-          return;
-        }
-
-        // Prefer authoritative next from server completion list
-        let nextWeekId: string | null = null;
-        let nextDayId: string | null = null;
-        if (plan.serverId) {
-          try {
-            const all = await sessionApi.completedList(plan.serverId);
-            const done = new Set(all.map((r) => `${String(r.week_id)}::${String(r.day_id)}`));
-            const ordered: Array<{ weekId: string; dayId: string }> = [];
-            for (const w of plan.weeks) for (const d of w.days) ordered.push({ weekId: w.id, dayId: d.id });
-            const firstIncomplete = ordered.find((d) => !done.has(`${d.weekId}::${d.dayId}`)) || ordered[ordered.length - 1] || null;
-            if (firstIncomplete) {
-              nextWeekId = firstIncomplete.weekId;
-              nextDayId = firstIncomplete.dayId;
-            }
-          } catch {
-            // ignore; fall back to prefs structure
-          }
-        }
-
-        if (!nextWeekId || !nextDayId) {
-          const week = plan.weeks.find((w) => w.id === prefs.lastWeekId) ?? plan.weeks[0] ?? null;
-          const day = week?.days.find((d) => d.id === prefs.lastDayId) ?? week?.days[0] ?? null;
-          nextWeekId = week?.id ?? null;
-          nextDayId = day?.id ?? null;
-        }
-
-        setSelectedPlanId(plan.id);
-        setSelectedWeekId(nextWeekId);
-        setSelectedDayId(nextDayId);
-        selectionOriginRef.current = "auto";
-        setShouldAutoNavigate(false);
       } catch (err) {
         if (import.meta.env.DEV) console.error("Failed to load plans/prefs", err);
       }
@@ -639,6 +636,11 @@ function AuthedApp({
     const weekId = selectedWeekId ?? null;
     const dayId = selectedDayId ?? null;
     const planIdStr: string | null = serverId == null ? null : String(serverId);
+    // Instant localStorage write — read on next cold launch for zero-flash restore
+    if (planIdStr) localStorage.setItem('lift:lastPlanServerId', planIdStr);
+    if (weekId) localStorage.setItem('lift:lastWeekId', weekId);
+    if (dayId) localStorage.setItem('lift:lastDayId', dayId);
+    // Debounced Supabase write (cross-device sync)
     if (prefsSaveDebounceRef.current) window.clearTimeout(prefsSaveDebounceRef.current);
     prefsSaveDebounceRef.current = window.setTimeout(() => {
       upsertUserPrefs({ last_plan_server_id: planIdStr, last_week_id: weekId, last_day_id: dayId }).catch(() => {});
