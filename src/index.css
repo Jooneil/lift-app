@@ -478,6 +478,23 @@ input[type="checkbox"] {
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
 
+/* ── Builder editable name inputs ── */
+.builder-name-input {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1.5px solid var(--border-subtle) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding-bottom: 3px !important;
+  transition: border-color 0.15s !important;
+}
+.builder-name-input:focus {
+  border-bottom-color: var(--accent-blue) !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 /* ── Responsive: Mobile bottom-sheet modal ── */
 @keyframes modal-sheet-in {
   from { opacity: 0; transform: translateY(100%); }

@@ -18,7 +18,7 @@ import type {
 import type { Plan, PlanWeek, PlanDay, PlanExercise, Exercise, CatalogExercise, ImportedExerciseMeta, PlanImportResult, Session, SessionEntry, SessionSet, ArchivedSessionMap, GhostSet, Mode } from './types';
 import { SET_COUNT_OPTIONS, MUSCLE_GROUPS } from './types';
 import { uuid, normalizeExerciseName, exerciseKey, parseBool, fixMojibake, getUserTimezone, toLocalDateString, isWorkoutDay, checkStreakStatus } from './lib/utils';
-import { buildCatalogByName, downloadCSV, exportPlanCSV, generateExerciseCatalogCSV, generateAIPrompt, calculateSetsPerMuscle } from './lib/csv';
+import { buildCatalogByName, downloadCSV, exportPlanCSV, generateExerciseCatalogCSV, generateAIPrompt, calculateSetsPerMuscle, calculateWeekSetsPerMuscle } from './lib/csv';
 import { startSessionFromDay, mergeSessionWithDay, mapRowToWeeks, nextWeekDay } from './lib/plan';
 import AddExerciseSheet from './components/AddExercise/AddExerciseSheet';
 import EquipmentIcon, { getEquipmentType } from './components/AddExercise/EquipmentIcon';
@@ -4204,6 +4204,7 @@ function BuilderPage({
   const [addSheetItemId, setAddSheetItemId] = useState<string | null>(null);
   const [editWeeksMode, setEditWeeksMode] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
+  const [volumeScope, setVolumeScope] = useState<'day' | 'week'>('day');
   const [exMenuOpenId, setExMenuOpenId] = useState<string | null>(null);
   const [focusDayMenuOpen, setFocusDayMenuOpen] = useState(false);
 
@@ -5056,7 +5057,8 @@ function BuilderPage({
             <input
               value={selectedPlan.name}
               onChange={(e) => handlePlanNameChange(e.target.value)}
-              style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)', background: 'transparent', border: 'none', outline: 'none', width: '100%', padding: 0 }}
+              className="builder-name-input"
+              style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)', width: '100%', padding: 0 }}
               placeholder="Untitled"
             />
           </div>
@@ -5145,7 +5147,8 @@ function BuilderPage({
                 <input
                   value={activeDay.name}
                   onChange={(e) => handleDayNameChange(activeWeekId, activeDayId, e.target.value)}
-                  style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', padding: 0, outline: 'none', minWidth: 0 }}
+                  className="builder-name-input"
+                  style={{ flex: 1, color: 'var(--text-primary)', fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', padding: 0, minWidth: 0 }}
                 />
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button onClick={() => setFocusDayMenuOpen(v => !v)} style={{ width: 30, height: 30, padding: 0, boxShadow: 'none', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 18, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Day options">⋯</button>
@@ -5165,10 +5168,27 @@ function BuilderPage({
                 )}
               </div>
               {/* 5. Volume drawer */}
-              {volumeOpen && activeDay.items.length > 0 && (
+              {volumeOpen && activeDay.items.length > 0 && activeWeek && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: 2, gap: 2 }}>
+                      {(['day', 'week'] as const).map(scope => (
+                        <button
+                          key={scope}
+                          onClick={() => setVolumeScope(scope)}
+                          style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, border: 'none', cursor: 'pointer', background: volumeScope === scope ? 'var(--accent-blue)' : 'transparent', color: volumeScope === scope ? '#0a0a0c' : 'var(--text-muted)', transition: 'all 0.15s' }}
+                        >
+                          {scope === 'day' ? 'Today' : 'This week'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {Object.entries(calculateSetsPerMuscle(activeDay.items, catalogExercises)).sort((a, b) => b[1] - a[1]).map(([m, s]) => (
+                    {Object.entries(
+                      volumeScope === 'day'
+                        ? calculateSetsPerMuscle(activeDay.items, catalogExercises)
+                        : calculateWeekSetsPerMuscle(activeWeek, catalogExercises)
+                    ).sort((a, b) => b[1] - a[1]).map(([m, s]) => (
                       <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '4px 10px', fontSize: 12 }}>
                         <span style={{ color: 'var(--text-secondary)' }}>{m}</span>
                         <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{s}</span>
