@@ -2047,8 +2047,7 @@ function WorkoutPage({
   const REST_DURATION = workoutPrefs.rest_timer_enabled ? workoutPrefs.rest_duration : 90;
   const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string; done?: boolean; paused?: boolean } | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [restTimerPopoverOpen, setRestTimerPopoverOpen] = useState(false);
-  const restTimerPopoverRef = useRef<HTMLDivElement>(null);
+  const restTimerStateRef = useRef<{ secondsLeft: number; total: number; entryId: string; done?: boolean; paused?: boolean } | null>(null);
 
   const formatElapsed = useCallback(() => {
     if (!sessionStartRef.current) return '';
@@ -2100,17 +2099,8 @@ function WorkoutPage({
     return () => document.removeEventListener('mousedown', handler);
   }, [showTimerPopover]);
 
-  // Close rest timer popover on outside click
-  useEffect(() => {
-    if (!restTimerPopoverOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (restTimerPopoverRef.current && !restTimerPopoverRef.current.contains(e.target as Node)) {
-        setRestTimerPopoverOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [restTimerPopoverOpen]);
+  // Keep restTimerStateRef in sync so togglePauseRestTimer can read it outside a state updater
+  useEffect(() => { restTimerStateRef.current = restTimer; }, [restTimer]);
 
   const handleResetTimer = () => {
     sessionStartRef.current = Date.now();
@@ -2171,19 +2161,30 @@ function WorkoutPage({
   const dismissRestTimer = useCallback(() => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
     setRestTimer(null);
-    setRestTimerPopoverOpen(false);
   }, []);
 
-  const stopRestTimer = useCallback(() => {
-    if (restTimerRef.current) clearInterval(restTimerRef.current);
-    setRestTimer(prev => prev ? { ...prev, paused: true } : null);
-    setRestTimerPopoverOpen(false);
-  }, []);
-
-  const resetRestTimer = useCallback((entryId: string) => {
-    setRestTimerPopoverOpen(false);
-    startRestTimer(entryId);
-  }, [startRestTimer]);
+  const togglePauseRestTimer = useCallback(() => {
+    const curr = restTimerStateRef.current;
+    if (!curr || curr.done) return;
+    if (!curr.paused) {
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
+      setRestTimer(prev => prev ? { ...prev, paused: true } : null);
+    } else {
+      setRestTimer(prev => prev ? { ...prev, paused: false } : null);
+      restTimerRef.current = setInterval(() => {
+        setRestTimer(prev => {
+          if (!prev || prev.paused) return prev;
+          if (prev.secondsLeft <= 1) {
+            if (restTimerRef.current) clearInterval(restTimerRef.current);
+            if (workoutPrefs.rest_sound) playBeep();
+            setTimeout(() => setRestTimer(null), 3000);
+            return { ...prev, secondsLeft: 0, done: true };
+          }
+          return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+        });
+      }, 1000);
+    }
+  }, [workoutPrefs.rest_sound, playBeep]);
 
   // Cleanup on unmount
   useEffect(() => () => { if (restTimerRef.current) clearInterval(restTimerRef.current); }, []);
@@ -3306,65 +3307,38 @@ function WorkoutPage({
               Notes
             </button>
 
-            {/* Rest timer pill — to the right of Notes, when rest timer enabled */}
+            {/* Rest timer pill — to the right of Notes */}
             {workoutPrefs.rest_timer_enabled && (() => {
               const thisTimer = restTimer?.entryId === entry.id ? restTimer : null;
               const isDone = thisTimer?.done;
               const isPaused = thisTimer?.paused;
               const isActive = thisTimer && !isDone && !isPaused;
               const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+              const pillStyle: React.CSSProperties = { fontSize: 12, padding: '5px 12px', borderRadius: 9999, border: '1px solid', display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', boxShadow: 'none', minHeight: 'auto', lineHeight: 1 };
 
               if (isDone) {
                 return (
-                  <span className="text-[12px] px-3 py-1.5 rounded-full border flex items-center gap-1.5" style={{ borderColor: 'var(--success)', background: 'var(--success-muted)', color: 'var(--success)', whiteSpace: 'nowrap', boxShadow: 'none' }}>
+                  <button onClick={dismissRestTimer} style={{ ...pillStyle, borderColor: 'var(--success)', background: 'var(--success-muted)', color: 'var(--success)', cursor: 'pointer' }}>
                     Rest done
-                  </span>
+                  </button>
                 );
               }
               if (isPaused) {
                 return (
-                  <button
-                    onClick={dismissRestTimer}
-                    className="text-[12px] px-3 py-1.5 rounded-full border flex items-center gap-1.5"
-                    style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', boxShadow: 'none', minHeight: 'auto' }}
-                    title="Tap to dismiss"
-                  >
-                    ⏸ {fmtDur(thisTimer!.secondsLeft)}
+                  <button onClick={togglePauseRestTimer} style={{ ...pillStyle, borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.6 }}>
+                    <TimerIcon size={12} /> {fmtDur(thisTimer!.secondsLeft)}
                   </button>
                 );
               }
               if (isActive) {
                 return (
-                  <div style={{ position: 'relative' }} ref={restTimerPopoverRef}>
-                    <button
-                      onClick={() => setRestTimerPopoverOpen(v => !v)}
-                      className="text-[12px] px-3 py-1.5 rounded-full border flex items-center gap-1.5"
-                      style={{ borderColor: 'var(--accent-blue)', background: 'var(--accent-blue-muted)', color: 'var(--accent-blue)', cursor: 'pointer', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', boxShadow: 'none', minHeight: 'auto' }}
-                    >
-                      <TimerIcon size={12} /> {fmtDur(restTimer!.secondsLeft)}
-                    </button>
-                    {restTimerPopoverOpen && (
-                      <div className="dropdown-menu" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '4px', minWidth: 110, zIndex: 30, boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <button onClick={() => resetRestTimer(entry.id)} style={{ width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 13, borderRadius: 6, background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-muted)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                        >Reset</button>
-                        <button onClick={stopRestTimer} style={{ width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 13, borderRadius: 6, background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-muted)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                        >Stop</button>
-                        <button onClick={dismissRestTimer} style={{ width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 13, borderRadius: 6, background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-muted)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                        >Dismiss</button>
-                      </div>
-                    )}
-                  </div>
+                  <button onClick={togglePauseRestTimer} style={{ ...pillStyle, borderColor: 'var(--accent-blue)', background: 'var(--accent-blue-muted)', color: 'var(--accent-blue)', cursor: 'pointer' }}>
+                    <TimerIcon size={12} /> {fmtDur(restTimer!.secondsLeft)}
+                  </button>
                 );
               }
-              // Inactive: grayed out, no interaction
               return (
-                <span className="text-[12px] px-3 py-1.5 rounded-full border flex items-center gap-1.5" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', opacity: 0.4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', userSelect: 'none', boxShadow: 'none' }}>
+                <span style={{ ...pillStyle, borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', opacity: 0.4, userSelect: 'none' }}>
                   <TimerIcon size={12} /> {fmtDur(REST_DURATION)}
                 </span>
               );
