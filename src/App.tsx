@@ -3260,8 +3260,8 @@ function WorkoutPage({
             </>
           )}
 
-          {/* Pill toggles: Instructions + Notes */}
-          <div className="flex gap-2 mt-3">
+          {/* Pill toggles: Instructions + Notes + Timer */}
+          <div className="flex flex-wrap gap-2 mt-3">
             <button
               onClick={() => {
                 if (openInstructions[entry.id]) {
@@ -3287,9 +3287,7 @@ function WorkoutPage({
                 minHeight: 'auto',
               }}
             >
-              {getEntryInstruction(entry) && (
-                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: '#60a5fa' }} />
-              )}
+              <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: '#60a5fa', opacity: getEntryInstruction(entry) ? 1 : 0 }} />
               Instructions
             </button>
             <button
@@ -3317,9 +3315,7 @@ function WorkoutPage({
                 minHeight: 'auto',
               }}
             >
-              {entry.note && String(entry.note).trim() !== '' && (
-                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: 'var(--success)' }} />
-              )}
+              <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: 'var(--success)', opacity: entry.note && String(entry.note).trim() !== '' ? 1 : 0 }} />
               Notes
             </button>
 
