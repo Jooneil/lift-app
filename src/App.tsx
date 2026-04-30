@@ -117,6 +117,7 @@ function AuthedApp({
   const [openHeaderMenu, setOpenHeaderMenu] = useState<'day' | 'gear' | 'app' | null>(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
+  const [confirmArchivePlanId, setConfirmArchivePlanId] = useState<string | null>(null);
   const [pendingAIBuilder, setPendingAIBuilder] = useState(false);
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([]);
   const [catalogExercises, setCatalogExercises] = useState<CatalogExercise[]>([]);
@@ -1399,7 +1400,7 @@ function AuthedApp({
                     </button>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                     <button
                       onClick={() => {
                         selectPlan(p.id);
@@ -1407,19 +1408,30 @@ function AuthedApp({
                         setShowPlanPicker(false);
                         setConfirmDeletePlanId(null);
                       }}
-                      style={{ width: 28, height: 28, padding: 0, borderRadius: 7, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                      style={{ width: 34, height: 34, padding: 0, borderRadius: 8, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
                       aria-label={`Edit ${p.name}`}
                     >
-                      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" />
                       </svg>
                     </button>
                     <button
+                      onClick={() => setConfirmArchivePlanId(p.id)}
+                      style={{ width: 34, height: 34, padding: 0, borderRadius: 8, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                      aria-label={`Archive ${p.name}`}
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="12" height="3" rx="1" />
+                        <path d="M3 6v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6" />
+                        <path d="M6.5 9h3" />
+                      </svg>
+                    </button>
+                    <button
                       onClick={() => setConfirmDeletePlanId(p.id)}
-                      style={{ width: 28, height: 28, padding: 0, borderRadius: 7, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                      style={{ width: 34, height: 34, padding: 0, borderRadius: 8, background: 'transparent', border: '1px solid var(--border-subtle)', boxShadow: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
                       aria-label={`Delete ${p.name}`}
                     >
-                      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 5 4 13 12 13 13 5" />
                         <line x1="2" y1="5" x2="14" y2="5" />
                         <path d="M6 5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" />
@@ -1452,6 +1464,42 @@ function AuthedApp({
           })}
         </div>
       </Modal>
+
+      {/* Archive confirmation modal */}
+      {(() => {
+        const archivePlan = plans.find(p => p.id === confirmArchivePlanId) ?? null;
+        return (
+          <Modal open={!!confirmArchivePlanId} onClose={() => setConfirmArchivePlanId(null)} title="Archive plan?" maxWidth={340} zIndex={40}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 20px', lineHeight: 1.5 }}>
+              <strong style={{ color: 'var(--text-primary)' }}>{archivePlan?.name}</strong> will be moved to your archive. You can bring it back anytime from Archived Plans.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" onClick={() => setConfirmArchivePlanId(null)}>Cancel</Button>
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  if (!archivePlan) return;
+                  const id = archivePlan.id;
+                  setConfirmArchivePlanId(null);
+                  try {
+                    if (archivePlan.serverId) await planApi.archive(archivePlan.serverId);
+                    setPlans(prev => prev.filter(x => x.id !== id));
+                    if (archivePlan.id === selectedPlanId) {
+                      const remaining = plans.filter(x => x.id !== id);
+                      if (remaining.length > 0) selectPlan(remaining[0].id);
+                      else { setSelectedPlanId(null); setShowPlanPicker(false); }
+                    }
+                  } catch (err) {
+                    alert(err instanceof Error ? err.message : String(err));
+                  }
+                }}
+              >
+                Archive
+              </Button>
+            </div>
+          </Modal>
+        );
+      })()}
 
       <Modal open={showArchiveList} onClose={closeArchive} title="Archived Plans" maxWidth={950} maxHeight="80vh" zIndex={20}>
             {archivedError && <div className="text-error px-3 py-2 bg-error-muted rounded-sm">{archivedError}</div>}
