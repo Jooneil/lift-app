@@ -1261,7 +1261,19 @@ function AuthedApp({
                     planCount={plans.length}
                     ghostMode={selectedPlan.ghostMode ?? 'default'}
                     onGhostModeChange={handleGhostModeChange}
-                    onNewPlan={() => { setMode('builder'); setShowPlanList(false); setSelectedPlanId(null); }}
+                    onNewPlan={() => {
+                      const newWeekId = uuid();
+                      const newDayId = uuid();
+                      const newPlan: Plan = {
+                        id: uuid(),
+                        name: 'New Plan',
+                        weeks: [{ id: newWeekId, name: 'Week 1', days: [{ id: newDayId, name: 'Day 1', items: [] }] }],
+                      };
+                      setPlans((prev) => [...prev, newPlan]);
+                      selectPlan(newPlan.id, newPlan);
+                      setMode('builder');
+                      setOpenHeaderMenu(null);
+                    }}
                     onSwitchPlan={() => { setShowPlanPicker(true); }}
                     onEditPlan={() => { setMode('builder'); setShowPlanList(false); }}
                     onClose={() => setOpenHeaderMenu(null)}
