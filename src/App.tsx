@@ -3333,13 +3333,13 @@ function WorkoutPage({
                 flex: 1,
                 padding: '6px 12px',
                 borderColor: openInstructions[entry.id] ? '#60a5fa' : 'var(--border-subtle)',
-                background: openInstructions[entry.id] ? 'rgba(96,165,250,0.15)' : 'var(--bg-card)',
-                color: openInstructions[entry.id] ? '#60a5fa' : 'var(--text-secondary)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-secondary)',
                 boxShadow: 'none',
                 minHeight: 0,
               }}
             >
-              <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: '#60a5fa', opacity: getEntryInstruction(entry) ? 1 : 0 }} />
+              <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: '#60a5fa', opacity: openInstructions[entry.id] || getEntryInstruction(entry) ? 1 : 0 }} />
               Instructions
             </button>
             <button
@@ -3363,13 +3363,13 @@ function WorkoutPage({
                 flex: 1,
                 padding: '6px 12px',
                 borderColor: openNotes[entry.id] ? 'var(--success)' : 'var(--border-subtle)',
-                background: openNotes[entry.id] ? 'var(--success-muted)' : 'var(--bg-card)',
-                color: openNotes[entry.id] ? 'var(--success)' : 'var(--text-secondary)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-secondary)',
                 boxShadow: 'none',
                 minHeight: 0,
               }}
             >
-              <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: 'var(--success)', opacity: entry.note && String(entry.note).trim() !== '' ? 1 : 0 }} />
+              <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0" style={{ background: 'var(--success)', opacity: openNotes[entry.id] || (entry.note && String(entry.note).trim() !== '') ? 1 : 0 }} />
               Notes
             </button>
 
