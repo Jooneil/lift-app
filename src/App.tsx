@@ -1210,7 +1210,7 @@ function AuthedApp({
           <div className="mb-4" style={{ position: 'relative' }}>
             {/* Header row: plan name · day chip · gear */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 12 }}>
-              <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {selectedPlan?.name ?? 'No plan'}
               </span>
 
