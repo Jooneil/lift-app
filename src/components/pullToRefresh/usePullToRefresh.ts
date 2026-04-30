@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
-const TRIGGER = 80;
-const MAX_PULL = 140;
+const TRIGGER = 110;
+const MAX_PULL = 180;
 
 export type PullState = {
   pull: number;
@@ -66,13 +66,13 @@ export function usePullToRefresh(onRefresh: () => void): PullState {
       currentRaw = Math.max(0, dy);
       const pull = currentRaw <= TRIGGER
         ? currentRaw
-        : TRIGGER + (currentRaw - TRIGGER) * 0.4;
+        : TRIGGER + (currentRaw - TRIGGER) * 0.25;
       const clamped = Math.min(pull, MAX_PULL);
       const progress = Math.min(clamped / TRIGGER, 1);
       const ready = progress >= 1;
 
       if (rootEl) {
-        const nudge = Math.min(clamped * 0.5, 60);
+        const nudge = Math.min(clamped * 0.35, 60);
         rootEl.style.transition = 'none';
         rootEl.style.transform = `translateY(${nudge}px)`;
       }

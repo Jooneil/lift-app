@@ -10,17 +10,21 @@ export default function PullDumbbell({ state }: Props) {
   const { pull, progress, springing } = state;
 
   useEffect(() => {
-    if (!springing || !ref.current) return;
     const el = ref.current;
-    el.getBoundingClientRect(); // force reflow so browser sees old transform before transition
-    el.style.transition = `transform ${SPRING_BEZIER} 0.5s, opacity 0.25s ease`;
-    el.style.transform = `translateX(-50%) translateY(-120px) rotate(180deg)`;
-    el.style.opacity = '0';
+    if (!el) return;
+    if (springing) {
+      el.getBoundingClientRect(); // force reflow so browser sees old transform before transition
+      el.style.transition = `transform ${SPRING_BEZIER} 0.5s, opacity 0.25s ease`;
+      el.style.transform = `translateX(-50%) translateY(-120px) rotate(180deg)`;
+      el.style.opacity = '0';
+    } else {
+      el.style.transition = 'transform 0.12s ease-out, opacity 0.12s ease-out';
+    }
   }, [springing]);
 
   if (pull === 0 && !springing) return null;
 
-  const TRIGGER = 80;
+  const TRIGGER = 110;
   const y = Math.min(pull, TRIGGER) - 50; // locks at trigger position, doesn't slide into content
   const rotation = Math.min(progress, 1) * 180;
   const opacity = Math.min(progress * 1.2, 1);
