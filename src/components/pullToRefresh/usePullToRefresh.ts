@@ -1,7 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 
 const TRIGGER = 110;
-const MAX_PULL = 180;
+const MAX_PULL = 200;
+
+// iOS rubber-band formula: f(x) = (x * c * d) / (d + c * x)
+// c=0.55 is Apple's constant; d is tuned so TRIGGER is reached at ~220px of raw finger travel.
+// Derived: d = TRIGGER * raw_target / (c * raw_target - TRIGGER) ≈ 1210
+const RB_C = 0.55;
+const RB_D = 1210;
+
+function rubberBand(raw: number): number {
+  return (raw * RB_C * RB_D) / (RB_D + RB_C * raw);
+}
 
 export type PullState = {
   pull: number;
@@ -64,15 +74,13 @@ export function usePullToRefresh(onRefresh: () => void): PullState {
       e.preventDefault();
 
       currentRaw = Math.max(0, dy);
-      const pull = currentRaw <= TRIGGER
-        ? currentRaw
-        : TRIGGER + (currentRaw - TRIGGER) * 0.25;
-      const clamped = Math.min(pull, MAX_PULL);
-      const progress = Math.min(clamped / TRIGGER, 1);
+      const pull = Math.min(rubberBand(currentRaw), MAX_PULL);
+      const progress = Math.min(pull / TRIGGER, 1);
       const ready = progress >= 1;
 
       if (rootEl) {
-        const nudge = Math.min(clamped * 0.35, 60);
+        // Very subtle page nudge — indicator movement carries the story, not the page
+        const nudge = Math.min(pull * 0.12, 18);
         rootEl.style.transition = 'none';
         rootEl.style.transform = `translateY(${nudge}px)`;
       }
@@ -80,19 +88,16 @@ export function usePullToRefresh(onRefresh: () => void): PullState {
       if (ready && !wasReady && navigator.vibrate) navigator.vibrate(8);
       wasReady = ready;
 
-      setState({ pull: clamped, progress, refreshing: false, springing: false });
+      setState({ pull, progress, refreshing: false, springing: false });
     };
 
     const onEnd = () => {
       if (triggered || !active) { active = false; return; }
       active = false;
 
-      const pull = currentRaw <= TRIGGER
-        ? currentRaw
-        : TRIGGER + (currentRaw - TRIGGER) * 0.4;
-      const clamped = Math.min(pull, MAX_PULL);
+      const pull = Math.min(rubberBand(currentRaw), MAX_PULL);
 
-      if (clamped >= TRIGGER) {
+      if (pull >= TRIGGER) {
         triggered = true;
         setState(s => ({ ...s, refreshing: true, springing: true }));
 

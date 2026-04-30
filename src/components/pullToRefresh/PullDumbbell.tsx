@@ -18,7 +18,7 @@ export default function PullDumbbell({ state }: Props) {
       el.style.transform = `translateX(-50%) translateY(-120px) rotate(180deg)`;
       el.style.opacity = '0';
     } else {
-      el.style.transition = 'transform 0.12s ease-out, opacity 0.12s ease-out';
+      el.style.transition = 'none';
     }
   }, [springing]);
 
