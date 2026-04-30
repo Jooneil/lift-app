@@ -4834,7 +4834,7 @@ function BuilderPage({
   };
 
   return (
-    <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
       <datalist id="exercise-options">
         {catalogExercises.map((exercise) => (
           <option key={exercise.id} value={exercise.name} />
@@ -4855,7 +4855,7 @@ function BuilderPage({
         </div>
       ) : (<>
         {/* 1. Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
           {onBack && (
             <button onClick={handleBack} style={{ width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'var(--text-secondary)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }} aria-label="Back">
               <ChevronLeftIcon size={18} />
@@ -4906,8 +4906,8 @@ function BuilderPage({
               );
             })}
             {!editWeeksMode && (
-              <button onClick={handleAddWeek} style={{ width: 32, background: 'transparent', border: 'none', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', flexShrink: 0 }} aria-label="Add week">
-                <svg viewBox="0 0 16 16" width="12" height="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+              <button onClick={handleAddWeek} style={{ width: 32, height: 32, background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', flexShrink: 0 }} aria-label="Add week">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
               </button>
             )}
             <button
@@ -4949,7 +4949,7 @@ function BuilderPage({
         {activeDay && activeDayId && activeWeekId && (
           <div style={{ padding: '8px 12px 88px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* 4. Day hero card */}
-            <div style={{ padding: '14px 16px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
+            <div style={{ padding: '14px 16px 12px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
                   value={activeDay.name}
@@ -4978,7 +4978,7 @@ function BuilderPage({
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {Object.entries(calculateSetsPerMuscle(activeDay.items, catalogExercises)).sort((a, b) => b[1] - a[1]).map(([m, s]) => (
-                      <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '4px 10px', fontSize: 12 }}>
+                      <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '4px 10px', fontSize: 12 }}>
                         <span style={{ color: 'var(--text-secondary)' }}>{m}</span>
                         <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{s}</span>
                       </span>
@@ -4990,7 +4990,7 @@ function BuilderPage({
 
             {/* 6. Exercise list or empty state */}
             {activeDay.items.length === 0 ? (
-              <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'var(--bg-elevated)', border: '1px dashed var(--border-default)', borderRadius: 14 }}>
+              <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', background: 'var(--bg-card-hover)', border: '1px dashed var(--border-default)', borderRadius: 14 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 999, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', marginBottom: 12 }}>
                   <svg viewBox="0 0 16 16" width="20" height="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
                 </div>
@@ -5064,7 +5064,7 @@ function BuilderPage({
                       <div
                         data-exercise-id={item.id}
                         ref={isDragging ? (el) => { draggedElRef.current = el; } : undefined}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 4px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto', userSelect: (draggingExerciseId && dragActive) ? 'none' : 'auto', opacity: isDragging ? 0.7 : 1 } as React.CSSProperties}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 4px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', borderRadius: 12, touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto', userSelect: (draggingExerciseId && dragActive) ? 'none' : 'auto', opacity: isDragging ? 0.7 : 1 } as React.CSSProperties}
                       >
                         {/* Grip col */}
                         <div
@@ -5142,8 +5142,8 @@ function BuilderPage({
 
         {/* 7. Sticky Add CTA */}
         {activeDay && activeDay.items.length > 0 && activeDayId && activeWeekId && (
-          <div style={{ position: 'sticky', bottom: 0, padding: '10px 14px 14px', background: 'linear-gradient(180deg, rgba(10,10,12,0) 0%, var(--bg-base) 30%)', display: 'flex' }}>
-            <button onClick={() => handleAddExercise(activeWeekId, activeDayId)} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-default)', borderRadius: 12, padding: '13px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <div style={{ position: 'sticky', bottom: 0, padding: '10px 14px 14px', background: 'linear-gradient(180deg, rgba(24,24,27,0) 0%, var(--bg-card) 30%)', display: 'flex' }}>
+            <button onClick={() => handleAddExercise(activeWeekId, activeDayId)} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'var(--bg-card-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-default)', borderRadius: 12, padding: '13px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               <svg viewBox="0 0 16 16" width="15" height="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
               <span>Add exercise</span>
             </button>
