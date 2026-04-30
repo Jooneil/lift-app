@@ -3314,33 +3314,34 @@ function WorkoutPage({
               const isPaused = thisTimer?.paused;
               const isActive = thisTimer && !isDone && !isPaused;
               const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-              const pillStyle: React.CSSProperties = { fontSize: 12, padding: '5px 12px', borderRadius: 9999, border: '1px solid', display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', boxShadow: 'none', minHeight: 'auto', lineHeight: 1 };
+              const pillCls = "text-[12px] px-3 py-1.5 rounded-full border flex items-center gap-1.5";
+              const pillBase: React.CSSProperties = { boxShadow: 'none', minHeight: 'auto', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
               if (isDone) {
                 return (
-                  <button onClick={dismissRestTimer} style={{ ...pillStyle, borderColor: 'var(--success)', background: 'var(--success-muted)', color: 'var(--success)', cursor: 'pointer' }}>
+                  <button onClick={dismissRestTimer} className={pillCls} style={{ ...pillBase, borderColor: 'var(--success)', background: 'var(--success-muted)', color: 'var(--success)' }}>
                     Rest done
                   </button>
                 );
               }
               if (isPaused) {
                 return (
-                  <button onClick={togglePauseRestTimer} style={{ ...pillStyle, borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.6 }}>
+                  <button onClick={togglePauseRestTimer} className={pillCls} style={{ ...pillBase, borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', opacity: 0.6 }}>
                     <TimerIcon size={12} /> {fmtDur(thisTimer!.secondsLeft)}
                   </button>
                 );
               }
               if (isActive) {
                 return (
-                  <button onClick={togglePauseRestTimer} style={{ ...pillStyle, borderColor: 'var(--accent-blue)', background: 'var(--accent-blue-muted)', color: 'var(--accent-blue)', cursor: 'pointer' }}>
+                  <button onClick={togglePauseRestTimer} className={pillCls} style={{ ...pillBase, borderColor: 'var(--accent-blue)', background: 'var(--accent-blue-muted)', color: 'var(--accent-blue)' }}>
                     <TimerIcon size={12} /> {fmtDur(restTimer!.secondsLeft)}
                   </button>
                 );
               }
               return (
-                <span style={{ ...pillStyle, borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', opacity: 0.4, userSelect: 'none' }}>
+                <button disabled className={pillCls} style={{ ...pillBase, borderColor: 'var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', opacity: 0.4, cursor: 'default' }}>
                   <TimerIcon size={12} /> {fmtDur(REST_DURATION)}
-                </span>
+                </button>
               );
             })()}
 
