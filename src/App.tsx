@@ -5127,14 +5127,15 @@ function BuilderPage({
               <ChevronLeftIcon size={18} />
             </button>
           )}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
             <input
               value={selectedPlan.name}
               onChange={(e) => handlePlanNameChange(e.target.value)}
               className="builder-name-input"
-              style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)', width: '100%', padding: 0 }}
+              style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)', width: '100%', padding: 0, minWidth: 0 }}
               placeholder="Untitled"
             />
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width={12} height={12} style={{ flexShrink: 0, color: 'var(--text-muted)', opacity: 0.5, pointerEvents: 'none' }}><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" /></svg>
           </div>
           {(exerciseLoading || catalogLoading) && <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Loading…</span>}
           <button
@@ -5224,6 +5225,7 @@ function BuilderPage({
                   className="builder-name-input"
                   style={{ flex: 1, color: 'var(--text-primary)', fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', padding: 0, minWidth: 0 }}
                 />
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width={13} height={13} style={{ flexShrink: 0, color: 'var(--text-muted)', opacity: 0.5, pointerEvents: 'none' }}><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z" /></svg>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button onClick={() => setFocusDayMenuOpen(v => !v)} style={{ width: 30, height: 30, padding: 0, boxShadow: 'none', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 18, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Day options">⋯</button>
                   {focusDayMenuOpen && (<>
