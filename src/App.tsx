@@ -2117,8 +2117,9 @@ function WorkoutPage({
   const restTimerStateRef = useRef<{ secondsLeft: number; total: number; entryId: string; done?: boolean; paused?: boolean } | null>(null);
 
   // Custom keypad state
-  type KeypadInfo = { entryId: string; setId: string; field: 'weight' | 'reps'; ghostWeight: number | null; ghostReps: number | null };
+  type KeypadInfo = { entryId: string; setId: string; ghostWeight: number | null; ghostReps: number | null };
   const [activeKeypad, setActiveKeypad] = useState<KeypadInfo | null>(null);
+  const [keypadField, setKeypadField] = useState<'weight' | 'reps'>('weight');
   const [keypadWeightDraft, setKeypadWeightDraft] = useState('');
   const [keypadRepsDraft, setKeypadRepsDraft] = useState('');
   const activeKeypadRef = useRef<KeypadInfo | null>(null);
@@ -3290,8 +3291,9 @@ function WorkoutPage({
                           setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
                           setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
                         }
-                        const kp: KeypadInfo = { entryId: entry.id, setId: set.id, field: 'weight', ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
+                        const kp: KeypadInfo = { entryId: entry.id, setId: set.id, ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
                         setActiveKeypad(kp); activeKeypadRef.current = kp;
+                        setKeypadField('weight');
                       }}
                       onBlur={() => {
                         keypadBlurTimerRef.current = setTimeout(() => {
@@ -3329,8 +3331,9 @@ function WorkoutPage({
                           setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
                           setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
                         }
-                        const kp: KeypadInfo = { entryId: entry.id, setId: set.id, field: 'reps', ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
+                        const kp: KeypadInfo = { entryId: entry.id, setId: set.id, ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
                         setActiveKeypad(kp); activeKeypadRef.current = kp;
+                        setKeypadField('reps');
                       }}
                       onBlur={() => {
                         keypadBlurTimerRef.current = setTimeout(() => {
@@ -3772,17 +3775,14 @@ function WorkoutPage({
 
       {activeKeypad && (
         <WorkoutKeypad
-          field={activeKeypad.field}
+          field={keypadField}
           weightDraft={keypadWeightDraft}
           repsDraft={keypadRepsDraft}
           ghostWeight={activeKeypad.ghostWeight}
           ghostReps={activeKeypad.ghostReps}
           onWeightChange={(v) => { setKeypadWeightDraft(v); keypadWeightDraftRef.current = v; }}
           onRepsChange={(v) => { setKeypadRepsDraft(v); keypadRepsDraftRef.current = v; }}
-          onFieldSwitch={(f) => {
-            const kp = { ...activeKeypadRef.current!, field: f };
-            setActiveKeypad(kp); activeKeypadRef.current = kp;
-          }}
+          onFieldSwitch={setKeypadField}
           onDone={() => { (document.activeElement as HTMLElement)?.blur(); }}
           onPromote={() => {
             const rawW = parseFloat(keypadWeightDraftRef.current) || 0;

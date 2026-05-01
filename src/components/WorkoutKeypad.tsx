@@ -140,7 +140,6 @@ export default function WorkoutKeypad({
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Consider adding weight</div>
           </div>
           <button
-            onPointerDown={(e) => e.preventDefault()}
             onClick={onPromote}
             style={{
               background: '#22c55e',
@@ -169,7 +168,6 @@ export default function WorkoutKeypad({
             return (
               <button
                 key={f}
-                onPointerDown={(e) => e.preventDefault()}
                 onClick={() => onFieldSwitch(f)}
                 style={{
                   flex: 1,
@@ -207,7 +205,6 @@ export default function WorkoutKeypad({
           })}
         </div>
         <button
-          onPointerDown={(e) => e.preventDefault()}
           onClick={onDone}
           style={{
             padding: '0 20px',
