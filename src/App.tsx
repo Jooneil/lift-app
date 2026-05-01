@@ -26,6 +26,7 @@ import PullToRefresh from './components/pullToRefresh/PullToRefresh';
 import DayPickerDropdown from './components/WorkoutHeader/DayPickerDropdown';
 import GearMenu from './components/WorkoutHeader/GearMenu';
 import AppMenu from './components/WorkoutHeader/AppMenu';
+import WorkoutKeypad from './components/WorkoutKeypad';
 
 
 export default function App() {
@@ -2115,6 +2116,16 @@ function WorkoutPage({
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restTimerStateRef = useRef<{ secondsLeft: number; total: number; entryId: string; done?: boolean; paused?: boolean } | null>(null);
 
+  // Custom keypad state
+  type KeypadInfo = { entryId: string; setId: string; field: 'weight' | 'reps'; ghostWeight: number | null; ghostReps: number | null };
+  const [activeKeypad, setActiveKeypad] = useState<KeypadInfo | null>(null);
+  const [keypadWeightDraft, setKeypadWeightDraft] = useState('');
+  const [keypadRepsDraft, setKeypadRepsDraft] = useState('');
+  const activeKeypadRef = useRef<KeypadInfo | null>(null);
+  const keypadWeightDraftRef = useRef('');
+  const keypadRepsDraftRef = useRef('');
+  const keypadBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const formatElapsed = useCallback(() => {
     if (!sessionStartRef.current) return '';
     const mins = Math.floor((Date.now() - sessionStartRef.current) / 60000);
@@ -3261,44 +3272,80 @@ function WorkoutPage({
                   }}>
                     <div className="flex items-center justify-center w-7 h-7 rounded-full bg-elevated text-muted font-semibold text-[13px] shrink-0">{i + 1}</div>
                     <input
-                      type="number"
-                      step="any"
-                      inputMode="decimal"
+                      type="text"
+                      inputMode="none"
                       placeholder={!workoutPrefs.show_ghost || ghostSet.weight == null ? '' : String(ghostSet.weight)}
-                      value={set.weight ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        const normalized = v.replace(',', '.');
-                        const num = normalized === '' ? null : Number(normalized);
-                        updateSet(entry.id, set.id, {
-                          weight: num !== null && Number.isNaN(num) ? null : num,
-                        });
+                      value={
+                        activeKeypad?.entryId === entry.id && activeKeypad?.setId === set.id
+                          ? keypadWeightDraft
+                          : (set.weight != null ? String(set.weight) : '')
+                      }
+                      onChange={() => {}}
+                      onFocus={() => {
+                        if (keypadBlurTimerRef.current) { clearTimeout(keypadBlurTimerRef.current); keypadBlurTimerRef.current = null; }
+                        const sameSet = activeKeypadRef.current?.entryId === entry.id && activeKeypadRef.current?.setId === set.id;
+                        if (!sameSet) {
+                          const wD = set.weight != null ? String(set.weight) : '';
+                          const rD = set.reps != null ? String(set.reps) : '';
+                          setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
+                          setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
+                        }
+                        const kp: KeypadInfo = { entryId: entry.id, setId: set.id, field: 'weight', ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
+                        setActiveKeypad(kp); activeKeypadRef.current = kp;
+                      }}
+                      onBlur={() => {
+                        keypadBlurTimerRef.current = setTimeout(() => {
+                          const kp = activeKeypadRef.current;
+                          if (!kp) return;
+                          const rawW = parseFloat(keypadWeightDraftRef.current);
+                          const rawR = parseInt(keypadRepsDraftRef.current, 10);
+                          const weightVal = keypadWeightDraftRef.current === '' || isNaN(rawW) ? null : rawW;
+                          const repsVal = keypadRepsDraftRef.current === '' || isNaN(rawR) ? null : rawR;
+                          let finalWeight = weightVal;
+                          if (finalWeight == null && repsVal != null && kp.ghostWeight != null) finalWeight = kp.ghostWeight;
+                          updateSet(kp.entryId, kp.setId, { weight: finalWeight, reps: repsVal });
+                          if (repsVal != null && finalWeight != null && workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) startRestTimer(kp.entryId);
+                          setActiveKeypad(null); activeKeypadRef.current = null;
+                        }, 80);
                       }}
                       className="workout-input w-full min-w-0"
                     />
                     <input
-                      inputMode="numeric"
+                      type="text"
+                      inputMode="none"
                       placeholder={!workoutPrefs.show_ghost || ghostSet.reps == null ? '' : String(ghostSet.reps)}
-                      value={set.reps ?? ''}
-                      onChange={(e) => {
-                        const num = e.target.value === '' ? null : Number(e.target.value);
-                        const repsValue = num !== null && Number.isNaN(num) ? null : num;
-                        const effectiveWeight = set.weight ?? (repsValue != null ? ghostSet.weight : null);
-                        // Auto-populate weight from ghost if weight is empty and entering reps
-                        if (set.weight == null && repsValue != null && ghostSet.weight != null) {
-                          updateSet(entry.id, set.id, {
-                            reps: repsValue,
-                            weight: ghostSet.weight,
-                          });
-                        } else {
-                          updateSet(entry.id, set.id, {
-                            reps: repsValue,
-                          });
+                      value={
+                        activeKeypad?.entryId === entry.id && activeKeypad?.setId === set.id
+                          ? keypadRepsDraft
+                          : (set.reps != null ? String(set.reps) : '')
+                      }
+                      onChange={() => {}}
+                      onFocus={() => {
+                        if (keypadBlurTimerRef.current) { clearTimeout(keypadBlurTimerRef.current); keypadBlurTimerRef.current = null; }
+                        const sameSet = activeKeypadRef.current?.entryId === entry.id && activeKeypadRef.current?.setId === set.id;
+                        if (!sameSet) {
+                          const wD = set.weight != null ? String(set.weight) : '';
+                          const rD = set.reps != null ? String(set.reps) : '';
+                          setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
+                          setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
                         }
-                        // Start rest timer when set becomes complete
-                        if (repsValue != null && effectiveWeight != null && workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) {
-                          startRestTimer(entry.id);
-                        }
+                        const kp: KeypadInfo = { entryId: entry.id, setId: set.id, field: 'reps', ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
+                        setActiveKeypad(kp); activeKeypadRef.current = kp;
+                      }}
+                      onBlur={() => {
+                        keypadBlurTimerRef.current = setTimeout(() => {
+                          const kp = activeKeypadRef.current;
+                          if (!kp) return;
+                          const rawW = parseFloat(keypadWeightDraftRef.current);
+                          const rawR = parseInt(keypadRepsDraftRef.current, 10);
+                          const weightVal = keypadWeightDraftRef.current === '' || isNaN(rawW) ? null : rawW;
+                          const repsVal = keypadRepsDraftRef.current === '' || isNaN(rawR) ? null : rawR;
+                          let finalWeight = weightVal;
+                          if (finalWeight == null && repsVal != null && kp.ghostWeight != null) finalWeight = kp.ghostWeight;
+                          updateSet(kp.entryId, kp.setId, { weight: finalWeight, reps: repsVal });
+                          if (repsVal != null && finalWeight != null && workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) startRestTimer(kp.entryId);
+                          setActiveKeypad(null); activeKeypadRef.current = null;
+                        }, 80);
                       }}
                       className="workout-input w-full min-w-0"
                     />
@@ -3722,6 +3769,29 @@ function WorkoutPage({
               </>
             )}
       </Modal>
+
+      {activeKeypad && (
+        <WorkoutKeypad
+          field={activeKeypad.field}
+          weightDraft={keypadWeightDraft}
+          repsDraft={keypadRepsDraft}
+          ghostWeight={activeKeypad.ghostWeight}
+          ghostReps={activeKeypad.ghostReps}
+          onWeightChange={(v) => { setKeypadWeightDraft(v); keypadWeightDraftRef.current = v; }}
+          onRepsChange={(v) => { setKeypadRepsDraft(v); keypadRepsDraftRef.current = v; }}
+          onFieldSwitch={(f) => {
+            const kp = { ...activeKeypadRef.current!, field: f };
+            setActiveKeypad(kp); activeKeypadRef.current = kp;
+          }}
+          onDone={() => { (document.activeElement as HTMLElement)?.blur(); }}
+          onPromote={() => {
+            const rawW = parseFloat(keypadWeightDraftRef.current) || 0;
+            const newW = String(Math.round((rawW + 5) * 100) / 100);
+            setKeypadWeightDraft(newW); keypadWeightDraftRef.current = newW;
+            setKeypadRepsDraft('10'); keypadRepsDraftRef.current = '10';
+          }}
+        />
+      )}
     </div>
   );
 }
