@@ -3306,7 +3306,7 @@ function WorkoutPage({
                           updateSet(kp.entryId, kp.setId, { weight: finalWeight, reps: repsVal });
                           if (repsVal != null && finalWeight != null && workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) startRestTimer(kp.entryId);
                           setActiveKeypad(null); activeKeypadRef.current = null;
-                        }, 80);
+                        }, 200);
                       }}
                       className="workout-input w-full min-w-0"
                     />
@@ -3345,7 +3345,7 @@ function WorkoutPage({
                           updateSet(kp.entryId, kp.setId, { weight: finalWeight, reps: repsVal });
                           if (repsVal != null && finalWeight != null && workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) startRestTimer(kp.entryId);
                           setActiveKeypad(null); activeKeypadRef.current = null;
-                        }, 80);
+                        }, 200);
                       }}
                       className="workout-input w-full min-w-0"
                     />

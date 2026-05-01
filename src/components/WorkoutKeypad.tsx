@@ -85,8 +85,8 @@ export default function WorkoutKeypad({
       return;
     }
     const parsed = isWeight
-      ? (parseFloat(currentDraft) || 0)
-      : (parseInt(currentDraft, 10) || 0);
+      ? (currentDraft === '' ? (ghostWeight ?? 0) : (parseFloat(currentDraft) || 0))
+      : (currentDraft === '' ? (ghostReps ?? 0) : (parseInt(currentDraft, 10) || 0));
     const smallStep = isWeight ? 2.5 : 1;
     const largeStep = 5;
     const clamp = (v: number) => Math.max(0, v);
@@ -111,6 +111,7 @@ export default function WorkoutKeypad({
   return (
     <div
       onPointerDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
         bottom: 0,
