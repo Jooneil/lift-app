@@ -2,10 +2,11 @@ import type { FilterState, EquipFilter } from './useExerciseFilters';
 import type { SearchSource } from '../../types';
 import EquipmentIcon, { EQUIP_LABEL } from './EquipmentIcon';
 
-const MUSCLE_GROUPS = [
-  'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Chest', 'Front Delt',
-  'Side Delt', 'Rear Delt', 'Lats', 'Upper Back', 'Traps',
-  'Bicep', 'Tricep', 'Abs', 'Lower Back', 'Forearm',
+const MUSCLE_PPL: { group: string; muscles: string[] }[] = [
+  { group: 'Push',  muscles: ['Chest', 'Front Delt', 'Side Delt', 'Tricep'] },
+  { group: 'Pull',  muscles: ['Bicep', 'Forearm', 'Lats', 'Rear Delt', 'Traps', 'Upper Back'] },
+  { group: 'Legs',  muscles: ['Calves', 'Glutes', 'Hamstrings', 'Quads'] },
+  { group: 'Core',  muscles: ['Abs', 'Lower Back'] },
 ];
 
 const EQUIP_OPTIONS: EquipFilter[] = ['free_weight', 'machine', 'cable', 'body_weight'];
@@ -46,13 +47,20 @@ export default function AddExerciseFilters({ filters, onChange, onClear, filterC
   return (
     <div style={{ padding: '10px 14px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0 }}>
 
-      {/* Muscle row */}
+      {/* Muscle rows — grouped by PPL + Core */}
       <div>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 6 }}>Muscle</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Muscle</div>
           <Chip active={filters.muscle === 'All'} onClick={() => onChange({ muscle: 'All' })}>All</Chip>
-          {MUSCLE_GROUPS.map((m) => (
-            <Chip key={m} active={filters.muscle === m} onClick={() => onChange({ muscle: m })}>{m}</Chip>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {MUSCLE_PPL.map(({ group, muscles }) => (
+            <div key={group} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', minWidth: 32 }}>{group}</span>
+              {muscles.map((m) => (
+                <Chip key={m} active={filters.muscle === m} onClick={() => onChange({ muscle: m })}>{m}</Chip>
+              ))}
+            </div>
           ))}
         </div>
       </div>
