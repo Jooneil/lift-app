@@ -284,6 +284,20 @@ export default function AddExerciseSheet({
               </span>
             )}
           </button>
+
+          <button
+            onClick={() => { setCreateOpen((v) => !v); setView('results'); }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '5px 13px', borderRadius: 9999, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              background: createOpen ? 'var(--accent-muted)' : 'var(--bg-card)',
+              border: `1px solid ${createOpen ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
+              color: createOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
+              marginLeft: 'auto',
+            }}
+          >
+            + Custom
+          </button>
         </div>
 
         {/* Filter block (collapsible) */}
@@ -342,57 +356,9 @@ export default function AddExerciseSheet({
                 </div>
               )}
 
-              {/* Empty search state */}
-              {isSearching && filtered.length === 0 ? (
-                <div style={{ padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>No matches for "{search}"</div>
-                  <button
-                    onClick={() => { setCreateOpen(true); setCreateName(search); }}
-                    style={{ padding: '8px 20px', borderRadius: 9999, border: '1px solid var(--border-default)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-                  >
-                    Create "{search}"
-                  </button>
-                </div>
-              ) : (
-                /* Grouped results */
-                grouped.map(({ muscle, exercises }) => (
-                  <div key={muscle}>
-                    {!isSearching && (
-                      <div style={{ padding: '8px 14px 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', background: 'var(--bg-card)', position: 'sticky', top: 0, zIndex: 2 }}>
-                        {muscle}
-                      </div>
-                    )}
-                    {exercises.map((ex) => (
-                      <AddExerciseResultRow
-                        key={`${ex.isCustom ? 'c' : 'd'}:${ex.id}`}
-                        exercise={ex}
-                        queued={queueNames.has(norm(ex.name))}
-                        inDay={dayItemNames.has(norm(ex.name))}
-                        onToggleQueue={() => toggleQueue(ex)}
-                        onDelete={ex.isCustom ? () => handleDeleteCustom(ex) : undefined}
-                      />
-                    ))}
-                  </div>
-                ))
-              )}
-
-              {/* Create custom movement button — at bottom of results */}
-              {!createOpen && (
-                <button
-                  onClick={() => setCreateOpen(true)}
-                  style={{
-                    margin: '12px 14px 80px', padding: '12px 16px', borderRadius: 10,
-                    border: '1.5px dashed var(--border-default)', background: 'transparent',
-                    color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', textAlign: 'center',
-                  }}
-                >
-                  + Create custom movement
-                </button>
-              )}
-
-              {/* Create custom form */}
+              {/* Create custom form — shown at top of results */}
               {createOpen && (
-                <div style={{ margin: '12px 14px 80px', padding: 14, border: '1px solid var(--border-subtle)', borderRadius: 12, background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ margin: '12px 14px', padding: 14, border: '1px solid var(--border-subtle)', borderRadius: 12, background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Create movement</div>
                   <input
                     value={createName}
@@ -431,6 +397,41 @@ export default function AddExerciseSheet({
                   </div>
                 </div>
               )}
+
+              {/* Empty search state */}
+              {isSearching && filtered.length === 0 ? (
+                <div style={{ padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>No matches for "{search}"</div>
+                  <button
+                    onClick={() => { setCreateOpen(true); setCreateName(search); }}
+                    style={{ padding: '8px 20px', borderRadius: 9999, border: '1px solid var(--border-default)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+                  >
+                    Create "{search}"
+                  </button>
+                </div>
+              ) : (
+                /* Grouped results */
+                grouped.map(({ muscle, exercises }) => (
+                  <div key={muscle}>
+                    {!isSearching && (
+                      <div style={{ padding: '8px 14px 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', background: 'var(--bg-card)', position: 'sticky', top: 0, zIndex: 2 }}>
+                        {muscle}
+                      </div>
+                    )}
+                    {exercises.map((ex) => (
+                      <AddExerciseResultRow
+                        key={`${ex.isCustom ? 'c' : 'd'}:${ex.id}`}
+                        exercise={ex}
+                        queued={queueNames.has(norm(ex.name))}
+                        inDay={dayItemNames.has(norm(ex.name))}
+                        onToggleQueue={() => toggleQueue(ex)}
+                        onDelete={ex.isCustom ? () => handleDeleteCustom(ex) : undefined}
+                      />
+                    ))}
+                  </div>
+                ))
+              )}
+
             </>
           )}
         </div>
