@@ -1306,7 +1306,56 @@ function AuthedApp({
           </div>
 
           {!selectedPlan ? (
-            <p className="text-muted">No plan selected.</p>
+            <div style={{ padding: '48px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
+              <svg viewBox="0 0 48 48" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={52} height={52} style={{ opacity: 0.4 }}>
+                <rect x="2" y="12" width="8" height="24" rx="2.5" />
+                <rect x="10" y="18" width="5" height="12" rx="1.5" />
+                <rect x="33" y="18" width="5" height="12" rx="1.5" />
+                <rect x="38" y="12" width="8" height="24" rx="2.5" />
+                <line x1="15" y1="24" x2="33" y2="24" />
+              </svg>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>No plan yet</div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.5, maxWidth: 260 }}>Create a workout plan to get started. You can build one yourself or let AI do it for you.</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280 }}>
+                <button
+                  onClick={() => {
+                    const newWeekId = uuid();
+                    const newDayId = uuid();
+                    const newPlan: Plan = {
+                      id: uuid(),
+                      name: 'New Plan',
+                      weeks: [{ id: newWeekId, name: 'Week 1', days: [{ id: newDayId, name: 'Day 1', items: [] }] }],
+                    };
+                    setPlans((prev) => [...prev, newPlan]);
+                    selectPlan(newPlan.id, newPlan);
+                    setMode('builder');
+                  }}
+                  style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: 'var(--accent-blue)', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Create a plan
+                </button>
+                <button
+                  onClick={() => {
+                    const newWeekId = uuid();
+                    const newDayId = uuid();
+                    const newPlan: Plan = {
+                      id: uuid(),
+                      name: 'New Plan',
+                      weeks: [{ id: newWeekId, name: 'Week 1', days: [{ id: newDayId, name: 'Day 1', items: [] }] }],
+                    };
+                    setPlans((prev) => [...prev, newPlan]);
+                    selectPlan(newPlan.id, newPlan);
+                    setPendingAIBuilder(true);
+                    setMode('builder');
+                  }}
+                  style={{ padding: '12px 20px', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}
+                >
+                  ✦ Build with AI
+                </button>
+              </div>
+            </div>
           ) : !selectedDay ? (
             <div className="text-muted">Select a day.</div>
           ) : (
