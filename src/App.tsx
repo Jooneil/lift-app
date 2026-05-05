@@ -2183,6 +2183,19 @@ function WorkoutPage({
   const keypadRepsDraftRef = useRef('');
   const keypadBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const commitKeypadDraft = () => {
+    const kp = activeKeypadRef.current;
+    if (!kp) return;
+    const rawW = parseFloat(keypadWeightDraftRef.current);
+    const rawR = parseInt(keypadRepsDraftRef.current, 10);
+    const weightVal = keypadWeightDraftRef.current === '' || isNaN(rawW) ? null : rawW;
+    const repsVal = keypadRepsDraftRef.current === '' || isNaN(rawR) ? null : rawR;
+    let finalWeight = weightVal;
+    if (finalWeight == null && repsVal != null && kp.ghostWeight != null) finalWeight = kp.ghostWeight;
+    updateSet(kp.entryId, kp.setId, { weight: finalWeight, reps: repsVal });
+    if (repsVal != null && finalWeight != null && workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) startRestTimer(kp.entryId);
+  };
+
   const formatElapsed = useCallback(() => {
     if (!sessionStartRef.current) return '';
     const mins = Math.floor((Date.now() - sessionStartRef.current) / 60000);
@@ -3342,6 +3355,7 @@ function WorkoutPage({
                         if (keypadBlurTimerRef.current) { clearTimeout(keypadBlurTimerRef.current); keypadBlurTimerRef.current = null; }
                         const sameSet = activeKeypadRef.current?.entryId === entry.id && activeKeypadRef.current?.setId === set.id;
                         if (!sameSet) {
+                          if (activeKeypadRef.current) commitKeypadDraft();
                           const wD = set.weight != null ? String(set.weight) : '';
                           const rD = set.reps != null ? String(set.reps) : '';
                           setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
@@ -3382,6 +3396,7 @@ function WorkoutPage({
                         if (keypadBlurTimerRef.current) { clearTimeout(keypadBlurTimerRef.current); keypadBlurTimerRef.current = null; }
                         const sameSet = activeKeypadRef.current?.entryId === entry.id && activeKeypadRef.current?.setId === set.id;
                         if (!sameSet) {
+                          if (activeKeypadRef.current) commitKeypadDraft();
                           const wD = set.weight != null ? String(set.weight) : '';
                           const rD = set.reps != null ? String(set.reps) : '';
                           setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
