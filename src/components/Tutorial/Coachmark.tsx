@@ -41,10 +41,12 @@ export default function Coachmark({ targetId, placement, title, body, stepId, aw
     measure();
     const t1 = setTimeout(measure, 60);
     const t2 = setTimeout(measure, 250);
+    const t3 = setTimeout(measure, 550);
     window.addEventListener('resize', measure);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
       window.removeEventListener('resize', measure);
     };
   }, [measure, targetId]);

@@ -420,7 +420,7 @@ export default function AddExerciseSheet({
                       </div>
                     )}
                     {exercises.map((ex) => (
-                      <div key={`${ex.isCustom ? 'c' : 'd'}:${ex.id}`} {...(norm(ex.name) === 'bench press' ? { 'data-tutorial-id': 'sheet-add-bench' } : {})}>
+                      <div key={`${ex.isCustom ? 'c' : 'd'}:${ex.id}`} {...(norm(ex.name).includes('bench press') ? { 'data-tutorial-id': 'sheet-add-bench' } : {})}>
                         <AddExerciseResultRow
                           exercise={ex}
                           queued={queueNames.has(norm(ex.name))}
