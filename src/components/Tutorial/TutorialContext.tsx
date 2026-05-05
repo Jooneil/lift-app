@@ -46,8 +46,10 @@ export function TutorialProvider({ children, plansLoaded, hasPlans }: {
     if (hasPlans) return;
     const stored = readStorage();
     if (stored.dismissed || stored.completedAt) return;
+    let aborted = false;
     // Check Supabase prefs for cross-device state
     getUserPrefs().then((prefs) => {
+      if (aborted) return;
       const tp = prefs?.prefs?.tutorial_prefs;
       if (tp?.dismissed || tp?.completedAt) {
         writeStorage({ dismissed: true });
@@ -55,8 +57,9 @@ export function TutorialProvider({ children, plansLoaded, hasPlans }: {
       }
       setState({ stepIndex: stored.stepIndex ?? 0, isActive: true, showSkipConfirm: false });
     }).catch(() => {
-      setState({ stepIndex: stored.stepIndex ?? 0, isActive: true, showSkipConfirm: false });
+      // Network failure — don't start tutorial; user will see it on next clean load
     });
+    return () => { aborted = true; };
   }, [plansLoaded, hasPlans]);
 
   const advance = useCallback(() => {

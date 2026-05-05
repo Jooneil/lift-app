@@ -1,5 +1,6 @@
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import Auth from "./Auth";
 import { Badge, Button, Card, EmptyState, Modal, Skeleton, KebabIcon, XIcon, TimerIcon, FlameIcon, ChevronLeftIcon } from "./components";
 import { api, aiApi, exerciseApi, exerciseCatalogApi, planApi, sessionApi, templateApi } from "./api";
@@ -29,6 +30,32 @@ import AppMenu from './components/WorkoutHeader/AppMenu';
 import WorkoutKeypad from './components/WorkoutKeypad';
 import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tutorial';
 
+
+// ─── Error boundary ───────────────────────────────────────────────────────────
+class AppErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean }> {
+  state = { crashed: false };
+  static getDerivedStateFromError() { return { crashed: true }; }
+  componentDidCatch(err: Error, info: ErrorInfo) {
+    console.error('[AppErrorBoundary]', err, info);
+  }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div style={{ position: 'fixed', inset: 0, background: '#0a0a0c', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#f5f5f7' }}>Something went wrong</div>
+          <div style={{ fontSize: 14, color: '#8e8e93', textAlign: 'center' }}>The app hit an unexpected error. Tap below to reload.</div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: '#5ac8fa', color: '#0a0a0c', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Reload app
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [user, setUser] = useState<{ id: number; username: string } | null>(null);
@@ -65,7 +92,25 @@ export default function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // iOS Safari PWA: when backgrounded then resumed, the page can go blank.
+  // Detect this via visibilitychange and reload if the root div has no height.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.hidden) return;
+      // Give the browser 300ms to restore the page, then check if it rendered
+      setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root && root.clientHeight < 10) {
+          window.location.reload();
+        }
+      }, 300);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
   return (
+    <AppErrorBoundary>
     <div>
       <PullToRefresh onRefresh={() => window.location.reload()} />
       {checking ? (
@@ -89,6 +134,7 @@ export default function App() {
         />
       )}
     </div>
+    </AppErrorBoundary>
   );
 }
 
