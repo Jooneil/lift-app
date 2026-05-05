@@ -2405,12 +2405,14 @@ function WorkoutPage({
 
   useEffect(() => {
     if (!currentWeek) return;
+    let cancelled = false;
 
     (async () => {
       const serverId = plan.serverId;
       if (serverId) {
         try {
           const latest: SessionPayload | null = await sessionApi.last(serverId, currentWeek.id, day.id);
+          if (cancelled) return;
           if (latest && latest.entries) {
             if (latest.ghostSeed) {
               const ghostMap: Record<string, { weight: number | null; reps: number | null }[]> = {};
@@ -2433,13 +2435,14 @@ function WorkoutPage({
             return;
           }
         } catch {
-          void 0;
+          if (cancelled) return;
         }
       }
 
-      setSession(startSessionFromDay(plan, currentWeek.id, day.id));
+      if (!cancelled) setSession(startSessionFromDay(plan, currentWeek.id, day.id));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { cancelled = true; };
   }, [plan.serverId, currentWeekId, day.id]);
 
   useEffect(() => {
