@@ -63,6 +63,15 @@ export const STEPS: TutorialStep[] = [
     waitFor: 'sheet-freeweight-filter',
   },
   {
+    id: 'exercise-filter-close',
+    kind: 'coach',
+    target: 'sheet-filters-btn',
+    placement: 'bottom',
+    title: 'See your results',
+    body: 'Tap Filters again to collapse and reveal the list.',
+    waitFor: 'sheet-filters-btn',
+  },
+  {
     id: 'exercise-pick-bench',
     kind: 'coach',
     target: 'sheet-add-bench',
