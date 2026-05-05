@@ -100,6 +100,7 @@ function AuthedApp({
 }) {
   const [mode, setMode] = useState<Mode>("workout");
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
@@ -461,6 +462,7 @@ function AuthedApp({
       try {
         const rows = await planApi.list();
         const loaded: Plan[] = rows.map((row) => mapServerPlan(row));
+        setPlansLoading(false);
 
         // ── Phase 1: instant restore from localStorage ──────────────────────
         // All state is set synchronously here so React batches it into ONE
@@ -628,6 +630,7 @@ function AuthedApp({
 
       } catch (err) {
         if (import.meta.env.DEV) console.error("Failed to load plans/prefs", err);
+        setPlansLoading(false);
       }
     })();
   }, []);
@@ -1305,7 +1308,11 @@ function AuthedApp({
             )}
           </div>
 
-          {!selectedPlan ? (
+          {plansLoading ? (
+            <div style={{ padding: '48px 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2.5px solid var(--border-subtle)', borderTopColor: 'var(--accent-blue)', animation: 'spin 0.8s linear infinite' }} />
+            </div>
+          ) : !selectedPlan ? (
             <div style={{ padding: '48px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
               <svg viewBox="0 0 48 48" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={52} height={52} style={{ opacity: 0.4 }}>
                 <rect x="2" y="12" width="8" height="24" rx="2.5" />
