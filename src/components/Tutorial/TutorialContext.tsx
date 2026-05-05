@@ -55,7 +55,8 @@ export function TutorialProvider({ children, plansLoaded, hasPlans }: {
         writeStorage({ dismissed: true });
         return;
       }
-      setState({ stepIndex: stored.stepIndex ?? 0, isActive: true, showSkipConfirm: false });
+      // Always start from step 0 on fresh load — no mid-tour resume
+      setState({ stepIndex: 0, isActive: true, showSkipConfirm: false });
     }).catch(() => {
       // Network failure — don't start tutorial; user will see it on next clean load
     });
@@ -71,7 +72,6 @@ export function TutorialProvider({ children, plansLoaded, hasPlans }: {
         upsertUserPrefs({ tutorial_prefs: { dismissed: false, completedAt: now } }).catch(() => {});
         return { stepIndex: 0, isActive: false, showSkipConfirm: false };
       }
-      writeStorage({ stepIndex: next });
       return { ...prev, stepIndex: next };
     });
   }, []);

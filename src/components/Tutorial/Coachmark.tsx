@@ -96,19 +96,19 @@ export default function Coachmark({ targetId, placement, title, body, stepId, aw
 
   return (
     <>
-      {/* SVG dim + spotlight ring */}
+      {/* SVG dim + spotlight ring — explicit pixel dimensions avoid 100vh≠innerHeight on iOS */}
       <svg
-        style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 9998 }}
-        viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
-        preserveAspectRatio="none"
+        style={{ position: 'fixed', left: 0, top: 0, pointerEvents: 'none', zIndex: 9998, overflow: 'visible' }}
+        width={window.innerWidth}
+        height={window.innerHeight}
       >
         <defs>
           <mask id={`tm-${stepId}`}>
-            <rect width="100%" height="100%" fill="white" />
+            <rect x={0} y={0} width={window.innerWidth} height={window.innerHeight} fill="white" />
             <rect x={sx} y={sy} width={sw} height={sh} rx={rx} fill="black" />
           </mask>
         </defs>
-        <rect width="100%" height="100%" fill="rgba(0,0,0,0.72)" mask={`url(#tm-${stepId})`} />
+        <rect x={0} y={0} width={window.innerWidth} height={window.innerHeight} fill="rgba(0,0,0,0.72)" mask={`url(#tm-${stepId})`} />
         <rect
           x={sx} y={sy} width={sw} height={sh} rx={rx}
           fill="none"
