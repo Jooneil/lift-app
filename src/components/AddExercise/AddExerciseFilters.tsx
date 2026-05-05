@@ -18,10 +18,11 @@ type Props = {
   filterCount: number;
 };
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({ active, onClick, children, tutorialId }: { active: boolean; onClick: () => void; children: React.ReactNode; tutorialId?: string }) {
   return (
     <button
       onClick={onClick}
+      {...(tutorialId ? { 'data-tutorial-id': tutorialId } : {})}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 5,
         padding: '4px 11px', borderRadius: 9999, fontSize: 12, fontWeight: 500, cursor: 'pointer',
@@ -58,7 +59,7 @@ export default function AddExerciseFilters({ filters, onChange, onClear, filterC
             <div key={group} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', minWidth: 32 }}>{group}</span>
               {muscles.map((m) => (
-                <Chip key={m} active={filters.muscle === m} onClick={() => onChange({ muscle: m })}>{m}</Chip>
+                <Chip key={m} active={filters.muscle === m} onClick={() => onChange({ muscle: m })} tutorialId={m === 'Chest' ? 'sheet-chest-filter' : undefined}>{m}</Chip>
               ))}
             </div>
           ))}
@@ -70,7 +71,7 @@ export default function AddExerciseFilters({ filters, onChange, onClear, filterC
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 6 }}>Equipment</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
           {EQUIP_OPTIONS.map((eq) => (
-            <Chip key={eq} active={filters.equipment.includes(eq)} onClick={() => toggleEquip(eq)}>
+            <Chip key={eq} active={filters.equipment.includes(eq)} onClick={() => toggleEquip(eq)} tutorialId={eq === 'free_weight' ? 'sheet-freeweight-filter' : undefined}>
               <EquipmentIcon type={eq} size={12} />
               {EQUIP_LABEL[eq]}
             </Chip>

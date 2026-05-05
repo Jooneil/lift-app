@@ -245,6 +245,7 @@ export default function AddExerciseSheet({
         {/* Toggle bar: Filters + Queue pills */}
         <div style={{ display: 'flex', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }}>
           <button
+            data-tutorial-id="sheet-filters-btn"
             onClick={() => setFiltersOpen((v) => !v)}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
