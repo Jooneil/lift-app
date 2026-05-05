@@ -419,14 +419,15 @@ export default function AddExerciseSheet({
                       </div>
                     )}
                     {exercises.map((ex) => (
-                      <AddExerciseResultRow
-                        key={`${ex.isCustom ? 'c' : 'd'}:${ex.id}`}
-                        exercise={ex}
-                        queued={queueNames.has(norm(ex.name))}
-                        inDay={dayItemNames.has(norm(ex.name))}
-                        onToggleQueue={() => toggleQueue(ex)}
-                        onDelete={ex.isCustom ? () => handleDeleteCustom(ex) : undefined}
-                      />
+                      <div key={`${ex.isCustom ? 'c' : 'd'}:${ex.id}`} {...(norm(ex.name) === 'bench press' ? { 'data-tutorial-id': 'sheet-add-bench' } : {})}>
+                        <AddExerciseResultRow
+                          exercise={ex}
+                          queued={queueNames.has(norm(ex.name))}
+                          inDay={dayItemNames.has(norm(ex.name))}
+                          onToggleQueue={() => toggleQueue(ex)}
+                          onDelete={ex.isCustom ? () => handleDeleteCustom(ex) : undefined}
+                        />
+                      </div>
                     ))}
                   </div>
                 ))
@@ -450,6 +451,7 @@ export default function AddExerciseSheet({
             Clear
           </button>
           <button
+            data-tutorial-id="sheet-add-cta"
             onClick={handleConfirm}
             disabled={!canConfirm || confirming}
             style={{

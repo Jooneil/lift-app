@@ -36,6 +36,11 @@ export const DEFAULT_WORKOUT_PREFS: Required<WorkoutPrefs> = {
   rest_sound: false,
 }
 
+export type TutorialPrefs = {
+  dismissed?: boolean
+  completedAt?: string | null
+}
+
 export type UserPrefsData = {
   last_plan_server_id?: string | null
   last_week_id?: string | null
@@ -45,6 +50,7 @@ export type UserPrefsData = {
   exercise_notes?: Record<string, string> | null
   exercise_instructions?: Record<string, string> | null
   workout_prefs?: WorkoutPrefs | null
+  tutorial_prefs?: TutorialPrefs | null
 }
 
 export type UserPrefs = {
@@ -82,6 +88,7 @@ export async function upsertUserPrefs(partial: {
   exercise_notes?: Record<string, string> | null
   exercise_instructions?: Record<string, string> | null
   workout_prefs?: WorkoutPrefs | null
+  tutorial_prefs?: TutorialPrefs | null
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
@@ -110,6 +117,7 @@ export async function upsertUserPrefs(partial: {
     ...(partial.exercise_notes !== undefined && { exercise_notes: partial.exercise_notes }),
     ...(partial.exercise_instructions !== undefined && { exercise_instructions: partial.exercise_instructions }),
     ...(partial.workout_prefs !== undefined && { workout_prefs: partial.workout_prefs }),
+    ...(partial.tutorial_prefs !== undefined && { tutorial_prefs: partial.tutorial_prefs }),
   }
 
   // Try update-first: if a row exists for this user, update it; otherwise insert.

@@ -29,6 +29,7 @@ export default function AddExerciseSearch({ value, onChange, autoFocus }: Props)
         </svg>
         <input
           ref={ref}
+          data-tutorial-id="sheet-search"
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}

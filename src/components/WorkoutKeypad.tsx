@@ -127,7 +127,7 @@ export default function WorkoutKeypad({
     >
       {/* Promote banner */}
       {showPromote && (
-        <div style={{
+        <div data-tutorial-id="promote-banner" style={{
           background: 'rgba(34, 197, 94, 0.1)',
           borderBottom: '1px solid rgba(34, 197, 94, 0.25)',
           padding: '9px 14px',

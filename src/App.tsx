@@ -27,6 +27,7 @@ import DayPickerDropdown from './components/WorkoutHeader/DayPickerDropdown';
 import GearMenu from './components/WorkoutHeader/GearMenu';
 import AppMenu from './components/WorkoutHeader/AppMenu';
 import WorkoutKeypad from './components/WorkoutKeypad';
+import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tutorial';
 
 
 export default function App() {
@@ -887,7 +888,8 @@ function AuthedApp({
   const handleReplaceExercise = (
     oldEntry: { exerciseId?: string; exerciseName: string },
     newName: string,
-    scope: "today" | "remaining"
+    scope: "today" | "remaining",
+    targetIndex?: number
   ) => {
     if (!selectedPlan || !selectedWeekId || !selectedDayId) return;
     const trimmed = normalizeExerciseName(newName);
@@ -920,9 +922,11 @@ function AuthedApp({
               const days = week.days.map((day, di) => {
                 if (!replaceRemaining && di !== dIdx) return day; // only current day when not replacing remaining
                 if (replaceRemaining && di < dIdx) return day; // keep days before current when replacing remaining
-                const items = day.items.map((it) =>
-                  matchesOld(it) ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it
-                );
+                const items = day.items.map((it, idx) => {
+                  // For the current day, use targetIndex to pinpoint the exact item
+                  const match = (di === dIdx && targetIndex != null) ? idx === targetIndex : matchesOld(it);
+                  return match ? { ...it, exerciseName: resolvedName, exerciseId: resolvedId } : it;
+                });
                 return { ...day, items };
               });
               return { ...week, days };
@@ -948,16 +952,16 @@ function AuthedApp({
       // Update current in-memory session for current day (replace entry there too)
       setSession((s) => {
         if (!s || s.planDayId !== selectedDayId) return s;
-        const matchesOldEntry = (e: SessionEntry) => {
-          if (oldEntry.exerciseId && e.exerciseId) return oldEntry.exerciseId === e.exerciseId;
-          const eName = normalizeExerciseName(e.exerciseName || '').toLowerCase();
-          const oldName = normalizeExerciseName(oldEntry.exerciseName || '').toLowerCase();
-          return eName === oldName;
-        };
         const next = {
           ...s,
-          entries: s.entries.map((e) => {
-            if (!matchesOldEntry(e)) return e;
+          entries: s.entries.map((e, idx) => {
+            // Use targetIndex to replace only the specific entry, not all with same name
+            const match = targetIndex != null ? idx === targetIndex : (
+              oldEntry.exerciseId && e.exerciseId
+                ? oldEntry.exerciseId === e.exerciseId
+                : normalizeExerciseName(e.exerciseName || '').toLowerCase() === normalizeExerciseName(oldEntry.exerciseName || '').toLowerCase()
+            );
+            if (!match) return e;
             const resetSets = e.sets.map((set) => ({ ...set, weight: null, reps: null }));
             return {
               ...e,
@@ -1124,6 +1128,8 @@ function AuthedApp({
   })();
   
   return (
+    <TutorialProvider plansLoaded={!plansLoading} hasPlans={plans.length > 0}>
+    <TutorialOverlay />
     <div className="max-w-[680px] lg:max-w-[1000px] w-full mx-auto p-3 sm:p-6">
       <div className="flex justify-between items-center pb-3 mb-4 border-b border-b-subtle">
         <div className="relative flex items-center gap-2">
@@ -1150,6 +1156,7 @@ function AuthedApp({
             </div>
           )}
           <button
+            data-tutorial-id="kebab-btn"
             onClick={() => setOpenHeaderMenu(v => v === 'app' ? null : 'app')}
             title="Settings"
             style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: openHeaderMenu === 'app' ? 'var(--text-primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
@@ -1160,11 +1167,12 @@ function AuthedApp({
             <>
               <div onClick={() => setOpenHeaderMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
               <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50 }}>
-                <AppMenu
+                <TutorialAwareAppMenu
                   userEmail={user.username}
                   onPreferences={() => { setOpenHeaderMenu(null); setShowWorkoutPrefs(true); }}
                   onArchive={() => { setOpenHeaderMenu(null); handleOpenArchive(); }}
                   onLogout={() => { setOpenHeaderMenu(null); onLogout(); }}
+                  onClose={() => setOpenHeaderMenu(null)}
                 />
               </div>
             </>
@@ -1220,6 +1228,7 @@ function AuthedApp({
 
               {selectedPlan && selectedWeekId && selectedDayId && (
                 <button
+                  data-tutorial-id="day-chip"
                   onClick={() => setOpenHeaderMenu(v => v === 'day' ? null : 'day')}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', background: 'var(--accent-blue-muted)', border: '1px solid var(--accent-blue)', borderRadius: 9999, color: 'var(--accent-blue)', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', cursor: 'pointer', flexShrink: 0 }}
                 >
@@ -1327,6 +1336,7 @@ function AuthedApp({
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280 }}>
                 <button
+                  data-tutorial-id="create-plan-btn"
                   onClick={() => {
                     const newWeekId = uuid();
                     const newDayId = uuid();
@@ -2080,6 +2090,7 @@ function AuthedApp({
         </div>
       </Modal>
     </div>
+    </TutorialProvider>
   );
 }
 function WorkoutPage({
@@ -2109,7 +2120,7 @@ function WorkoutPage({
   day: PlanDay;
   session: Session | null;
   setSession: React.Dispatch<React.SetStateAction<Session | null>>;
-  onReplaceExercise?: (oldEntry: { exerciseId?: string; exerciseName: string }, newName: string, scope: "today" | "remaining") => void;
+  onReplaceExercise?: (oldEntry: { exerciseId?: string; exerciseName: string }, newName: string, scope: "today" | "remaining", targetIndex?: number) => void;
   exerciseOptions: string[];
   catalogExercises: CatalogExercise[];
   onInsertExercisesAt?: (weekId: string, dayId: string, insertIndex: number, names: string[]) => Promise<void>;
@@ -2391,7 +2402,7 @@ function WorkoutPage({
 
   const handleSheetConfirmReplace = async (firstName: string, scope: "today" | "remaining", extras: string[]) => {
     if (!replaceTargetEntry) return;
-    if (typeof onReplaceExercise === "function") onReplaceExercise(replaceTargetEntry, firstName, scope);
+    if (typeof onReplaceExercise === "function") onReplaceExercise(replaceTargetEntry, firstName, scope, replaceTargetIndex ?? undefined);
     historyCacheRef.current = null;
     if (extras.length > 0 && typeof onInsertExercisesAt === "function" && currentWeekId && replaceTargetIndex != null) {
       await onInsertExercisesAt(currentWeekId, day.id, replaceTargetIndex, extras);
@@ -3350,8 +3361,9 @@ function WorkoutPage({
               {entry.sets.map((set, i) => {
                 const ghostSet = getGhost(entry.exerciseId, entry.exerciseName, i);
                 const hasValue = set.weight != null || set.reps != null;
+                const tutorialId = entryIndex === 0 && i === 0 ? 'set-row-1' : entryIndex === 0 && i === 1 ? 'ghost-row' : undefined;
                 return (
-                  <div key={set.id} className="grid grid-cols-[28px_1fr_1fr] gap-2 mb-2 items-center" style={{
+                  <div key={set.id} {...(tutorialId ? { 'data-tutorial-id': tutorialId } : {})} className="grid grid-cols-[28px_1fr_1fr] gap-2 mb-2 items-center" style={{
                     borderBottom: hasValue ? '1px solid var(--accent-blue)' : '1px solid transparent',
                   }}>
                     <div className="flex items-center justify-center w-7 h-7 rounded-full bg-elevated text-muted font-semibold text-[13px] shrink-0">{i + 1}</div>
@@ -3878,6 +3890,25 @@ function WorkoutPage({
         />
       )}
     </div>
+  );
+}
+
+function TutorialAwareAppMenu({ userEmail, onPreferences, onArchive, onLogout, onClose }: {
+  userEmail: string;
+  onPreferences: () => void;
+  onArchive: () => void;
+  onLogout: () => void;
+  onClose: () => void;
+}) {
+  const { replay } = useTutorial();
+  return (
+    <AppMenu
+      userEmail={userEmail}
+      onPreferences={onPreferences}
+      onArchive={onArchive}
+      onLogout={onLogout}
+      onReplayTutorial={() => { onClose(); replay(); }}
+    />
   );
 }
 
@@ -5224,6 +5255,7 @@ function BuilderPage({
           </div>
           {(exerciseLoading || catalogLoading) && <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Loading…</span>}
           <button
+            data-tutorial-id="builder-save-btn"
             onClick={handleSavePlan}
             disabled={saving}
             style={{ background: 'var(--accent-blue)', color: '#0a0a0c', fontWeight: 600, fontSize: 13, border: 'none', borderRadius: 8, padding: '8px 14px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, flexShrink: 0 }}
@@ -5239,7 +5271,7 @@ function BuilderPage({
               const isActive = w.id === activeWeekId;
               const canDelete = selectedPlan.weeks.length > 1 && !isActive;
               return (
-                <div key={w.id} style={{ position: 'relative', flex: 1, minWidth: 0, borderRadius: 7, ...(isActive ? { background: 'var(--bg-elevated)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' } : {}) }}>
+                <div key={w.id} {...(i === 1 ? { 'data-tutorial-id': 'builder-week-2' } : {})} style={{ position: 'relative', flex: 1, minWidth: 0, borderRadius: 7, ...(isActive ? { background: 'var(--bg-elevated)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' } : {}) }}>
                   <button
                     onClick={() => { if (!editWeeksMode) switchWeek(w.id); }}
                     style={{ width: '100%', height: '100%', background: 'transparent', border: 'none', boxShadow: 'none', color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: 12.5, fontWeight: 600, padding: '7px 10px', borderRadius: 7, cursor: editWeeksMode ? 'default' : 'pointer' }}
@@ -5259,7 +5291,7 @@ function BuilderPage({
               );
             })}
             {!editWeeksMode && (
-              <button onClick={handleAddWeek} style={{ width: 32, height: 32, background: 'transparent', border: 'none', boxShadow: 'none', padding: 0, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 20, fontWeight: 300, lineHeight: 1 }} aria-label="Add week">
+              <button data-tutorial-id="builder-add-week-btn" onClick={handleAddWeek} style={{ width: 32, height: 32, background: 'transparent', border: 'none', boxShadow: 'none', padding: 0, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 20, fontWeight: 300, lineHeight: 1 }} aria-label="Add week">
                 +
               </button>
             )}
@@ -5368,7 +5400,7 @@ function BuilderPage({
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>No exercises yet</div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4, marginBottom: 16 }}>Add your first exercise to {activeDay.name}.</div>
-                <button onClick={() => handleAddExercise(activeWeekId, activeDayId)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-blue)', color: '#0a0a0c', fontWeight: 600, fontSize: 13, border: 'none', borderRadius: 10, padding: '10px 16px', cursor: 'pointer' }}>
+                <button data-tutorial-id="builder-add-btn" onClick={() => handleAddExercise(activeWeekId, activeDayId)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-blue)', color: '#0a0a0c', fontWeight: 600, fontSize: 13, border: 'none', borderRadius: 10, padding: '10px 16px', cursor: 'pointer' }}>
                   <svg viewBox="0 0 16 16" width="14" height="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
                   <span>Add exercise</span>
                 </button>
