@@ -102,7 +102,7 @@ export const STEPS: TutorialStep[] = [
     id: 'builder-week-copied',
     kind: 'coach',
     target: 'builder-week-2',
-    placement: 'top',
+    placement: 'bottom',
     title: 'Week 2 mirrors Week 1',
     body: 'New weeks copy the previous one by default — same exercises, sets, reps. Tweak any week independently, or leave it so progressive overload does the talking.',
   },
