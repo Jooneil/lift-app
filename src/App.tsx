@@ -2518,6 +2518,14 @@ function WorkoutPage({
     };
 
     (async () => {
+      // Instant restore from localStorage cache so ghost appears before API calls complete
+      const cacheKey = `ghost:${plan.serverId ?? plan.id}:${currentWeekId}:${day.id}`;
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) setGhost(JSON.parse(cached));
+        else setGhost({});
+      } catch { setGhost({}); }
+
       try {
         const ordered: Array<{ weekId: string; dayId: string; dayIndex: number; dayName: string }> = [];
         for (const w of plan.weeks) {
@@ -2536,6 +2544,7 @@ function WorkoutPage({
         }));
         if (targets.length === 0) {
           setGhost({});
+          try { localStorage.removeItem(cacheKey); } catch {}
           return;
         }
 
@@ -2545,9 +2554,9 @@ function WorkoutPage({
         const currentDayName = day.name.trim().toLowerCase();
 
         for (let idx = currentIdx - 1; idx >= 0; idx--) {
+          if (cancelled) return;
           if (remaining.size === 0) break;
           const prev = ordered[idx];
-          // In full-body mode, only look at days with the same name
           if (ghostMode === 'full-body' && prev.dayName !== currentDayName) continue;
           const payload = await readSessionForDay(prev.weekId, prev.dayId);
           if (!payload || !payload.entries) continue;
@@ -2572,16 +2581,18 @@ function WorkoutPage({
         }
 
         if (!cancelled) {
-          if (Object.keys(ghostMap).length > 0) setGhost(ghostMap);
-          else setGhost({});
-
-          // Load historical ghost data for sets that might not have regular ghost
+          if (Object.keys(ghostMap).length > 0) {
+            setGhost(ghostMap);
+            try { localStorage.setItem(cacheKey, JSON.stringify(ghostMap)); } catch {}
+          } else {
+            // Genuine no-data — invalidate stale cache but keep ghost as-is
+            // (may have been set by ghostSeed via Effect 1)
+            try { localStorage.removeItem(cacheKey); } catch {}
+          }
           void loadHistoricalGhost(targets);
         }
       } catch {
-        if (!cancelled) {
-          setGhost({});
-        }
+        // Keep ghost as set by cache read above
       }
     })();
 
