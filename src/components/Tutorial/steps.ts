@@ -121,7 +121,7 @@ export const STEPS: TutorialStep[] = [
     target: 'day-chip',
     placement: 'bottom',
     title: 'Slide into any day',
-    body: 'W1 · D1 — tap that chip to jump weeks and days. Long press for the whole map.',
+    body: 'W1 · D1 — tap that chip to jump between weeks and days.',
   },
   {
     id: 'workout-keypad',

@@ -29,6 +29,7 @@ import GearMenu from './components/WorkoutHeader/GearMenu';
 import AppMenu from './components/WorkoutHeader/AppMenu';
 import WorkoutKeypad from './components/WorkoutKeypad';
 import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tutorial';
+import { STEPS } from './components/Tutorial/steps';
 
 
 // ─── Error boundary ───────────────────────────────────────────────────────────
@@ -1219,6 +1220,18 @@ function AuthedApp({
                   onArchive={() => { setOpenHeaderMenu(null); handleOpenArchive(); }}
                   onLogout={() => { setOpenHeaderMenu(null); onLogout(); }}
                   onClose={() => setOpenHeaderMenu(null)}
+                  onSetupReplay={() => {
+                    const newWeekId = uuid();
+                    const newDayId = uuid();
+                    const newPlan: Plan = {
+                      id: uuid(),
+                      name: 'New Plan',
+                      weeks: [{ id: newWeekId, name: 'Week 1', days: [{ id: newDayId, name: 'Day 1', items: [] }] }],
+                    };
+                    setPlans((prev) => [...prev, newPlan]);
+                    selectPlan(newPlan.id, newPlan);
+                    setMode('builder');
+                  }}
                 />
               </div>
             </>
@@ -3939,21 +3952,23 @@ function WorkoutPage({
   );
 }
 
-function TutorialAwareAppMenu({ userEmail, onPreferences, onArchive, onLogout, onClose }: {
+function TutorialAwareAppMenu({ userEmail, onPreferences, onArchive, onLogout, onClose, onSetupReplay }: {
   userEmail: string;
   onPreferences: () => void;
   onArchive: () => void;
   onLogout: () => void;
   onClose: () => void;
+  onSetupReplay: () => void;
 }) {
   const { replay } = useTutorial();
+  const builderIntroIndex = STEPS.findIndex((s) => s.id === 'builder-intro');
   return (
     <AppMenu
       userEmail={userEmail}
       onPreferences={onPreferences}
       onArchive={onArchive}
       onLogout={onLogout}
-      onReplayTutorial={() => { onClose(); replay(); }}
+      onReplayTutorial={() => { onClose(); onSetupReplay(); replay(builderIntroIndex); }}
     />
   );
 }

@@ -15,7 +15,7 @@ export type TutorialContextValue = {
   showSkipConfirm: boolean;
   advance: () => void;
   dismiss: () => void;
-  replay: () => void;
+  replay: (startIndex?: number) => void;
   confirmSkip: () => void;
   cancelSkip: () => void;
 };
@@ -90,10 +90,10 @@ export function TutorialProvider({ children, plansLoaded, hasPlans }: {
     setState((prev) => ({ ...prev, showSkipConfirm: false }));
   }, []);
 
-  const replay = useCallback(() => {
+  const replay = useCallback((startIndex = 0) => {
     writeStorage({ stepIndex: 0, dismissed: false, completedAt: undefined });
     upsertUserPrefs({ tutorial_prefs: { dismissed: false, completedAt: null } }).catch(() => {});
-    setState({ stepIndex: 0, isActive: true, showSkipConfirm: false });
+    setState({ stepIndex: startIndex, isActive: true, showSkipConfirm: false });
   }, []);
 
   const step = state.isActive ? (STEPS[state.stepIndex] ?? null) : null;
