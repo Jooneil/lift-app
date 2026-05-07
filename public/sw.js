@@ -1,4 +1,46 @@
 // Service Worker — cache-first for static assets, network-only for API/auth
+
+// Rest timer scheduling
+let restTimerTimeoutId = null;
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SCHEDULE_TIMER') {
+    if (restTimerTimeoutId !== null) clearTimeout(restTimerTimeoutId);
+    const delay = event.data.endTime - Date.now();
+    if (delay <= 0) { showRestDoneNotification(); return; }
+    restTimerTimeoutId = setTimeout(() => {
+      showRestDoneNotification();
+      restTimerTimeoutId = null;
+    }, delay);
+  }
+  if (event.data?.type === 'CANCEL_TIMER') {
+    if (restTimerTimeoutId !== null) { clearTimeout(restTimerTimeoutId); restTimerTimeoutId = null; }
+  }
+});
+
+function showRestDoneNotification() {
+  if (self.Notification?.permission !== 'granted') return;
+  self.registration.showNotification('Rest done!', {
+    body: 'Time to crush the next set.',
+    icon: '/logo.png',
+    badge: '/logo.png',
+    vibrate: [200, 100, 200],
+    tag: 'rest-timer',
+    renotify: true,
+    silent: false,
+  });
+}
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) return c.focus(); }
+      if (clients.openWindow) return clients.openWindow('/');
+    })
+  );
+});
+
 const CACHE_VERSION = 'v1';
 const CACHE_NAME = `lift-app-${CACHE_VERSION}`;
 

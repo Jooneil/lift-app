@@ -2241,6 +2241,7 @@ function WorkoutPage({
   const [restTimer, setRestTimer] = useState<{ secondsLeft: number; total: number; entryId: string; done?: boolean; paused?: boolean } | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restTimerStateRef = useRef<{ secondsLeft: number; total: number; entryId: string; done?: boolean; paused?: boolean } | null>(null);
+  const restEndTimeRef = useRef<number | null>(null);
 
   // Custom keypad state
   type KeypadInfo = { entryId: string; setId: string; ghostWeight: number | null; ghostReps: number | null };
@@ -2358,14 +2359,40 @@ function WorkoutPage({
     } catch { /* ignore */ }
   }, []);
 
+  const scheduleSwTimer = useCallback((endTime: number) => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.active?.postMessage({ type: 'SCHEDULE_TIMER', endTime });
+    }).catch(() => {});
+  }, []);
+
+  const cancelSwTimer = useCallback(() => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.active?.postMessage({ type: 'CANCEL_TIMER' });
+    }).catch(() => {});
+  }, []);
+
+  const ensureNotifPermission = useCallback(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
   const startRestTimer = useCallback((entryId: string) => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
+    const endTime = Date.now() + REST_DURATION * 1000;
+    restEndTimeRef.current = endTime;
     setRestTimer({ secondsLeft: REST_DURATION, total: REST_DURATION, entryId });
+    ensureNotifPermission();
+    scheduleSwTimer(endTime);
     restTimerRef.current = setInterval(() => {
       setRestTimer(prev => {
         if (!prev) return null;
         if (prev.secondsLeft <= 1) {
           if (restTimerRef.current) clearInterval(restTimerRef.current);
+          restEndTimeRef.current = null;
+          cancelSwTimer();
           if (workoutPrefs.rest_sound) playBeep();
           setTimeout(() => setRestTimer(null), 3000);
           return { ...prev, secondsLeft: 0, done: true };
@@ -2373,26 +2400,35 @@ function WorkoutPage({
         return { ...prev, secondsLeft: prev.secondsLeft - 1 };
       });
     }, 1000);
-  }, [REST_DURATION, workoutPrefs.rest_sound, playBeep]);
+  }, [REST_DURATION, workoutPrefs.rest_sound, playBeep, ensureNotifPermission, scheduleSwTimer, cancelSwTimer]);
 
   const dismissRestTimer = useCallback(() => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
+    restEndTimeRef.current = null;
+    cancelSwTimer();
     setRestTimer(null);
-  }, []);
+  }, [cancelSwTimer]);
 
   const togglePauseRestTimer = useCallback(() => {
     const curr = restTimerStateRef.current;
     if (!curr || curr.done) return;
     if (!curr.paused) {
       if (restTimerRef.current) clearInterval(restTimerRef.current);
+      restEndTimeRef.current = null;
+      cancelSwTimer();
       setRestTimer(prev => prev ? { ...prev, paused: true } : null);
     } else {
+      const newEndTime = Date.now() + curr.secondsLeft * 1000;
+      restEndTimeRef.current = newEndTime;
+      scheduleSwTimer(newEndTime);
       setRestTimer(prev => prev ? { ...prev, paused: false } : null);
       restTimerRef.current = setInterval(() => {
         setRestTimer(prev => {
           if (!prev || prev.paused) return prev;
           if (prev.secondsLeft <= 1) {
             if (restTimerRef.current) clearInterval(restTimerRef.current);
+            restEndTimeRef.current = null;
+            cancelSwTimer();
             if (workoutPrefs.rest_sound) playBeep();
             setTimeout(() => setRestTimer(null), 3000);
             return { ...prev, secondsLeft: 0, done: true };
@@ -2401,10 +2437,32 @@ function WorkoutPage({
         });
       }, 1000);
     }
-  }, [workoutPrefs.rest_sound, playBeep]);
+  }, [workoutPrefs.rest_sound, playBeep, scheduleSwTimer, cancelSwTimer]);
 
   // Cleanup on unmount
   useEffect(() => () => { if (restTimerRef.current) clearInterval(restTimerRef.current); }, []);
+
+  // Sync rest timer when returning to the app (handles backgrounding / screen lock)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.hidden) return;
+      const endTime = restEndTimeRef.current;
+      const curr = restTimerStateRef.current;
+      if (!endTime || !curr || curr.paused || curr.done) return;
+      const remaining = Math.ceil((endTime - Date.now()) / 1000);
+      if (remaining <= 0) {
+        if (restTimerRef.current) clearInterval(restTimerRef.current);
+        restEndTimeRef.current = null;
+        if (workoutPrefs.rest_sound) playBeep();
+        setRestTimer(prev => prev ? { ...prev, secondsLeft: 0, done: true } : null);
+        setTimeout(() => setRestTimer(null), 3000);
+      } else {
+        setRestTimer(prev => prev ? { ...prev, secondsLeft: remaining } : null);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [workoutPrefs.rest_sound, playBeep]);
 
   const loggedSets = useMemo(() =>
     session ? session.entries.reduce((acc, e) => acc + e.sets.filter(s => s.weight != null && s.reps != null).length, 0) : 0,
