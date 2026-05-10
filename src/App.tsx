@@ -168,6 +168,7 @@ function AuthedApp({
   const [openHeaderMenu, setOpenHeaderMenu] = useState<'day' | 'gear' | 'app' | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [displayName, setDisplayName] = useState('');
+  const [pinnedPrs, setPinnedPrs] = useState<string[]>([]);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
   const [confirmArchivePlanId, setConfirmArchivePlanId] = useState<string | null>(null);
@@ -579,6 +580,11 @@ function AuthedApp({
         // Load display name
         if (p?.display_name) {
           setDisplayName(p.display_name);
+        }
+
+        // Load pinned PRs
+        if (p?.pinned_prs) {
+          setPinnedPrs(p.pinned_prs);
         }
 
         // Validate position with server completedList — update only if it disagrees
@@ -2191,6 +2197,11 @@ function AuthedApp({
       currentStreak={currentStreak}
       bestStreak={streakState?.longestStreak ?? 0}
       streakEnabled={!!streakConfig?.enabled}
+      pinnedPrs={pinnedPrs}
+      onSavePinnedPrs={async (prs) => {
+        setPinnedPrs(prs);
+        await upsertUserPrefs({ pinned_prs: prs }).catch(() => {});
+      }}
     />
     </TutorialProvider>
   );

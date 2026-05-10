@@ -4,6 +4,7 @@ import { sessionApi } from '../api';
 export type ProfileStats = {
   totalSessions: number;
   totalSets: number;
+  totalVolume: number;
   memberSince: string | null;
 };
 
@@ -27,7 +28,13 @@ export async function getProfileStats(): Promise<ProfileStats> {
     acc + (row.data?.entries ?? []).reduce((ea, entry) =>
       ea + entry.sets.filter((s) => s.weight != null && s.reps != null).length, 0), 0);
 
-  return { totalSessions, totalSets, memberSince: user?.created_at ?? null };
+  const totalVolume = real.reduce((acc, row) =>
+    acc + (row.data?.entries ?? []).reduce((ea, entry) =>
+      ea + entry.sets
+        .filter((s) => s.weight != null && s.reps != null)
+        .reduce((sv, s) => sv + s.weight! * s.reps!, 0), 0), 0);
+
+  return { totalSessions, totalSets, totalVolume, memberSince: user?.created_at ?? null };
 }
 
 export async function getPersonalRecords(): Promise<PR[]> {

@@ -53,6 +53,7 @@ export type UserPrefsData = {
   tutorial_prefs?: TutorialPrefs | null
   display_name?: string | null
   profile_public?: boolean | null
+  pinned_prs?: string[] | null
 }
 
 export type UserPrefs = {
@@ -93,6 +94,7 @@ export async function upsertUserPrefs(partial: {
   tutorial_prefs?: TutorialPrefs | null
   display_name?: string | null
   profile_public?: boolean | null
+  pinned_prs?: string[] | null
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
@@ -124,6 +126,7 @@ export async function upsertUserPrefs(partial: {
     ...(partial.tutorial_prefs !== undefined && { tutorial_prefs: partial.tutorial_prefs }),
     ...(partial.display_name !== undefined && { display_name: partial.display_name }),
     ...(partial.profile_public !== undefined && { profile_public: partial.profile_public }),
+    ...(partial.pinned_prs !== undefined && { pinned_prs: partial.pinned_prs }),
   }
 
   // Try update-first: if a row exists for this user, update it; otherwise insert.
