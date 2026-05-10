@@ -20,6 +20,8 @@ interface Props {
   onChange: (next: MascotExpression) => void;
   /** Tile size in px. Default 96. */
   tileSize?: number;
+  /** Force a fixed column count instead of auto-fill. */
+  columns?: number;
   className?: string;
 }
 
@@ -27,6 +29,7 @@ export function MascotExpressionPicker({
   value,
   onChange,
   tileSize = 96,
+  columns,
   className,
 }: Props) {
   return (
@@ -34,7 +37,9 @@ export function MascotExpressionPicker({
       className={className}
       style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(auto-fill, minmax(${tileSize + 24}px, 1fr))`,
+        gridTemplateColumns: columns
+          ? `repeat(${columns}, 1fr)`
+          : `repeat(auto-fill, minmax(${tileSize + 24}px, 1fr))`,
         gap: 12,
       }}
       role="radiogroup"

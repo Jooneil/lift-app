@@ -108,6 +108,12 @@ export default function ProfileModal({
 
   useEffect(() => { setPinned(initialPinnedPrs); }, [initialPinnedPrs]);
 
+  // Reset expression editor when modal closes
+  useEffect(() => {
+    if (!open) { setEditingExpression(false); setExpressionDraft(mascotExpression); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // Lock body scroll and prevent pull-to-refresh while modal is open
   useEffect(() => {
     if (!open) return;
@@ -262,13 +268,13 @@ export default function ProfileModal({
         {/* Scrollable body */}
         <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 'max(28px, env(safe-area-inset-bottom))', overscrollBehavior: 'contain' }}>
 
-          {/* Top section: expression editor (inline) OR normal avatar + pinned */}
+          {/* Expression editor — takes over the full scrollable area */}
           {editingExpression ? (
-            <div style={{ padding: '16px 16px 8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', padding: '16px 16px 8px' }}>
               {/* Preview row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.2)' }}>
-                  <Mascot expression={expressionDraft} size={80} idSuffix="edit-preview" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.2)' }}>
+                  <Mascot expression={expressionDraft} size={72} idSuffix="edit-preview" />
                 </div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Choose expression</div>
@@ -277,19 +283,19 @@ export default function ProfileModal({
                   </div>
                 </div>
               </div>
-              {/* Grid */}
-              <MascotExpressionPicker value={expressionDraft} onChange={setExpressionDraft} tileSize={64} />
+              {/* 2-column grid with big tiles */}
+              <MascotExpressionPicker value={expressionDraft} onChange={setExpressionDraft} tileSize={120} columns={2} />
               {/* Actions */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <button
                   onClick={() => { setEditingExpression(false); setExpressionDraft(mascotExpression); }}
-                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveExpression}
-                  style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: '#60a5fa', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}
+                  style={{ flex: 2, padding: '11px 0', borderRadius: 10, border: 'none', background: '#60a5fa', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}
                 >
                   Save
                 </button>
@@ -301,20 +307,27 @@ export default function ProfileModal({
 
             {/* Left: avatar + name + email */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0, width: 120 }}>
-              {/* Mascot avatar with edit badge */}
+              {/* Mascot avatar — entire circle is clickable when own profile */}
               <div style={{ position: 'relative', flexShrink: 0 }}>
-                <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.25), 0 6px 20px rgba(0,0,0,0.3)' }}>
-                  <Mascot expression={effectiveMascot} size={72} idSuffix="profile-main" />
-                </div>
-                {effectiveIsOwn && (
+                {effectiveIsOwn ? (
                   <button
                     onClick={() => { setExpressionDraft(mascotExpression); setEditingExpression(true); }}
-                    style={{ position: 'absolute', bottom: -4, right: 2, border: 'none', background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 2 }}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', borderRadius: '50%', display: 'block' }}
+                    title="Change expression"
                   >
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11.5 2.5a2.121 2.121 0 013 3L5 15H1v-4L11.5 2.5z" />
-                    </svg>
+                    <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.25), 0 6px 20px rgba(0,0,0,0.3)' }}>
+                      <Mascot expression={effectiveMascot} size={72} idSuffix="profile-main" />
+                    </div>
+                    <div style={{ position: 'absolute', bottom: -2, right: 0, background: 'var(--bg-elevated)', border: '1.5px solid var(--border-subtle)', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11.5 2.5a2.121 2.121 0 013 3L5 15H1v-4L11.5 2.5z" />
+                      </svg>
+                    </div>
                   </button>
+                ) : (
+                  <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.25), 0 6px 20px rgba(0,0,0,0.3)' }}>
+                    <Mascot expression={effectiveMascot} size={72} idSuffix="profile-main" />
+                  </div>
                 )}
               </div>
 
