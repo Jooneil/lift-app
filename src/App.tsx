@@ -30,7 +30,7 @@ import AppMenu from './components/WorkoutHeader/AppMenu';
 import WorkoutKeypad from './components/WorkoutKeypad';
 import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tutorial';
 import { STEPS } from './components/Tutorial/steps';
-import ProfileModal from './components/Profile/ProfileModal';
+import ProfileModal, { type ViewingProfile } from './components/Profile/ProfileModal';
 import SocialSheet from './components/Social/SocialSheet';
 import { ensureProfile } from './api/friends';
 import { Mascot, MASCOT_EXPRESSIONS, type MascotExpression } from './components/mascot/Mascot';
@@ -181,6 +181,7 @@ function AuthedApp({
   const [mascotExpression, setMascotExpression] = useState<MascotExpression>('happy');
   const [showSocial, setShowSocial] = useState(false);
   const [socialBadge, setSocialBadge] = useState(0);
+  const [viewingFriendProfile, setViewingFriendProfile] = useState<ViewingProfile | null>(null);
   const [supabaseUserId, setSupabaseUserId] = useState('');
   const [userCode, setUserCode] = useState('');
   const [showPlanPicker, setShowPlanPicker] = useState(false);
@@ -2254,8 +2255,11 @@ function AuthedApp({
     </div>
 
     <ProfileModal
-      open={showProfile}
-      onClose={() => setShowProfile(false)}
+      open={showProfile || !!viewingFriendProfile}
+      onClose={() => {
+        if (viewingFriendProfile) { setViewingFriendProfile(null); }
+        else { setShowProfile(false); }
+      }}
       email={user.username}
       displayName={displayName}
       onSaveDisplayName={async (name) => {
@@ -2280,6 +2284,7 @@ function AuthedApp({
         setMascotExpression(expr);
         await upsertUserPrefs({ mascot_expression: expr }).catch(() => {});
       }}
+      viewingProfile={viewingFriendProfile}
     />
     <SocialSheet
       open={showSocial}
@@ -2295,6 +2300,10 @@ function AuthedApp({
         }
       }}
       onBadgeUpdate={setSocialBadge}
+      onViewProfile={(profile) => {
+        setShowSocial(false);
+        setViewingFriendProfile(profile);
+      }}
     />
     </TutorialProvider>
   );

@@ -4,6 +4,12 @@ import { planApi, type ServerPlanRow } from '../../api';
 import { Mascot, MASCOT_EXPRESSIONS, type MascotExpression } from '../mascot/Mascot';
 import { MascotExpressionPicker } from '../mascot/MascotExpressionPicker';
 
+export type ViewingProfile = {
+  username: string | null;
+  user_code: string;
+  mascot_expression: string;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -20,6 +26,7 @@ type Props = {
   isOwnProfile?: boolean;
   mascotExpression: MascotExpression;
   onSaveMascotExpression: (expr: MascotExpression) => Promise<void>;
+  viewingProfile?: ViewingProfile | null;
 };
 
 export function getInitials(displayName: string, email: string): string {
@@ -61,7 +68,18 @@ export default function ProfileModal({
   pinnedPrs: initialPinnedPrs, onSavePinnedPrs,
   plansPublic, onTogglePlansPublic, isOwnProfile = true,
   mascotExpression, onSaveMascotExpression,
+  viewingProfile = null,
 }: Props) {
+  const isViewing = !!viewingProfile;
+  const effectiveIsOwn = isViewing ? false : isOwnProfile;
+  const effectiveName = isViewing
+    ? (viewingProfile!.username || 'Lifter')
+    : null; // null = use normal nameLabel derivation below
+  const effectiveMascot: MascotExpression = isViewing
+    ? ((MASCOT_EXPRESSIONS as readonly string[]).includes(viewingProfile!.mascot_expression)
+        ? viewingProfile!.mascot_expression as MascotExpression
+        : 'happy')
+    : mascotExpression;
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [prs, setPrs] = useState<PR[]>([]);
   const [plans, setPlans] = useState<ServerPlanRow[]>([]);
@@ -104,13 +122,13 @@ export default function ProfileModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isViewing) return;
     setLoading(true);
     Promise.all([getProfileData(), planApi.list()])
       .then(([{ stats: s, prs: p }, pl]) => { setStats(s); setPrs(p); setPlans(pl); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, isViewing]);
 
   useEffect(() => { setNameDraft(displayName); }, [displayName]);
 
@@ -173,7 +191,7 @@ export default function ProfileModal({
 
   if (!open) return null;
 
-  const nameLabel = deriveLabel(displayName, email);
+  const nameLabel = effectiveName ?? deriveLabel(displayName, email);
   const pinnedPrData = pinned
     .map(key => prs.find(pr => norm(pr.exerciseName) === key))
     .filter(Boolean) as PR[];
@@ -228,7 +246,9 @@ export default function ProfileModal({
           onTouchEnd={onDragTouchEnd}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 18px 0', flexShrink: 0, touchAction: 'none' }}
         >
-          <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>Profile</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
+            {isViewing ? `${nameLabel}'s Profile` : 'Profile'}
+          </span>
           <button
             onClick={dismiss}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center', borderRadius: 6 }}
@@ -284,9 +304,9 @@ export default function ProfileModal({
               {/* Mascot avatar with edit badge */}
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.25), 0 6px 20px rgba(0,0,0,0.3)' }}>
-                  <Mascot expression={mascotExpression} size={72} idSuffix="profile-main" />
+                  <Mascot expression={effectiveMascot} size={72} idSuffix="profile-main" />
                 </div>
-                {isOwnProfile && (
+                {effectiveIsOwn && (
                   <button
                     onClick={() => { setExpressionDraft(mascotExpression); setEditingExpression(true); }}
                     style={{ position: 'absolute', bottom: -4, right: 2, border: 'none', background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 2 }}
@@ -315,7 +335,7 @@ export default function ProfileModal({
                     outline: 'none',
                   }}
                 />
-              ) : (
+              ) : effectiveIsOwn ? (
                 <button
                   onClick={() => { setNameDraft(nameLabel); setEditingName(true); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: '1px 2px' }}
@@ -332,6 +352,14 @@ export default function ProfileModal({
                     <path d="M11.5 2.5a2.121 2.121 0 013 3L5 15H1v-4L11.5 2.5z" />
                   </svg>
                 </button>
+              ) : (
+                <span style={{
+                  fontSize: 14, fontWeight: 700, color: 'var(--text-primary)',
+                  letterSpacing: '-0.02em', textAlign: 'center',
+                  maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {nameLabel}
+                </span>
               )}
 
               {stats?.memberSince && (
@@ -364,7 +392,7 @@ export default function ProfileModal({
                   padding: '12px 10px', textAlign: 'center',
                 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                    Pin your best lifts from the PRs tab below
+                    {isViewing ? 'No pinned lifts' : 'Pin your best lifts from the PRs tab below'}
                   </span>
                 </div>
               ) : (
@@ -423,7 +451,7 @@ export default function ProfileModal({
           </div>
 
           {/* Streak card */}
-          {streakEnabled && (
+          {!isViewing && streakEnabled && (
             <div style={{
               margin: '0 16px 20px',
               background: currentStreak > 0 ? 'rgba(249,115,22,0.08)' : 'var(--bg-card)',
@@ -492,48 +520,62 @@ export default function ProfileModal({
             {activeTab === 'plans' ? (
               <>
                 {/* Privacy toggle row (own profile only) */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {plansPublic ? (
-                      <>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
-                        </svg>
-                        Plans are public
-                      </>
-                    ) : (
-                      <>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
-                        </svg>
-                        Plans are private
-                      </>
+                {!isViewing && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {plansPublic ? (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                          </svg>
+                          Plans are public
+                        </>
+                      ) : (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                          </svg>
+                          Plans are private
+                        </>
+                      )}
+                    </span>
+                    {isOwnProfile && (
+                      <div
+                        role="switch"
+                        aria-checked={plansPublic}
+                        tabIndex={0}
+                        onClick={() => onTogglePlansPublic(!plansPublic)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onTogglePlansPublic(!plansPublic); }}
+                        style={{
+                          width: 44, height: 26, borderRadius: 999, cursor: 'pointer',
+                          background: plansPublic ? '#60a5fa' : 'var(--border-subtle)',
+                          position: 'relative', transition: 'background 0.2s ease', flexShrink: 0,
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute', top: 3, width: 20, height: 20, borderRadius: '50%',
+                          background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                          left: plansPublic ? 21 : 3,
+                          transition: 'left 0.18s ease',
+                        }} />
+                      </div>
                     )}
-                  </span>
-                  {isOwnProfile && (
-                    <div
-                      role="switch"
-                      aria-checked={plansPublic}
-                      tabIndex={0}
-                      onClick={() => onTogglePlansPublic(!plansPublic)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onTogglePlansPublic(!plansPublic); }}
-                      style={{
-                        width: 44, height: 26, borderRadius: 999, cursor: 'pointer',
-                        background: plansPublic ? '#60a5fa' : 'var(--border-subtle)',
-                        position: 'relative', transition: 'background 0.2s ease', flexShrink: 0,
-                      }}
-                    >
-                      <div style={{
-                        position: 'absolute', top: 3, width: 20, height: 20, borderRadius: '50%',
-                        background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                        left: plansPublic ? 21 : 3,
-                        transition: 'left 0.18s ease',
-                      }} />
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                {!plansPublic ? (
+                {isViewing ? (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    padding: '32px 20px', gap: 10,
+                    borderRadius: 12, border: '1px solid var(--border-subtle)',
+                    background: 'var(--bg-card)', opacity: 0.6,
+                  }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' }}>Plans are private</span>
+                  </div>
+                ) : !plansPublic ? (
                   <div style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     padding: '32px 20px', gap: 10,
@@ -611,7 +653,7 @@ export default function ProfileModal({
                 </div>
               ) : prs.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: 14 }}>
-                  Log some sets to see your PRs here
+                  {isViewing ? 'PRs are private' : 'Log some sets to see your PRs here'}
                 </div>
               ) : (
                 <>

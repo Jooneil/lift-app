@@ -3,6 +3,7 @@ import { Mascot } from '../mascot/Mascot';
 import * as friendsApi from '../../api/friends';
 import * as planSharesApi from '../../api/planShares';
 import type { FriendWithProfile, Profile } from '../../api/friends';
+import type { ViewingProfile } from '../Profile/ProfileModal';
 import type { PlanShare } from '../../api/planShares';
 import type { Plan } from '../../types';
 import type { ServerPlanData } from '../../api';
@@ -17,6 +18,7 @@ type Props = {
   plans: Plan[];
   onAcceptPlan: (planName: string, planData: ServerPlanData) => Promise<void>;
   onBadgeUpdate: (count: number) => void;
+  onViewProfile: (profile: ViewingProfile) => void;
 };
 
 // ─── Small shared pieces ──────────────────────────────────────────────────────
@@ -76,7 +78,7 @@ function ActionBtn({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SocialSheet({
-  open, onClose, currentUserId, userCode, plans, onAcceptPlan, onBadgeUpdate,
+  open, onClose, currentUserId, userCode, plans, onAcceptPlan, onBadgeUpdate, onViewProfile,
 }: Props) {
   const [tab, setTab] = useState<Tab>('friends');
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
@@ -93,7 +95,6 @@ export default function SocialSheet({
   const [sendTarget, setSendTarget] = useState<FriendWithProfile | null>(null);
   const [sendingPlan, setSendingPlan] = useState(false);
   const [justSent, setJustSent] = useState(false);
-  const [viewingFriend, setViewingFriend] = useState<FriendWithProfile | null>(null);
 
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
 
@@ -145,7 +146,6 @@ export default function SocialSheet({
       setSearchResults([]);
       setSendTarget(null);
       setJustSent(false);
-      setViewingFriend(null);
     }
   }, [open, currentUserId, loadData]);
 
@@ -228,9 +228,6 @@ export default function SocialSheet({
   const handleCancelRequest = (id: string) =>
     withPending(`cancel-${id}`, () => friendsApi.cancelFriendRequest(id));
 
-  const handleRemoveFriend = (id: string) =>
-    withPending(`remove-${id}`, () => friendsApi.removeFriend(id));
-
   const handleSendPlan = async (plan: Plan) => {
     if (!sendTarget) return;
     setSendingPlan(true);
@@ -278,56 +275,6 @@ export default function SocialSheet({
   const requestBadge = incoming.length;
   const planBadge = receivedPlans.length;
   const activePlans = plans.filter(p => !('archived' in p && p.archived));
-
-  // ─── Friend profile sub-view ─────────────────────────────────────────────
-  const renderFriendProfile = () => {
-    const f = viewingFriend!;
-    const isRemoving = pendingActions.has(`remove-${f.id}`);
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
-          <button
-            onClick={() => setViewingFriend(null)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontSize: 13, fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            ← Back
-          </button>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 24px', gap: 12 }}>
-          <div style={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', background: 'var(--bg-elevated)', boxShadow: '0 0 0 3px var(--border-subtle)' }}>
-            <Mascot
-              expression={(f.profile.mascot_expression as Parameters<typeof Mascot>[0]['expression']) || 'happy'}
-              size={96}
-              idSuffix={`profile-view-${f.profile.user_id.slice(0, 8)}`}
-            />
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
-              {f.profile.username || 'Lifter'}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.06em', marginTop: 4 }}>
-              {f.profile.user_code}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <ActionBtn
-              onClick={() => { setViewingFriend(null); setSendTarget(f); }}
-              variant="primary"
-            >
-              Share Plan
-            </ActionBtn>
-            <ActionBtn
-              onClick={() => { handleRemoveFriend(f.id); setViewingFriend(null); }}
-              variant="danger"
-              disabled={isRemoving}
-            >
-              {isRemoving ? '…' : 'Remove Friend'}
-            </ActionBtn>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // ─── Plan sender sub-view ────────────────────────────────────────────────
   const renderSendPlanView = () => (
@@ -451,7 +398,7 @@ export default function SocialSheet({
             <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
               <ProfileAvatar profile={f.profile} />
               <div style={{ flex: 1, minWidth: 0 }}><Username profile={f.profile} /></div>
-              <ActionBtn onClick={() => setViewingFriend(f)} variant="ghost">
+              <ActionBtn onClick={() => onViewProfile(f.profile)} variant="ghost">
                 View Profile
               </ActionBtn>
             </div>
@@ -641,9 +588,7 @@ export default function SocialSheet({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
           {sendTarget
             ? renderSendPlanView()
-            : viewingFriend
-              ? renderFriendProfile()
-              : tab === 'friends'
+            : tab === 'friends'
               ? renderFriendsTab()
               : tab === 'requests'
                 ? renderRequestsTab()
