@@ -161,6 +161,7 @@ export default function ProfileModal({
 
       <div
         ref={sheetRef}
+        data-no-ptr
         className="profile-sheet"
         style={{
           position: 'fixed',
@@ -434,13 +435,16 @@ export default function ProfileModal({
                     )}
                   </span>
                   {isOwnProfile && (
-                    <button
+                    <div
+                      role="switch"
+                      aria-checked={plansPublic}
+                      tabIndex={0}
                       onClick={() => onTogglePlansPublic(!plansPublic)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onTogglePlansPublic(!plansPublic); }}
                       style={{
-                        width: 44, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer',
-                        background: plansPublic ? 'var(--accent-blue, #60a5fa)' : 'var(--border-subtle)',
-                        position: 'relative', transition: 'background 0.2s ease', flexShrink: 0, padding: 0,
-                        appearance: 'none', WebkitAppearance: 'none', outline: 'none',
+                        width: 44, height: 26, borderRadius: 999, cursor: 'pointer',
+                        background: plansPublic ? '#60a5fa' : 'var(--border-subtle)',
+                        position: 'relative', transition: 'background 0.2s ease', flexShrink: 0,
                       }}
                     >
                       <div style={{
@@ -449,7 +453,7 @@ export default function ProfileModal({
                         left: plansPublic ? 21 : 3,
                         transition: 'left 0.18s ease',
                       }} />
-                    </button>
+                    </div>
                   )}
                 </div>
 
