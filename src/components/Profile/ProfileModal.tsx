@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { getProfileData, type ProfileStats, type PR } from '../../api/profile';
 import { planApi, type ServerPlanRow } from '../../api';
 
@@ -67,6 +67,12 @@ export default function ProfileModal({
   const [activeTab, setActiveTab] = useState<'plans' | 'prs'>('plans');
   const [pinned, setPinned] = useState<string[]>(initialPinnedPrs);
 
+  // Drag-to-dismiss
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef(0);
+  const isDragging = useRef(false);
+  const dragOffset = useRef(0);
+
   useEffect(() => { setPinned(initialPinnedPrs); }, [initialPinnedPrs]);
 
   useEffect(() => {
@@ -88,6 +94,40 @@ export default function ProfileModal({
     await onSaveDisplayName(trimmed).catch(() => {});
     setSaving(false);
   };
+
+  const onDragTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    isDragging.current = true;
+    dragOffset.current = 0;
+  }, []);
+
+  const onDragTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const dy = Math.max(0, e.touches[0].clientY - touchStartY.current);
+    dragOffset.current = dy;
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = `translateY(${dy}px)`;
+      sheetRef.current.style.transition = 'none';
+    }
+  }, []);
+
+  const onDragTouchEnd = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    if (dragOffset.current > 110) {
+      if (sheetRef.current) {
+        sheetRef.current.style.transform = 'translateY(100%)';
+        sheetRef.current.style.transition = 'transform 0.27s ease';
+      }
+      setTimeout(onClose, 270);
+    } else {
+      if (sheetRef.current) {
+        sheetRef.current.style.transform = 'translateY(0)';
+        sheetRef.current.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      }
+      dragOffset.current = 0;
+    }
+  }, [onClose]);
 
   const togglePin = (exerciseName: string) => {
     const key = norm(exerciseName);
@@ -112,6 +152,7 @@ export default function ProfileModal({
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200 }} />
 
       <div
+        ref={sheetRef}
         className="profile-sheet"
         style={{
           position: 'fixed',
@@ -126,13 +167,23 @@ export default function ProfileModal({
           boxShadow: '0 -8px 40px rgba(0,0,0,0.5)',
         }}
       >
-        {/* Drag handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 2px', flexShrink: 0 }}>
+        {/* Drag handle — touch here to swipe-dismiss */}
+        <div
+          onTouchStart={onDragTouchStart}
+          onTouchMove={onDragTouchMove}
+          onTouchEnd={onDragTouchEnd}
+          style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 2px', flexShrink: 0, touchAction: 'none' }}
+        >
           <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border-subtle)' }} />
         </div>
 
-        {/* Title row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 18px 0', flexShrink: 0 }}>
+        {/* Title row — also draggable */}
+        <div
+          onTouchStart={onDragTouchStart}
+          onTouchMove={onDragTouchMove}
+          onTouchEnd={onDragTouchEnd}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 18px 0', flexShrink: 0, touchAction: 'none' }}
+        >
           <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>Profile</span>
           <button
             onClick={onClose}
@@ -145,7 +196,7 @@ export default function ProfileModal({
         </div>
 
         {/* Scrollable body */}
-        <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 'max(28px, env(safe-area-inset-bottom))' }}>
+        <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 'max(28px, env(safe-area-inset-bottom))', overscrollBehavior: 'contain' }}>
 
           {/* Top section: left (avatar + name) | right (pinned PRs) */}
           <div style={{ display: 'flex', padding: '20px 16px 16px', gap: 16, alignItems: 'flex-start' }}>
