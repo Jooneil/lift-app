@@ -328,7 +328,7 @@ export default function SocialSheet({
         <input
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search by name or LIFT-XXXXXX"
+          placeholder="Search by name or code"
           style={{
             width: '100%', padding: '9px 32px 9px 12px', borderRadius: 10,
             border: '1.5px solid var(--border-subtle)', background: 'var(--bg-elevated)',
@@ -572,7 +572,7 @@ export default function SocialSheet({
                   padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
                   border: 'none', cursor: 'pointer', position: 'relative',
                   background: active ? 'var(--accent)' : 'var(--bg-elevated)',
-                  color: active ? '#fff' : 'var(--text-muted)',
+                  color: active ? '#fff' : 'var(--text-primary)',
                   transition: 'background 0.15s, color 0.15s',
                 }}
               >
