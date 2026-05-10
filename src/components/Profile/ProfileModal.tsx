@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getProfileStats, getPersonalRecords, type ProfileStats, type PR } from '../../api/profile';
+import { getProfileData, type ProfileStats, type PR } from '../../api/profile';
 import { planApi, type ServerPlanRow } from '../../api';
 
 type Props = {
@@ -72,8 +72,8 @@ export default function ProfileModal({
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    Promise.all([getProfileStats(), getPersonalRecords(), planApi.list()])
-      .then(([s, p, pl]) => { setStats(s); setPrs(p); setPlans(pl); })
+    Promise.all([getProfileData(), planApi.list()])
+      .then(([{ stats: s, prs: p }, pl]) => { setStats(s); setPrs(p); setPlans(pl); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [open]);

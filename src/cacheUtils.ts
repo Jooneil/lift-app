@@ -29,4 +29,5 @@ export const CACHE_KEYS = {
   customExercises: 'cache:custom_exercises',
   catalog: 'cache:exercise_catalog',
   userPrefs: 'cache:user_prefs',
+  sessions: 'cache:sessions',
 } as const;

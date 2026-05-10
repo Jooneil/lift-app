@@ -276,7 +276,7 @@ export const sessionApi = {
       .match({ plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId })
       .select('plan_id');
     if (upd.error && (!('code' in upd.error) || (upd.error as any).code !== 'PGRST116')) throw upd.error;
-    if (Array.isArray((upd as any).data) && (upd as any).data.length > 0) return { ok: true };
+    if (Array.isArray((upd as any).data) && (upd as any).data.length > 0) { invalidateCache(CACHE_KEYS.sessions); return { ok: true }; }
 
     const ins = await supabase
       .from('sessions')
@@ -284,6 +284,7 @@ export const sessionApi = {
       .select('plan_id')
       .single();
     if (ins.error) throw ins.error;
+    invalidateCache(CACHE_KEYS.sessions);
     return { ok: true };
   },
   async complete(planServerId: number | string, planWeekId: string, planDayId: string, completed?: boolean): Promise<{ ok: true }> {
@@ -324,12 +325,14 @@ export const sessionApi = {
     const { data } = await supabase.from('completions').select('week_id,day_id').eq('plan_id', planServerId).order('completed_at', { ascending: true }); return (data ?? []) as Array<{ week_id: string; day_id: string }>;
   },
   async listAll(): Promise<SessionRow[]> {
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('plan_id,week_id,day_id,updated_at,data')
-      .order('updated_at', { ascending: false });
-    if (error) throw error;
-    return (data ?? []) as unknown as SessionRow[];
+    return cachedFetch(CACHE_KEYS.sessions, async () => {
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('plan_id,week_id,day_id,updated_at,data')
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as SessionRow[];
+    }, 5 * 60 * 1000);
   },
 };
 
