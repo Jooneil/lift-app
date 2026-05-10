@@ -1187,43 +1187,8 @@ function AuthedApp({
     <TutorialOverlay />
     <div className="max-w-[680px] lg:max-w-[1000px] w-full mx-auto p-3 sm:p-6">
       <div className="flex justify-between items-center pb-3 mb-4 border-b border-b-subtle">
-        <div className="relative flex items-center gap-2">
-          {streakConfig?.enabled && (
-            <div
-              className="relative inline-flex items-center justify-center w-8 h-8 cursor-pointer transition-all duration-150"
-              onClick={() => setShowStreakSettings(true)}
-              title={`${currentStreak} day streak`}
-            >
-              <FlameIcon
-                size={28}
-                color={streakHitToday ? '#f97316' : 'var(--text-muted)'}
-              />
-              <span
-                style={{
-                  transform: 'translate(-50%, -45%)',
-                  color: streakHitToday ? '#fff' : 'var(--text-muted)',
-                  textShadow: streakHitToday ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
-                }}
-                className="absolute top-1/2 left-1/2 text-[11px] font-bold pointer-events-none"
-              >
-                {currentStreak}
-              </span>
-            </div>
-          )}
-          <button
-            onClick={() => { setOpenHeaderMenu(null); setShowProfile(true); }}
-            title="Profile"
-            style={{
-              width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #60a5fa 0%, #818cf8 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em',
-              flexShrink: 0,
-              boxShadow: '0 0 0 2px var(--bg-base), 0 0 0 3px rgba(96,165,250,0.3)',
-            }}
-          >
-            {getInitials(displayName, user.username)}
-          </button>
+        {/* Left: settings kebab */}
+        <div className="relative flex items-center">
           <button
             data-tutorial-id="kebab-btn"
             onClick={() => setOpenHeaderMenu(v => v === 'app' ? null : 'app')}
@@ -1258,6 +1223,48 @@ function AuthedApp({
               </div>
             </>
           )}
+        </div>
+
+        {/* Right: streak + profile avatar */}
+        <div className="flex items-center gap-2">
+          {streakConfig?.enabled && (
+            <div
+              className="relative inline-flex items-center justify-center w-8 h-8 cursor-pointer transition-all duration-150"
+              onClick={() => setShowStreakSettings(true)}
+              title={`${currentStreak} day streak`}
+            >
+              <FlameIcon
+                size={28}
+                color={streakHitToday ? '#f97316' : 'var(--text-muted)'}
+              />
+              <span
+                style={{
+                  transform: 'translate(-50%, -45%)',
+                  color: streakHitToday ? '#fff' : 'var(--text-muted)',
+                  textShadow: streakHitToday ? '0 1px 2px rgba(0,0,0,0.6)' : 'none',
+                }}
+                className="absolute top-1/2 left-1/2 text-[11px] font-bold pointer-events-none"
+              >
+                {currentStreak}
+              </span>
+            </div>
+          )}
+          <button
+            onClick={() => setShowProfile(true)}
+            title="Profile"
+            style={{
+              width: 32, height: 32, minWidth: 32, minHeight: 32,
+              borderRadius: '50%', border: 'none', padding: 0,
+              cursor: 'pointer', lineHeight: 1, overflow: 'hidden',
+              background: 'linear-gradient(135deg, #60a5fa 0%, #818cf8 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: '0.02em',
+              flexShrink: 0,
+              boxShadow: '0 0 0 2px var(--bg-elevated), 0 0 0 3.5px rgba(96,165,250,0.4)',
+            }}
+          >
+            {getInitials(displayName, user.username)}
+          </button>
         </div>
       </div>
 
