@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getProfileData, type ProfileStats, type PR } from '../../api/profile';
 import { planApi, type ServerPlanRow } from '../../api';
+import { Mascot, MASCOT_EXPRESSIONS, type MascotExpression } from '../mascot/Mascot';
+import { MascotExpressionPicker } from '../mascot/MascotExpressionPicker';
 
 type Props = {
   open: boolean;
@@ -16,6 +18,8 @@ type Props = {
   plansPublic: boolean;
   onTogglePlansPublic: (val: boolean) => Promise<void>;
   isOwnProfile?: boolean;
+  mascotExpression: MascotExpression;
+  onSaveMascotExpression: (expr: MascotExpression) => Promise<void>;
 };
 
 export function getInitials(displayName: string, email: string): string {
@@ -56,6 +60,7 @@ export default function ProfileModal({
   currentStreak, bestStreak, streakEnabled,
   pinnedPrs: initialPinnedPrs, onSavePinnedPrs,
   plansPublic, onTogglePlansPublic, isOwnProfile = true,
+  mascotExpression, onSaveMascotExpression,
 }: Props) {
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [prs, setPrs] = useState<PR[]>([]);
@@ -67,6 +72,15 @@ export default function ProfileModal({
   const [activeTab, setActiveTab] = useState<'plans' | 'prs'>('plans');
   const [pinned, setPinned] = useState<string[]>(initialPinnedPrs);
   const [prSearch, setPrSearch] = useState('');
+  const [editingExpression, setEditingExpression] = useState(false);
+  const [expressionDraft, setExpressionDraft] = useState<MascotExpression>(mascotExpression);
+
+  useEffect(() => { setExpressionDraft(mascotExpression); }, [mascotExpression]);
+
+  const handleSaveExpression = async () => {
+    setEditingExpression(false);
+    await onSaveMascotExpression(expressionDraft).catch(() => {});
+  };
 
   // Drag-to-dismiss
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -159,7 +173,6 @@ export default function ProfileModal({
 
   if (!open) return null;
 
-  const initials = getInitials(displayName, email);
   const nameLabel = deriveLabel(displayName, email);
   const pinnedPrData = pinned
     .map(key => prs.find(pr => norm(pr.exerciseName) === key))
@@ -229,19 +242,60 @@ export default function ProfileModal({
         {/* Scrollable body */}
         <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 'max(28px, env(safe-area-inset-bottom))', overscrollBehavior: 'contain' }}>
 
-          {/* Top section: left (avatar + name) | right (pinned PRs) */}
+          {/* Top section: expression editor (inline) OR normal avatar + pinned */}
+          {editingExpression ? (
+            <div style={{ padding: '16px 16px 8px' }}>
+              {/* Preview row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                <div style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.2)' }}>
+                  <Mascot expression={expressionDraft} size={80} idSuffix="edit-preview" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Choose expression</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>
+                    All {MASCOT_EXPRESSIONS.length} expressions are yours — more coming soon.
+                  </div>
+                </div>
+              </div>
+              {/* Grid */}
+              <MascotExpressionPicker value={expressionDraft} onChange={setExpressionDraft} tileSize={64} />
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <button
+                  onClick={() => { setEditingExpression(false); setExpressionDraft(mascotExpression); }}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveExpression}
+                  style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: '#60a5fa', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+
           <div style={{ display: 'flex', padding: '20px 16px 16px', gap: 16, alignItems: 'flex-start' }}>
 
             {/* Left: avatar + name + email */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0, width: 120 }}>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%', flexShrink: 0,
-                background: 'linear-gradient(135deg, #60a5fa 0%, #818cf8 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 24, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em',
-                boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.25), 0 6px 20px rgba(0,0,0,0.3)',
-              }}>
-                {initials}
+              {/* Mascot avatar with edit badge */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.25), 0 6px 20px rgba(0,0,0,0.3)' }}>
+                  <Mascot expression={mascotExpression} size={72} idSuffix="profile-main" />
+                </div>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => { setExpressionDraft(mascotExpression); setEditingExpression(true); }}
+                    style={{ position: 'absolute', bottom: -1, right: -3, width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'var(--bg-elevated)', boxShadow: '0 0 0 1.5px var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11.5 2.5a2.121 2.121 0 013 3L5 15H1v-4L11.5 2.5z" />
+                    </svg>
+                  </button>
+                )}
               </div>
 
               {editingName ? (
@@ -345,6 +399,7 @@ export default function ProfileModal({
               )}
             </div>
           </div>
+          )} {/* end editingExpression conditional */}
 
           {/* Stats row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 16px 16px' }}>
@@ -581,8 +636,8 @@ export default function ProfileModal({
                         }}
                       />
                       {prSearch && (
-                        <button onClick={() => setPrSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'var(--text-muted)' }}>
-                          <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <button onClick={() => setPrSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
+                          <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                             <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
                           </svg>
                         </button>

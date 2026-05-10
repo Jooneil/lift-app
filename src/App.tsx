@@ -30,7 +30,13 @@ import AppMenu from './components/WorkoutHeader/AppMenu';
 import WorkoutKeypad from './components/WorkoutKeypad';
 import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tutorial';
 import { STEPS } from './components/Tutorial/steps';
-import ProfileModal, { getInitials } from './components/Profile/ProfileModal';
+import ProfileModal from './components/Profile/ProfileModal';
+import { Mascot, MASCOT_EXPRESSIONS, type MascotExpression } from './components/mascot/Mascot';
+
+function safeExpression(val: unknown): MascotExpression {
+  return (MASCOT_EXPRESSIONS as readonly string[]).includes(val as string)
+    ? (val as MascotExpression) : 'happy';
+}
 
 
 // ─── Error boundary ───────────────────────────────────────────────────────────
@@ -170,6 +176,7 @@ function AuthedApp({
   const [displayName, setDisplayName] = useState('');
   const [pinnedPrs, setPinnedPrs] = useState<string[]>([]);
   const [plansPublic, setPlansPublic] = useState(false);
+  const [mascotExpression, setMascotExpression] = useState<MascotExpression>('happy');
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
   const [confirmArchivePlanId, setConfirmArchivePlanId] = useState<string | null>(null);
@@ -591,6 +598,11 @@ function AuthedApp({
         // Load plans visibility
         if (p?.profile_public != null) {
           setPlansPublic(!!p.profile_public);
+        }
+
+        // Load mascot expression
+        if (p?.mascot_expression) {
+          setMascotExpression(safeExpression(p.mascot_expression));
         }
 
         // Validate position with server completedList — update only if it disagrees
@@ -1267,15 +1279,14 @@ function AuthedApp({
             style={{
               width: 32, height: 32, minWidth: 32, minHeight: 32,
               borderRadius: '50%', border: 'none', padding: 0,
-              cursor: 'pointer', lineHeight: 1, overflow: 'hidden',
-              background: 'linear-gradient(135deg, #60a5fa 0%, #818cf8 100%)',
+              cursor: 'pointer', overflow: 'hidden',
+              background: 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: '0.02em',
               flexShrink: 0,
               boxShadow: '0 0 0 2px var(--bg-elevated), 0 0 0 3.5px rgba(96,165,250,0.4)',
             }}
           >
-            {getInitials(displayName, user.username)}
+            <Mascot expression={mascotExpression} size={32} idSuffix="header" />
           </button>
         </div>
       </div>
@@ -2212,6 +2223,11 @@ function AuthedApp({
       onTogglePlansPublic={async (val) => {
         setPlansPublic(val);
         await upsertUserPrefs({ profile_public: val }).catch(() => {});
+      }}
+      mascotExpression={mascotExpression}
+      onSaveMascotExpression={async (expr) => {
+        setMascotExpression(expr);
+        await upsertUserPrefs({ mascot_expression: expr }).catch(() => {});
       }}
     />
     </TutorialProvider>
