@@ -20,7 +20,7 @@ export type FriendWithProfile = Friendship & { profile: Profile };
 function generateCode(): string {
   // No 0/O/1/I to avoid confusion when reading aloud
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = 'LIFT-';
+  let code = '';
   for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
@@ -74,14 +74,13 @@ export async function searchUsers(query: string, currentUserId: string): Promise
   const upper = trimmed.toUpperCase();
   const map = new Map<string, Profile>();
 
-  // Code search: if it looks like a code or starts with LIFT-
-  const isCodeSearch = upper.startsWith('LIFT-') || /^[A-Z0-9]{3,}$/.test(upper);
+  // Code search: 6 uppercase alphanumeric chars
+  const isCodeSearch = /^[A-Z0-9]{3,6}$/.test(upper);
   if (isCodeSearch) {
-    const codeQuery = upper.startsWith('LIFT-') ? upper : `LIFT-${upper}`;
     const { data } = await supabase
       .from('profiles')
       .select('user_id,username,user_code,mascot_expression')
-      .eq('user_code', codeQuery)
+      .eq('user_code', upper)
       .neq('user_id', currentUserId)
       .limit(5);
     for (const p of (data ?? []) as Profile[]) map.set(p.user_id, p);
