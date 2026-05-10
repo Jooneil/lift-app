@@ -2281,6 +2281,7 @@ function AuthedApp({
       onSaveDisplayName={async (name) => {
         setDisplayName(name);
         await upsertUserPrefs({ display_name: name }).catch(() => {});
+        if (supabaseUserId) ensureProfile(supabaseUserId, name, mascotExpression).catch(() => {});
       }}
       currentStreak={currentStreak}
       bestStreak={streakState?.longestStreak ?? 0}
@@ -2299,6 +2300,7 @@ function AuthedApp({
       onSaveMascotExpression={async (expr) => {
         setMascotExpression(expr);
         await upsertUserPrefs({ mascot_expression: expr }).catch(() => {});
+        if (supabaseUserId) ensureProfile(supabaseUserId, displayName, expr).catch(() => {});
       }}
       viewingProfile={viewingFriendProfile}
     />
