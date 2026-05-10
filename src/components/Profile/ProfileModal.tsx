@@ -13,6 +13,9 @@ type Props = {
   streakEnabled: boolean;
   pinnedPrs: string[];
   onSavePinnedPrs: (prs: string[]) => Promise<void>;
+  plansPublic: boolean;
+  onTogglePlansPublic: (val: boolean) => Promise<void>;
+  isOwnProfile?: boolean;
 };
 
 export function getInitials(displayName: string, email: string): string {
@@ -52,6 +55,7 @@ export default function ProfileModal({
   open, onClose, email, displayName, onSaveDisplayName,
   currentStreak, bestStreak, streakEnabled,
   pinnedPrs: initialPinnedPrs, onSavePinnedPrs,
+  plansPublic, onTogglePlansPublic, isOwnProfile = true,
 }: Props) {
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [prs, setPrs] = useState<PR[]>([]);
@@ -243,8 +247,10 @@ export default function ProfileModal({
                       }}>
                         {pr.exerciseName}
                       </span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                        {pr.weight}<span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 2 }}>lbs</span>
+                      <span style={{ display: 'flex', alignItems: 'baseline', gap: 2, flexShrink: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{pr.weight}</span>
+                        <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>lbs</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 1 }}>× {pr.reps}</span>
                       </span>
                     </div>
                   ))}
@@ -348,56 +354,113 @@ export default function ProfileModal({
           {/* Tab content */}
           <div style={{ padding: '0 16px' }}>
             {activeTab === 'plans' ? (
-              loading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {[1, 2, 3].map(i => (
-                    <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--bg-card)', opacity: 0.4 + i * 0.1 }} />
-                  ))}
+              <>
+                {/* Privacy toggle row (own profile only) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {plansPublic ? (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                        </svg>
+                        Plans are public
+                      </>
+                    ) : (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                        </svg>
+                        Plans are private
+                      </>
+                    )}
+                  </span>
+                  {isOwnProfile && (
+                    <button
+                      onClick={() => onTogglePlansPublic(!plansPublic)}
+                      style={{
+                        width: 44, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer',
+                        background: plansPublic ? 'var(--accent-blue, #60a5fa)' : 'var(--border-subtle)',
+                        position: 'relative', transition: 'background 0.2s ease', flexShrink: 0, padding: 0,
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute', top: 3, width: 20, height: 20, borderRadius: '50%',
+                        background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                        left: plansPublic ? 21 : 3,
+                        transition: 'left 0.18s ease',
+                      }} />
+                    </button>
+                  )}
                 </div>
-              ) : plans.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: 14 }}>
-                  No active plans
-                </div>
-              ) : (
-                <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-                  {plans.map((plan, i) => {
-                    const weeks = plan.data?.weeks?.length ?? 0;
-                    const daysPerWeek = plan.data?.weeks?.[0]?.days?.length ?? 0;
-                    return (
-                      <div
-                        key={plan.id}
-                        style={{
-                          display: 'flex', alignItems: 'center', padding: '13px 14px',
-                          background: 'var(--bg-card)',
-                          borderTop: i > 0 ? '1px solid var(--border-subtle)' : 'none',
-                          gap: 10,
-                        }}
-                      >
-                        <div style={{
-                          width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-                          background: 'rgba(96,165,250,0.12)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {plan.name || 'Unnamed Plan'}
+
+                {!plansPublic ? (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    padding: '32px 20px', gap: 10,
+                    borderRadius: 12, border: '1px solid var(--border-subtle)',
+                    background: 'var(--bg-card)', opacity: 0.6,
+                  }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' }}>These plans are private</span>
+                    {isOwnProfile && (
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
+                        Toggle the switch above to share your plans with others
+                      </span>
+                    )}
+                  </div>
+                ) : loading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {[1, 2, 3].map(i => (
+                      <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--bg-card)', opacity: 0.4 + i * 0.1 }} />
+                    ))}
+                  </div>
+                ) : plans.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: 14 }}>
+                    No active plans
+                  </div>
+                ) : (
+                  <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                    {plans.map((plan, i) => {
+                      const weeks = plan.data?.weeks?.length ?? 0;
+                      const daysPerWeek = plan.data?.weeks?.[0]?.days?.length ?? 0;
+                      return (
+                        <div
+                          key={plan.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', padding: '13px 14px',
+                            background: 'var(--bg-card)',
+                            borderTop: i > 0 ? '1px solid var(--border-subtle)' : 'none',
+                            gap: 10,
+                          }}
+                        >
+                          <div style={{
+                            width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                            background: 'rgba(96,165,250,0.12)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                            </svg>
                           </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                            {weeks > 0 ? `${weeks} week${weeks !== 1 ? 's' : ''}` : ''}
-                            {weeks > 0 && daysPerWeek > 0 ? ' · ' : ''}
-                            {daysPerWeek > 0 ? `${daysPerWeek} day${daysPerWeek !== 1 ? 's' : ''}/week` : ''}
-                            {weeks === 0 && daysPerWeek === 0 ? 'No schedule set' : ''}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {plan.name || 'Unnamed Plan'}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                              {weeks > 0 ? `${weeks} week${weeks !== 1 ? 's' : ''}` : ''}
+                              {weeks > 0 && daysPerWeek > 0 ? ' · ' : ''}
+                              {daysPerWeek > 0 ? `${daysPerWeek} day${daysPerWeek !== 1 ? 's' : ''}/week` : ''}
+                              {weeks === 0 && daysPerWeek === 0 ? 'No schedule set' : ''}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
               /* PRs tab */
               loading ? (

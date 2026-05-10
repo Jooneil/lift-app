@@ -169,6 +169,7 @@ function AuthedApp({
   const [showProfile, setShowProfile] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [pinnedPrs, setPinnedPrs] = useState<string[]>([]);
+  const [plansPublic, setPlansPublic] = useState(false);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
   const [confirmArchivePlanId, setConfirmArchivePlanId] = useState<string | null>(null);
@@ -585,6 +586,11 @@ function AuthedApp({
         // Load pinned PRs
         if (p?.pinned_prs) {
           setPinnedPrs(p.pinned_prs);
+        }
+
+        // Load plans visibility
+        if (p?.profile_public != null) {
+          setPlansPublic(!!p.profile_public);
         }
 
         // Validate position with server completedList — update only if it disagrees
@@ -2201,6 +2207,11 @@ function AuthedApp({
       onSavePinnedPrs={async (prs) => {
         setPinnedPrs(prs);
         await upsertUserPrefs({ pinned_prs: prs }).catch(() => {});
+      }}
+      plansPublic={plansPublic}
+      onTogglePlansPublic={async (val) => {
+        setPlansPublic(val);
+        await upsertUserPrefs({ profile_public: val }).catch(() => {});
       }}
     />
     </TutorialProvider>
