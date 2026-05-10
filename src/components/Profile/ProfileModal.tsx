@@ -66,6 +66,7 @@ export default function ProfileModal({
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'plans' | 'prs'>('plans');
   const [pinned, setPinned] = useState<string[]>(initialPinnedPrs);
+  const [prSearch, setPrSearch] = useState('');
 
   // Drag-to-dismiss
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -158,6 +159,18 @@ export default function ProfileModal({
   const pinnedPrData = pinned
     .map(key => prs.find(pr => norm(pr.exerciseName) === key))
     .filter(Boolean) as PR[];
+
+  const searchTerm = norm(prSearch);
+  const filteredPrs = searchTerm
+    ? prs
+        .filter(pr => norm(pr.exerciseName).includes(searchTerm))
+        .sort((a, b) => {
+          const an = norm(a.exerciseName), bn = norm(b.exerciseName);
+          const aStarts = an.startsWith(searchTerm), bStarts = bn.startsWith(searchTerm);
+          if (aStarts !== bStarts) return aStarts ? -1 : 1;
+          return b.weight - a.weight;
+        })
+    : prs;
 
   return (
     <>
@@ -543,63 +556,97 @@ export default function ProfileModal({
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'right' }}>
-                    {pinned.length}/4 pinned
+                  {/* Search + pin count row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{
+                      flex: 1, display: 'flex', alignItems: 'center', gap: 7,
+                      background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+                      borderRadius: 9, padding: '7px 10px',
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      <input
+                        value={prSearch}
+                        onChange={e => setPrSearch(e.target.value)}
+                        placeholder="Search exercises…"
+                        style={{
+                          flex: 1, background: 'none', border: 'none', outline: 'none',
+                          fontSize: 13, color: 'var(--text-primary)',
+                        }}
+                      />
+                      {prSearch && (
+                        <button onClick={() => setPrSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'var(--text-muted)' }}>
+                          <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {isOwnProfile && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+                        {pinned.length}/4 pinned
+                      </span>
+                    )}
                   </div>
-                  <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-                    {prs.map((pr, i) => {
-                      const key = norm(pr.exerciseName);
-                      const isPinned = pinned.includes(key);
-                      const canPin = isPinned || pinned.length < 4;
-                      return (
-                        <div
-                          key={pr.exerciseName}
-                          style={{
-                            display: 'flex', alignItems: 'center', padding: '11px 14px',
-                            background: 'var(--bg-card)',
-                            borderTop: i > 0 ? '1px solid var(--border-subtle)' : 'none',
-                            gap: 10,
-                          }}
-                        >
-                          {/* Rank */}
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', minWidth: 18, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                            {i + 1}
-                          </span>
-                          {/* Name */}
-                          <span style={{ flex: 1, fontSize: 14, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {pr.exerciseName}
-                          </span>
-                          {/* Weight × reps */}
-                          <span style={{ display: 'flex', alignItems: 'baseline', gap: 3, flexShrink: 0 }}>
-                            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-                              {pr.weight}
-                            </span>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>lbs</span>
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 1 }}>× {pr.reps}</span>
-                          </span>
-                          {/* Pin toggle */}
-                          <button
-                            onClick={() => togglePin(pr.exerciseName)}
-                            title={isPinned ? 'Unpin' : canPin ? 'Pin to profile' : 'Max 4 pinned'}
+
+                  {filteredPrs.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                      No results for "{prSearch}"
+                    </div>
+                  ) : (
+                    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                      {filteredPrs.map((pr, i) => {
+                        const key = norm(pr.exerciseName);
+                        const isPinned = pinned.includes(key);
+                        const canPin = isPinned || pinned.length < 4;
+                        return (
+                          <div
+                            key={pr.exerciseName}
                             style={{
-                              background: 'none', border: 'none', cursor: canPin ? 'pointer' : 'default',
-                              padding: '2px 4px', display: 'flex', alignItems: 'center',
-                              opacity: canPin ? 1 : 0.3,
-                              flexShrink: 0,
+                              display: 'flex', alignItems: 'center', padding: '11px 14px',
+                              background: 'var(--bg-card)',
+                              borderTop: i > 0 ? '1px solid var(--border-subtle)' : 'none',
+                              gap: 10,
                             }}
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              {isPinned ? (
-                                <path d="M16 3a1 1 0 011 1v1l1.293 1.293A1 1 0 0118 7h-1v5l2 2v1H13v5l-1 1-1-1v-5H5v-1l2-2V7H6a1 1 0 01-.293-.707L7 5V4a1 1 0 011-1h8z" fill="#60a5fa" />
-                              ) : (
-                                <path d="M16 3a1 1 0 011 1v1l1.293 1.293A1 1 0 0118 7h-1v5l2 2v1H13v5l-1 1-1-1v-5H5v-1l2-2V7H6a1 1 0 01-.293-.707L7 5V4a1 1 0 011-1h8z" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" />
-                              )}
-                            </svg>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', minWidth: 18, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                              {i + 1}
+                            </span>
+                            <span style={{ flex: 1, fontSize: 14, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {pr.exerciseName}
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'baseline', gap: 3, flexShrink: 0 }}>
+                              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                                {pr.weight}
+                              </span>
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>lbs</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 1 }}>× {pr.reps}</span>
+                            </span>
+                            {isOwnProfile && (
+                              <button
+                                onClick={() => togglePin(pr.exerciseName)}
+                                title={isPinned ? 'Unpin' : canPin ? 'Pin to profile' : 'Max 4 pinned'}
+                                style={{
+                                  background: 'none', border: 'none', cursor: canPin ? 'pointer' : 'default',
+                                  padding: '2px 4px', display: 'flex', alignItems: 'center',
+                                  opacity: canPin ? 1 : 0.3, flexShrink: 0,
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                  {isPinned ? (
+                                    <path d="M16 3a1 1 0 011 1v1l1.293 1.293A1 1 0 0118 7h-1v5l2 2v1H13v5l-1 1-1-1v-5H5v-1l2-2V7H6a1 1 0 01-.293-.707L7 5V4a1 1 0 011-1h8z" fill="#60a5fa" />
+                                  ) : (
+                                    <path d="M16 3a1 1 0 011 1v1l1.293 1.293A1 1 0 0118 7h-1v5l2 2v1H13v5l-1 1-1-1v-5H5v-1l2-2V7H6a1 1 0 01-.293-.707L7 5V4a1 1 0 011-1h8z" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" />
+                                  )}
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               )
             )}
