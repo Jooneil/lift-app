@@ -432,6 +432,7 @@ export default function ProfileModal({
                         width: 44, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer',
                         background: plansPublic ? 'var(--accent-blue, #60a5fa)' : 'var(--border-subtle)',
                         position: 'relative', transition: 'background 0.2s ease', flexShrink: 0, padding: 0,
+                        appearance: 'none', WebkitAppearance: 'none', outline: 'none',
                       }}
                     >
                       <div style={{
