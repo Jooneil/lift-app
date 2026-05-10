@@ -238,6 +238,13 @@ function AuthedApp({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [viewingFriendProfile, showProfile, showSocial, showStreakSettings, showWorkoutPrefs, showPlanSettings, openHeaderMenu]);
 
+  // Push latest name/avatar to profiles table whenever social is opened
+  useEffect(() => {
+    if (showSocial && supabaseUserId) {
+      ensureProfile(supabaseUserId, displayName || null, mascotExpression).catch(() => {});
+    }
+  }, [showSocial, supabaseUserId, displayName, mascotExpression]);
+
   const exerciseByName = useMemo(() => {
     const map = new Map<string, Exercise>();
     for (const ex of exerciseLibrary) {
