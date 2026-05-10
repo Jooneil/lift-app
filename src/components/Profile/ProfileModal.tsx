@@ -114,6 +114,19 @@ export default function ProfileModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Escape inside expression picker → go back to profile (capture before App.tsx handler)
+  useEffect(() => {
+    if (!editingExpression) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setEditingExpression(false);
+      setExpressionDraft(mascotExpression);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [editingExpression, mascotExpression]);
+
   // Lock body scroll and prevent pull-to-refresh while modal is open
   useEffect(() => {
     if (!open) return;
@@ -265,43 +278,40 @@ export default function ProfileModal({
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 'max(28px, env(safe-area-inset-bottom))', overscrollBehavior: 'contain' }}>
-
-          {/* Expression editor — takes over the full scrollable area */}
-          {editingExpression ? (
-            <div style={{ display: 'flex', flexDirection: 'column', padding: '16px 16px 8px' }}>
-              {/* Preview row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-                <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 0 3px var(--bg-elevated), 0 0 0 5px rgba(96,165,250,0.2)' }}>
-                  <Mascot expression={expressionDraft} size={72} idSuffix="edit-preview" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Choose expression</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>
-                    All {MASCOT_EXPRESSIONS.length} expressions are yours — more coming soon.
-                  </div>
-                </div>
+        {/* Expression picker sub-panel — own flex column, replaces entire body */}
+        {editingExpression ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 0 2px var(--border-subtle)' }}>
+                <Mascot expression={expressionDraft} size={48} idSuffix="edit-preview" />
               </div>
-              {/* 2-column grid with big tiles */}
-              <MascotExpressionPicker value={expressionDraft} onChange={setExpressionDraft} tileSize={120} columns={2} />
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <button
-                  onClick={() => { setEditingExpression(false); setExpressionDraft(mascotExpression); }}
-                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveExpression}
-                  style={{ flex: 2, padding: '11px 0', borderRadius: 10, border: 'none', background: '#60a5fa', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: '-0.01em' }}
-                >
-                  Save
-                </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Choose expression</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{MASCOT_EXPRESSIONS.length} available</div>
               </div>
+              <button
+                onClick={() => { setEditingExpression(false); setExpressionDraft(mascotExpression); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontSize: 14, fontWeight: 600, padding: '6px 0 6px 8px', flexShrink: 0 }}
+              >
+                ← Back
+              </button>
             </div>
-          ) : (
+            <div style={{ overflowY: 'auto', flex: 1, padding: '12px 16px', overscrollBehavior: 'contain' }}>
+              <MascotExpressionPicker value={expressionDraft} onChange={setExpressionDraft} tileSize={120} columns={2} />
+            </div>
+            <div style={{ padding: '12px 16px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+              <button
+                onClick={handleSaveExpression}
+                style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: 'none', background: '#60a5fa', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Save
+              </button>
+            </div>
+          </>
+        ) : (
+          /* Normal scrollable body */
+          <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 'max(28px, env(safe-area-inset-bottom))', overscrollBehavior: 'contain' }}>
+
 
           <div style={{ display: 'flex', padding: '20px 16px 16px', gap: 16, alignItems: 'flex-start' }}>
 
@@ -439,8 +449,6 @@ export default function ProfileModal({
               )}
             </div>
           </div>
-          )} {/* end editingExpression conditional */}
-
           {/* Stats row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '0 16px 16px' }}>
             {([
@@ -767,7 +775,8 @@ export default function ProfileModal({
           </div>
 
           <div style={{ height: 16 }} />
-        </div>
+          </div>
+        )}
       </div>
 
       <style>{`
