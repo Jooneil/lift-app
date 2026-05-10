@@ -289,9 +289,9 @@ export default function ProfileModal({
                 {isOwnProfile && (
                   <button
                     onClick={() => { setExpressionDraft(mascotExpression); setEditingExpression(true); }}
-                    style={{ position: 'absolute', bottom: -1, right: -3, width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'var(--bg-elevated)', boxShadow: '0 0 0 1.5px var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}
+                    style={{ position: 'absolute', bottom: -1, right: -3, border: 'none', background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 2 }}
                   >
-                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11.5 2.5a2.121 2.121 0 013 3L5 15H1v-4L11.5 2.5z" />
                     </svg>
                   </button>
@@ -326,7 +326,7 @@ export default function ProfileModal({
                     letterSpacing: '-0.02em', textAlign: 'center',
                     maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
-                    {saving ? 'Saving…' : nameLabel}
+                    {nameLabel}
                   </span>
                   <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11.5 2.5a2.121 2.121 0 013 3L5 15H1v-4L11.5 2.5z" />
@@ -334,7 +334,6 @@ export default function ProfileModal({
                 </button>
               )}
 
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', wordBreak: 'break-all', lineHeight: 1.3 }}>{email}</span>
               {stats?.memberSince && (
                 <span style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', letterSpacing: '0.02em', lineHeight: 1.3 }}>
                   Since {formatMemberSince(stats.memberSince)}
