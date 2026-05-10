@@ -222,6 +222,22 @@ function AuthedApp({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Global Escape key handler — closes the topmost open overlay
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (viewingFriendProfile) { setViewingFriendProfile(null); return; }
+      if (showProfile) { setShowProfile(false); return; }
+      if (showSocial) { setShowSocial(false); return; }
+      if (showStreakSettings) { setShowStreakSettings(false); return; }
+      if (showWorkoutPrefs) { setShowWorkoutPrefs(false); return; }
+      if (showPlanSettings) { setShowPlanSettings(false); return; }
+      if (openHeaderMenu) { setOpenHeaderMenu(null); return; }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [viewingFriendProfile, showProfile, showSocial, showStreakSettings, showWorkoutPrefs, showPlanSettings, openHeaderMenu]);
+
   const exerciseByName = useMemo(() => {
     const map = new Map<string, Exercise>();
     for (const ex of exerciseLibrary) {
