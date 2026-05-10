@@ -51,10 +51,10 @@ function ActionBtn({
   disabled?: boolean;
 }) {
   const colors: Record<string, { bg: string; color: string; border: string }> = {
-    ghost: { bg: 'transparent', color: 'var(--accent)', border: '1.5px solid var(--accent)' },
-    primary: { bg: 'var(--accent)', color: '#fff', border: '1.5px solid var(--accent)' },
+    ghost: { bg: 'transparent', color: 'var(--accent-blue)', border: '1.5px solid var(--accent-blue)' },
+    primary: { bg: 'var(--accent-blue)', color: '#fff', border: '1.5px solid var(--accent-blue)' },
     danger: { bg: 'transparent', color: 'var(--danger, #ef4444)', border: '1.5px solid var(--danger, #ef4444)' },
-    muted: { bg: 'var(--bg-elevated)', color: 'var(--text-muted)', border: '1.5px solid var(--border-subtle)' },
+    muted: { bg: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1.5px solid var(--border-subtle)' },
   };
   const c = colors[variant];
   return (
@@ -93,6 +93,7 @@ export default function SocialSheet({
   const [sendTarget, setSendTarget] = useState<FriendWithProfile | null>(null);
   const [sendingPlan, setSendingPlan] = useState(false);
   const [justSent, setJustSent] = useState(false);
+  const [viewingFriend, setViewingFriend] = useState<FriendWithProfile | null>(null);
 
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
 
@@ -144,6 +145,7 @@ export default function SocialSheet({
       setSearchResults([]);
       setSendTarget(null);
       setJustSent(false);
+      setViewingFriend(null);
     }
   }, [open, currentUserId, loadData]);
 
@@ -277,6 +279,56 @@ export default function SocialSheet({
   const planBadge = receivedPlans.length;
   const activePlans = plans.filter(p => !('archived' in p && p.archived));
 
+  // ─── Friend profile sub-view ─────────────────────────────────────────────
+  const renderFriendProfile = () => {
+    const f = viewingFriend!;
+    const isRemoving = pendingActions.has(`remove-${f.id}`);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
+          <button
+            onClick={() => setViewingFriend(null)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontSize: 13, fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            ← Back
+          </button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 24px', gap: 12 }}>
+          <div style={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', background: 'var(--bg-elevated)', boxShadow: '0 0 0 3px var(--border-subtle)' }}>
+            <Mascot
+              expression={(f.profile.mascot_expression as Parameters<typeof Mascot>[0]['expression']) || 'happy'}
+              size={96}
+              idSuffix={`profile-view-${f.profile.user_id.slice(0, 8)}`}
+            />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
+              {f.profile.username || 'Lifter'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.06em', marginTop: 4 }}>
+              {f.profile.user_code}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+            <ActionBtn
+              onClick={() => { setViewingFriend(null); setSendTarget(f); }}
+              variant="primary"
+            >
+              Share Plan
+            </ActionBtn>
+            <ActionBtn
+              onClick={() => { handleRemoveFriend(f.id); setViewingFriend(null); }}
+              variant="danger"
+              disabled={isRemoving}
+            >
+              {isRemoving ? '…' : 'Remove Friend'}
+            </ActionBtn>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ─── Plan sender sub-view ────────────────────────────────────────────────
   const renderSendPlanView = () => (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -395,23 +447,15 @@ export default function SocialSheet({
             No friends yet.<br />Search by name or share your code: <strong style={{ color: 'var(--text-primary)' }}>{userCode}</strong>
           </div>
         ) : (
-          friends.map(f => {
-            const isRemoving = pendingActions.has(`remove-${f.id}`);
-            return (
-              <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <ProfileAvatar profile={f.profile} />
-                <div style={{ flex: 1, minWidth: 0 }}><Username profile={f.profile} /></div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <ActionBtn onClick={() => setSendTarget(f)} variant="ghost">
-                    Share Plan
-                  </ActionBtn>
-                  <ActionBtn onClick={() => handleRemoveFriend(f.id)} variant="muted" disabled={isRemoving}>
-                    {isRemoving ? '…' : 'Remove'}
-                  </ActionBtn>
-                </div>
-              </div>
-            );
-          })
+          friends.map(f => (
+            <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
+              <ProfileAvatar profile={f.profile} />
+              <div style={{ flex: 1, minWidth: 0 }}><Username profile={f.profile} /></div>
+              <ActionBtn onClick={() => setViewingFriend(f)} variant="ghost">
+                View Profile
+              </ActionBtn>
+            </div>
+          ))
         )}
       </div>
     </div>
@@ -571,7 +615,7 @@ export default function SocialSheet({
                 style={{
                   padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
                   border: 'none', cursor: 'pointer', position: 'relative',
-                  background: active ? 'var(--accent)' : 'var(--bg-elevated)',
+                  background: active ? 'var(--accent-blue)' : 'var(--bg-elevated)',
                   color: active ? '#fff' : 'var(--text-primary)',
                   transition: 'background 0.15s, color 0.15s',
                 }}
@@ -597,7 +641,9 @@ export default function SocialSheet({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
           {sendTarget
             ? renderSendPlanView()
-            : tab === 'friends'
+            : viewingFriend
+              ? renderFriendProfile()
+              : tab === 'friends'
               ? renderFriendsTab()
               : tab === 'requests'
                 ? renderRequestsTab()
