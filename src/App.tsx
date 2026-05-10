@@ -30,6 +30,7 @@ import AppMenu from './components/WorkoutHeader/AppMenu';
 import WorkoutKeypad from './components/WorkoutKeypad';
 import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tutorial';
 import { STEPS } from './components/Tutorial/steps';
+import ProfileModal, { getInitials } from './components/Profile/ProfileModal';
 
 
 // ─── Error boundary ───────────────────────────────────────────────────────────
@@ -165,6 +166,8 @@ function AuthedApp({
   const [viewArchivedLoading, setViewArchivedLoading] = useState(false);
   const [finishingPlan, setFinishingPlan] = useState(false);
   const [openHeaderMenu, setOpenHeaderMenu] = useState<'day' | 'gear' | 'app' | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
   const [confirmArchivePlanId, setConfirmArchivePlanId] = useState<string | null>(null);
@@ -571,6 +574,11 @@ function AuthedApp({
         // Load workout preferences
         if (p?.workout_prefs) {
           setWorkoutPrefs({ ...DEFAULT_WORKOUT_PREFS, ...p.workout_prefs });
+        }
+
+        // Load display name
+        if (p?.display_name) {
+          setDisplayName(p.display_name);
         }
 
         // Validate position with server completedList — update only if it disagrees
@@ -1202,6 +1210,20 @@ function AuthedApp({
               </span>
             </div>
           )}
+          <button
+            onClick={() => { setOpenHeaderMenu(null); setShowProfile(true); }}
+            title="Profile"
+            style={{
+              width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #60a5fa 0%, #818cf8 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em',
+              flexShrink: 0,
+              boxShadow: '0 0 0 2px var(--bg-base), 0 0 0 3px rgba(96,165,250,0.3)',
+            }}
+          >
+            {getInitials(displayName, user.username)}
+          </button>
           <button
             data-tutorial-id="kebab-btn"
             onClick={() => setOpenHeaderMenu(v => v === 'app' ? null : 'app')}
@@ -2149,6 +2171,20 @@ function AuthedApp({
         </div>
       </Modal>
     </div>
+
+    <ProfileModal
+      open={showProfile}
+      onClose={() => setShowProfile(false)}
+      email={user.username}
+      displayName={displayName}
+      onSaveDisplayName={async (name) => {
+        setDisplayName(name);
+        await upsertUserPrefs({ display_name: name }).catch(() => {});
+      }}
+      currentStreak={currentStreak}
+      bestStreak={streakState?.longestStreak ?? 0}
+      streakEnabled={!!streakConfig?.enabled}
+    />
     </TutorialProvider>
   );
 }
