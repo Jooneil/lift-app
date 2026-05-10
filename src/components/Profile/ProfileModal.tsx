@@ -75,6 +75,14 @@ export default function ProfileModal({
 
   useEffect(() => { setPinned(initialPinnedPrs); }, [initialPinnedPrs]);
 
+  // Prevent browser pull-to-refresh while modal is open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overscrollBehavior;
+    document.body.style.overscrollBehavior = 'none';
+    return () => { document.body.style.overscrollBehavior = prev; };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     setLoading(true);
