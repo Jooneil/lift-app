@@ -1277,7 +1277,7 @@ function AuthedApp({
             onClick={() => setShowProfile(true)}
             title="Profile"
             style={{
-              width: 32, height: 32, minWidth: 32, minHeight: 32,
+              width: 40, height: 40, minWidth: 40, minHeight: 40,
               borderRadius: '50%', border: 'none', padding: 0,
               cursor: 'pointer', overflow: 'hidden',
               background: 'transparent',
@@ -1286,7 +1286,7 @@ function AuthedApp({
               boxShadow: '0 0 0 2px var(--bg-elevated), 0 0 0 3.5px rgba(96,165,250,0.4)',
             }}
           >
-            <Mascot expression={mascotExpression} size={32} idSuffix="header" />
+            <Mascot expression={mascotExpression} size={40} idSuffix="header" />
           </button>
         </div>
       </div>

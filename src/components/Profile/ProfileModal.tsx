@@ -289,7 +289,7 @@ export default function ProfileModal({
                 {isOwnProfile && (
                   <button
                     onClick={() => { setExpressionDraft(mascotExpression); setEditingExpression(true); }}
-                    style={{ position: 'absolute', bottom: -1, right: -3, border: 'none', background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 2 }}
+                    style={{ position: 'absolute', bottom: -4, right: 2, border: 'none', background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 2 }}
                   >
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11.5 2.5a2.121 2.121 0 013 3L5 15H1v-4L11.5 2.5z" />
@@ -317,7 +317,7 @@ export default function ProfileModal({
                 />
               ) : (
                 <button
-                  onClick={() => setEditingName(true)}
+                  onClick={() => { setNameDraft(nameLabel); setEditingName(true); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: '1px 2px' }}
                 >
                   <span style={{
