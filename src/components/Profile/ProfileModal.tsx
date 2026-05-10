@@ -119,15 +119,19 @@ export default function ProfileModal({
     }
   }, []);
 
+  const dismiss = useCallback(() => {
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = 'translateY(100%)';
+      sheetRef.current.style.transition = 'transform 0.28s ease';
+    }
+    setTimeout(onClose, 270);
+  }, [onClose]);
+
   const onDragTouchEnd = useCallback(() => {
     if (!isDragging.current) return;
     isDragging.current = false;
     if (dragOffset.current > 110) {
-      if (sheetRef.current) {
-        sheetRef.current.style.transform = 'translateY(100%)';
-        sheetRef.current.style.transition = 'transform 0.27s ease';
-      }
-      setTimeout(onClose, 270);
+      dismiss();
     } else {
       if (sheetRef.current) {
         sheetRef.current.style.transform = 'translateY(0)';
@@ -135,7 +139,7 @@ export default function ProfileModal({
       }
       dragOffset.current = 0;
     }
-  }, [onClose]);
+  }, [dismiss]);
 
   const togglePin = (exerciseName: string) => {
     const key = norm(exerciseName);
@@ -157,7 +161,7 @@ export default function ProfileModal({
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200 }} />
+      <div data-no-ptr onClick={dismiss} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200 }} />
 
       <div
         ref={sheetRef}
@@ -195,7 +199,7 @@ export default function ProfileModal({
         >
           <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>Profile</span>
           <button
-            onClick={onClose}
+            onClick={dismiss}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center', borderRadius: 6 }}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -416,7 +420,7 @@ export default function ProfileModal({
             {activeTab === 'plans' ? (
               <>
                 {/* Privacy toggle row (own profile only) */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
                     {plansPublic ? (
                       <>
