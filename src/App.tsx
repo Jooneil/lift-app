@@ -31,6 +31,8 @@ import WorkoutKeypad from './components/WorkoutKeypad';
 import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tutorial';
 import { STEPS } from './components/Tutorial/steps';
 import ProfileModal from './components/Profile/ProfileModal';
+import SocialSheet from './components/Social/SocialSheet';
+import { ensureProfile } from './api/friends';
 import { Mascot, MASCOT_EXPRESSIONS, type MascotExpression } from './components/mascot/Mascot';
 
 function safeExpression(val: unknown): MascotExpression {
@@ -177,6 +179,10 @@ function AuthedApp({
   const [pinnedPrs, setPinnedPrs] = useState<string[]>([]);
   const [plansPublic, setPlansPublic] = useState(false);
   const [mascotExpression, setMascotExpression] = useState<MascotExpression>('happy');
+  const [showSocial, setShowSocial] = useState(false);
+  const [socialBadge, setSocialBadge] = useState(0);
+  const [supabaseUserId, setSupabaseUserId] = useState('');
+  const [userCode, setUserCode] = useState('');
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
   const [confirmArchivePlanId, setConfirmArchivePlanId] = useState<string | null>(null);
@@ -198,6 +204,22 @@ function AuthedApp({
   const [workoutPrefs, setWorkoutPrefs] = useState<Required<WorkoutPrefs>>({ ...DEFAULT_WORKOUT_PREFS });
   const [showWorkoutPrefs, setShowWorkoutPrefs] = useState(false);
   const [showPlanSettings, setShowPlanSettings] = useState(false);
+
+  // Ensure Supabase profile row exists (for friend search / user codes)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user: supaUser } } = await supabase.auth.getUser();
+        if (!supaUser) return;
+        setSupabaseUserId(supaUser.id);
+        const up = await getUserPrefs().catch(() => null);
+        const p = up?.prefs;
+        const profile = await ensureProfile(supaUser.id, p?.display_name || null, p?.mascot_expression || 'happy');
+        setUserCode(profile.user_code);
+      } catch { /* social feature degraded gracefully */ }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const exerciseByName = useMemo(() => {
     const map = new Map<string, Exercise>();
@@ -1249,8 +1271,37 @@ function AuthedApp({
           )}
         </div>
 
-        {/* Right: streak + profile avatar */}
+        {/* Right: social + streak + profile avatar */}
         <div className="flex items-center gap-2">
+          {/* Social button */}
+          <button
+            onClick={() => setShowSocial(true)}
+            title="Friends & Social"
+            style={{
+              position: 'relative', background: 'none', border: 'none', padding: 4,
+              cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="7" r="3" />
+              <path d="M2 19c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+              <path d="M15 5c1.7 0 3 1.3 3 3s-1.3 3-3 3" strokeDasharray="1 0" />
+              <path d="M20 19c0-2.8-2-5-4.5-5.5" />
+            </svg>
+            {socialBadge > 0 && (
+              <span style={{
+                position: 'absolute', top: 0, right: 0,
+                background: '#ef4444', color: '#fff',
+                borderRadius: '50%', width: 16, height: 16,
+                fontSize: 10, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                lineHeight: 1,
+              }}>
+                {socialBadge > 9 ? '9+' : socialBadge}
+              </span>
+            )}
+          </button>
+
           {streakConfig?.enabled && (
             <div
               className="relative inline-flex items-center justify-center w-8 h-8 cursor-pointer transition-all duration-150"
@@ -2229,6 +2280,21 @@ function AuthedApp({
         setMascotExpression(expr);
         await upsertUserPrefs({ mascot_expression: expr }).catch(() => {});
       }}
+    />
+    <SocialSheet
+      open={showSocial}
+      onClose={() => setShowSocial(false)}
+      currentUserId={supabaseUserId}
+      userCode={userCode}
+      plans={plans}
+      onAcceptPlan={async (planName, planData) => {
+        const created = await planApi.create(planName, planData);
+        if (created?.id) {
+          const newPlan = mapServerPlan(created);
+          setPlans(prev => [...prev, newPlan]);
+        }
+      }}
+      onBadgeUpdate={setSocialBadge}
     />
     </TutorialProvider>
   );

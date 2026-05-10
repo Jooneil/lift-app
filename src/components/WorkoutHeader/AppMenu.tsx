@@ -1,7 +1,6 @@
 import MenuShell from './MenuShell';
 import MenuRow from './MenuRow';
-
-const APP_VERSION = (import.meta.env as Record<string, string>).VITE_APP_VERSION ?? '1.0.0';
+import { APP_VERSION } from '../../version';
 
 const userIcon = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="6" r="2.5" /><path d="M3 14c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5" /></svg>;
 const slidersIcon = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 4h8M12 4h2M2 8h2M6 8h8M2 12h8M12 12h2" /><circle cx="11" cy="4" r="1.5" /><circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="12" r="1.5" /></svg>;
@@ -30,7 +29,7 @@ export default function AppMenu({ userEmail, onPreferences, onArchive, onLogout,
         <MenuRow label="Log out" onClick={onLogout} danger />
       </div>
       <div style={{ padding: '8px 14px', background: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)', fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', letterSpacing: '0.04em' }}>
-        Lift v{APP_VERSION}
+        Lift · Beta {APP_VERSION}
       </div>
     </MenuShell>
   );

@@ -280,3 +280,69 @@ on conflict ((lower(name))) do update set
   body_weight = excluded.body_weight,
   is_compound = excluded.is_compound,
   secondary_muscles = excluded.secondary_muscles;
+
+-- ─── Social / Friends System ──────────────────────────────────────────────────
+
+-- profiles: public user data used for friend search and display
+create table if not exists public.profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  username text,
+  user_code text unique not null,
+  mascot_expression text not null default 'happy',
+  updated_at timestamptz default now()
+);
+alter table public.profiles enable row level security;
+drop policy if exists profiles_select on public.profiles;
+drop policy if exists profiles_insert on public.profiles;
+drop policy if exists profiles_update on public.profiles;
+drop policy if exists profiles_delete on public.profiles;
+create policy profiles_select on public.profiles for select using (auth.uid() is not null);
+create policy profiles_insert on public.profiles for insert with check (user_id = auth.uid());
+create policy profiles_update on public.profiles for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy profiles_delete on public.profiles for delete using (user_id = auth.uid());
+create index if not exists idx_profiles_user_code on public.profiles(user_code);
+create index if not exists idx_profiles_username_lower on public.profiles(lower(username));
+grant select on public.profiles to authenticated;
+
+-- friendships: friend requests and accepted friends
+create table if not exists public.friendships (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references auth.users(id) on delete cascade,
+  addressee_id uuid not null references auth.users(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined')),
+  created_at timestamptz default now(),
+  unique(requester_id, addressee_id)
+);
+alter table public.friendships enable row level security;
+drop policy if exists friendships_select on public.friendships;
+drop policy if exists friendships_insert on public.friendships;
+drop policy if exists friendships_update on public.friendships;
+drop policy if exists friendships_delete on public.friendships;
+create policy friendships_select on public.friendships for select using (requester_id = auth.uid() or addressee_id = auth.uid());
+create policy friendships_insert on public.friendships for insert with check (requester_id = auth.uid());
+create policy friendships_update on public.friendships for update using (requester_id = auth.uid() or addressee_id = auth.uid());
+create policy friendships_delete on public.friendships for delete using (requester_id = auth.uid() or addressee_id = auth.uid());
+create index if not exists idx_friendships_requester on public.friendships(requester_id);
+create index if not exists idx_friendships_addressee on public.friendships(addressee_id);
+
+-- plan_shares: plan sharing between friends (snapshot copy, not live link)
+create table if not exists public.plan_shares (
+  id uuid primary key default gen_random_uuid(),
+  from_user_id uuid not null references auth.users(id) on delete cascade,
+  to_user_id uuid not null references auth.users(id) on delete cascade,
+  plan_name text not null,
+  plan_snapshot jsonb not null,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'dismissed')),
+  created_at timestamptz default now()
+);
+alter table public.plan_shares enable row level security;
+drop policy if exists plan_shares_select on public.plan_shares;
+drop policy if exists plan_shares_insert on public.plan_shares;
+drop policy if exists plan_shares_update on public.plan_shares;
+drop policy if exists plan_shares_delete on public.plan_shares;
+create policy plan_shares_select on public.plan_shares for select using (from_user_id = auth.uid() or to_user_id = auth.uid());
+create policy plan_shares_insert on public.plan_shares for insert with check (from_user_id = auth.uid());
+create policy plan_shares_update on public.plan_shares for update using (to_user_id = auth.uid());
+create policy plan_shares_delete on public.plan_shares for delete using (from_user_id = auth.uid() or to_user_id = auth.uid());
+create index if not exists idx_plan_shares_to_user on public.plan_shares(to_user_id, created_at desc);
+create index if not exists idx_plan_shares_from_user on public.plan_shares(from_user_id);
