@@ -76,12 +76,17 @@ export default function ProfileModal({
 
   useEffect(() => { setPinned(initialPinnedPrs); }, [initialPinnedPrs]);
 
-  // Prevent browser pull-to-refresh while modal is open
+  // Lock body scroll and prevent pull-to-refresh while modal is open
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overscrollBehavior;
+    const prevOverscroll = document.body.style.overscrollBehavior;
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overscrollBehavior = 'none';
-    return () => { document.body.style.overscrollBehavior = prev; };
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overscrollBehavior = prevOverscroll;
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open]);
 
   useEffect(() => {
