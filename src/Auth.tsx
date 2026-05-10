@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-// no direct API calls needed for auth
 import { supabase } from "./supabaseClient";
 import { Button } from "./components";
+import { ensureProfile } from "./api/friends";
+import { upsertUserPrefs } from "./api/userPrefs";
 
 type AuthMode = 'login' | 'register' | 'forgot' | 'reset';
 
@@ -16,6 +17,7 @@ export default function Auth({
 }) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [err, setErr] = useState<string|null>(null);
@@ -58,12 +60,20 @@ export default function Auth({
         return;
       }
       if (mode === 'register') {
+        if (!username.trim()) throw new Error('Choose a username.');
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
       }
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       const userEmail = data.user?.email || email;
+      if (mode === 'register' && data.user && username.trim()) {
+        const name = username.trim();
+        await Promise.all([
+          ensureProfile(data.user.id, name, 'happy').catch(() => {}),
+          upsertUserPrefs({ display_name: name }).catch(() => {}),
+        ]);
+      }
       onAuthed({ id: 0, username: userEmail });
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Error');
@@ -91,6 +101,16 @@ export default function Auth({
               type="email"
               value={email}
               onChange={(e)=>setEmail(e.target.value)}
+            />
+          )}
+          {mode === 'register' && (
+            <input
+              placeholder="Username"
+              type="text"
+              value={username}
+              onChange={(e)=>setUsername(e.target.value)}
+              maxLength={50}
+              autoComplete="username"
             />
           )}
           {(mode === 'login' || mode === 'register' || mode === 'reset') && (

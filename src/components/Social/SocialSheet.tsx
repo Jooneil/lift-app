@@ -509,13 +509,15 @@ export default function SocialSheet({
       <div
         ref={sheetRef}
         data-no-ptr
+        className="social-sheet"
         style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
           background: 'var(--bg-card)',
           borderRadius: '20px 20px 0 0',
           boxShadow: '0 -4px 32px rgba(0,0,0,0.35)',
           zIndex: 201,
-          maxHeight: '88vh',
+          height: '92vh',
+          maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -539,13 +541,24 @@ export default function SocialSheet({
               onClick={copyCode}
               style={{
                 background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-                borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
+                borderRadius: 8, padding: '5px 10px', cursor: 'pointer',
                 fontSize: 11, fontWeight: 600, letterSpacing: '0.05em',
-                color: codeCopied ? 'var(--accent)' : 'var(--text-muted)',
-                display: 'flex', alignItems: 'center', gap: 5, transition: 'color 0.15s',
+                color: codeCopied ? '#22c55e' : 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.15s',
               }}
+              title="Copy your code"
             >
-              {codeCopied ? '✓ Copied' : userCode}
+              {codeCopied ? (
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="2 8 6 12 14 4" />
+                </svg>
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="5" width="9" height="9" rx="1.5" />
+                  <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" />
+                </svg>
+              )}
+              {codeCopied ? 'Copied!' : userCode}
             </button>
           )}
         </div>
@@ -596,6 +609,22 @@ export default function SocialSheet({
           }
         </div>
       </div>
+
+      <style>{`
+        @media (min-width: 768px) {
+          .social-sheet {
+            top: 50% !important;
+            left: 50% !important;
+            right: auto !important;
+            bottom: auto !important;
+            transform: translate(-50%, -50%);
+            width: 460px;
+            height: 720px !important;
+            max-height: 720px !important;
+            border-radius: 20px !important;
+          }
+        }
+      `}</style>
     </>
   );
 }

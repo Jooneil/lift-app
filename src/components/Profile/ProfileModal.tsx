@@ -238,6 +238,7 @@ export default function ProfileModal({
         style={{
           position: 'fixed',
           bottom: 0, left: 0, right: 0,
+          height: '92vh',
           maxHeight: '92vh',
           borderRadius: '20px 20px 0 0',
           background: 'var(--bg-elevated)',
@@ -788,6 +789,7 @@ export default function ProfileModal({
             bottom: auto !important;
             transform: translate(-50%, -50%);
             width: 460px;
+            height: 720px !important;
             max-height: 720px !important;
             border-radius: 20px !important;
           }

@@ -215,7 +215,8 @@ function AuthedApp({
         setSupabaseUserId(supaUser.id);
         const up = await getUserPrefs().catch(() => null);
         const p = up?.prefs;
-        const profile = await ensureProfile(supaUser.id, p?.display_name || null, p?.mascot_expression || 'happy');
+        const derivedName = p?.display_name || user.username.split('@')[0] || null;
+        const profile = await ensureProfile(supaUser.id, derivedName, p?.mascot_expression || 'happy');
         setUserCode(profile.user_code);
       } catch { /* social feature degraded gracefully */ }
     })();
@@ -241,7 +242,8 @@ function AuthedApp({
   // Push latest name/avatar to profiles table whenever social is opened
   useEffect(() => {
     if (showSocial && supabaseUserId) {
-      ensureProfile(supabaseUserId, displayName || null, mascotExpression).catch(() => {});
+      const effectiveName = displayName || user.username.split('@')[0] || null;
+      ensureProfile(supabaseUserId, effectiveName, mascotExpression).catch(() => {});
     }
   }, [showSocial, supabaseUserId, displayName, mascotExpression]);
 
