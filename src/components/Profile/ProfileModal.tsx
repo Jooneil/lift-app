@@ -141,7 +141,13 @@ export default function ProfileModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open || isViewing) return;
+    if (!open) return;
+    if (isViewing) {
+      setStats(null);
+      setPrs([]);
+      setPlans([]);
+      return;
+    }
     setLoading(true);
     Promise.all([getProfileData(), planApi.list()])
       .then(([{ stats: s, prs: p }, pl]) => { setStats(s); setPrs(p); setPlans(pl); })
