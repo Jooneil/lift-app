@@ -4351,65 +4351,60 @@ function WorkoutPage({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+            {/* Personal Best — top, highlighted */}
+            {historyPr && (
+              <div style={{ background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 12, padding: '13px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 7 }}>Personal Best</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{historyPr.weight}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>lbs</span>
+                  <span style={{ fontSize: 17, color: 'var(--text-muted)', margin: '0 3px' }}>×</span>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{historyPr.reps}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>reps</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>· {formatHistoryDate(historyPr.date)}</span>
+                </div>
+              </div>
+            )}
+
             {/* Last Workout */}
-            <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>Last Workout</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{formatHistoryDate(historyLastSession.date)}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '13px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Last Workout</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatHistoryDate(historyLastSession.date)}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {historyLastSession.sets.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--surface-elevated)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
-                    <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.weight}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>lbs</span>
-                    <span style={{ fontSize: 14, color: 'var(--text-muted)', margin: '0 2px' }}>×</span>
-                    <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.reps}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>reps</span>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--surface-elevated)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{s.weight}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>lbs</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 1px' }}>×</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{s.reps}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>reps</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Personal Best */}
-            {historyPr && (
-              <div style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.28)', borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Personal Best</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 30, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{historyPr.weight}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>lbs</span>
-                  <span style={{ fontSize: 20, color: 'var(--text-muted)', margin: '0 4px' }}>×</span>
-                  <span style={{ fontSize: 30, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{historyPr.reps}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>reps</span>
+            {/* First Ever — compact single line */}
+            {historyFirstSession && (() => {
+              const best = historyFirstSession.sets.reduce((b, s) => (s.weight > b.weight ? s : b), historyFirstSession.sets[0]);
+              return (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    First ever: <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{best.weight} × {best.reps}</span>
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatHistoryDate(historyFirstSession.date)}</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{formatHistoryDate(historyPr.date)}</div>
-              </div>
-            )}
-
-            {/* First Ever */}
-            {historyFirstSession && (
-              <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>First Ever</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{formatHistoryDate(historyFirstSession.date)}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {historyFirstSession.sets.map((s, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--surface-elevated)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
-                      <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.weight}</span>
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>lbs</span>
-                      <span style={{ fontSize: 14, color: 'var(--text-muted)', margin: '0 2px' }}>×</span>
-                      <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.reps}</span>
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>reps</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Progression — collapsible */}
             {historyProgression.length > 1 && (
               <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
                 <button
                   onClick={() => setHistoryProgressionExpanded(v => !v)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                     Full Progression ({historyProgression.length} sessions)
@@ -4419,9 +4414,9 @@ function WorkoutPage({
                 {historyProgressionExpanded && (
                   <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     {historyProgression.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 16px', borderBottom: idx < historyProgression.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--border-strong)', flexShrink: 0 }} />
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', borderBottom: idx < historyProgression.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--border-strong)', flexShrink: 0 }} />
                           <span style={{ fontWeight: 600, fontSize: 14 }}>{item.weight}</span>
                           <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>×</span>
                           <span style={{ fontWeight: 600, fontSize: 14 }}>{item.reps}</span>
