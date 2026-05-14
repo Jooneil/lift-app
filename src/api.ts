@@ -334,6 +334,16 @@ export const sessionApi = {
       return (data ?? []) as unknown as SessionRow[];
     }, 30 * 60 * 1000);
   },
+  async listForPlan(planId: number | string): Promise<SessionRow[]> {
+    const pid = typeof planId === 'number' ? planId : /^\d+$/.test(String(planId)) ? Number(planId) : String(planId);
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('plan_id,week_id,day_id,updated_at,data')
+      .eq('plan_id', pid)
+      .order('updated_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as unknown as SessionRow[];
+  },
 };
 
 // --- AI Program Builder API (Vercel serverless in prod, Express locally) ---

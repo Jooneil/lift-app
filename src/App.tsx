@@ -32,6 +32,7 @@ import { TutorialProvider, TutorialOverlay, useTutorial } from './components/Tut
 import { STEPS } from './components/Tutorial/steps';
 import ProfileModal, { type ViewingProfile } from './components/Profile/ProfileModal';
 import SocialSheet from './components/Social/SocialSheet';
+import PlanCompleteModal, { type PlanCompleteData } from './components/PlanComplete/PlanCompleteModal';
 import { ensureProfile } from './api/friends';
 import { Mascot, MASCOT_EXPRESSIONS, type MascotExpression } from './components/mascot/Mascot';
 
@@ -202,6 +203,7 @@ function AuthedApp({
   const [currentStreak, setCurrentStreak] = useState(0);
   const [showStreakSettings, setShowStreakSettings] = useState(false);
   const [showStreakReconfigPrompt, setShowStreakReconfigPrompt] = useState(false);
+  const [planCompleteData, setPlanCompleteData] = useState<PlanCompleteData | null>(null);
   const [workoutPrefs, setWorkoutPrefs] = useState<Required<WorkoutPrefs>>({ ...DEFAULT_WORKOUT_PREFS });
   const [showWorkoutPrefs, setShowWorkoutPrefs] = useState(false);
   const [showPlanSettings, setShowPlanSettings] = useState(false);
@@ -1243,10 +1245,66 @@ function AuthedApp({
       }
       await loadArchivedPlans();
 
-      // Update streak and show reconfigure prompt
+      // Update streak
       await updateStreak();
-      if (streakConfig?.enabled) {
-        setShowStreakReconfigPrompt(true);
+      const shouldShowStreakReconfig = !!(streakConfig?.enabled);
+
+      // Compute plan completion stats for celebration screen
+      try {
+        const rawSessions = await sessionApi.listForPlan(serverPlanId);
+        const workoutSessions = rawSessions.filter(
+          s => s.data && !s.data.ghostSeed && (s.data.entries ?? []).length > 0
+        );
+        const sorted = [...workoutSessions].sort((a, b) =>
+          (a.data?.date ?? '').localeCompare(b.data?.date ?? '')
+        );
+
+        let totalSets = 0;
+        let totalLbs = 0;
+        const exerciseMap = new Map<string, {
+          firstDate: string; firstW: number; firstR: number;
+          lastDate: string; lastW: number; lastR: number;
+        }>();
+
+        for (const s of sorted) {
+          for (const entry of (s.data?.entries ?? [])) {
+            const validSets = (entry.sets ?? []).filter(
+              st => (st.weight ?? 0) > 0 && (st.reps ?? 0) > 0
+            );
+            totalSets += validSets.length;
+            for (const st of validSets) totalLbs += (st.weight ?? 0) * (st.reps ?? 0);
+
+            if (!validSets.length) continue;
+            const maxSet = validSets.reduce((best, st) => ((st.weight ?? 0) > (best.weight ?? 0) ? st : best));
+            const date = s.data?.date ?? '';
+            const name = entry.exerciseName;
+            const ex = exerciseMap.get(name);
+            if (!ex) {
+              exerciseMap.set(name, { firstDate: date, firstW: maxSet.weight!, firstR: maxSet.reps!, lastDate: date, lastW: maxSet.weight!, lastR: maxSet.reps! });
+            } else if (date >= ex.lastDate) {
+              ex.lastDate = date; ex.lastW = maxSet.weight!; ex.lastR = maxSet.reps!;
+            }
+          }
+        }
+
+        const improvements = Array.from(exerciseMap.entries())
+          .filter(([, v]) => v.lastDate !== v.firstDate && v.lastW > v.firstW)
+          .map(([name, v]) => ({ name, fromWeight: v.firstW, fromReps: v.firstR, toWeight: v.lastW, toReps: v.lastR }))
+          .sort((a, b) => (b.toWeight - b.fromWeight) - (a.toWeight - a.fromWeight))
+          .slice(0, 5);
+
+        setPlanCompleteData({
+          planName: planToArchive.name,
+          totalSessions: workoutSessions.length,
+          totalSets,
+          totalLbs,
+          improvements,
+          mascotExpression: mascotExpression as import('./components/mascot/Mascot').MascotExpression,
+          shouldShowStreakReconfig,
+        });
+      } catch {
+        // Stats failed — still show prompt if needed
+        if (shouldShowStreakReconfig) setShowStreakReconfigPrompt(true);
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
@@ -2360,6 +2418,21 @@ function AuthedApp({
       onViewProfile={(profile) => {
         setShowSocial(false);
         setViewingFriendProfile(profile);
+      }}
+    />
+    <PlanCompleteModal
+      open={!!planCompleteData}
+      data={planCompleteData}
+      onContinue={() => {
+        const reconfig = planCompleteData?.shouldShowStreakReconfig ?? false;
+        setPlanCompleteData(null);
+        if (reconfig) setShowStreakReconfigPrompt(true);
+      }}
+      onStartFresh={() => {
+        const reconfig = planCompleteData?.shouldShowStreakReconfig ?? false;
+        setPlanCompleteData(null);
+        if (reconfig) setShowStreakReconfigPrompt(true);
+        setMode('builder');
       }}
     />
     </TutorialProvider>
