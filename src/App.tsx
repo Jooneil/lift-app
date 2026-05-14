@@ -223,6 +223,36 @@ function AuthedApp({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Supabase Realtime — live badge updates for friend requests and plan shares
+  useEffect(() => {
+    if (!supabaseUserId) return;
+    const channel = supabase
+      .channel(`social-${supabaseUserId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'friendships',
+        filter: `addressee_id=eq.${supabaseUserId}`,
+      }, () => {
+        // Re-fetch incoming count and update badge
+        import('./api/friends').then(({ getIncomingRequests }) =>
+          getIncomingRequests(supabaseUserId).then(inc =>
+            setSocialBadge(b => {
+              // preserve plan share count, just update friend request portion
+              const planCount = Math.max(0, b - inc.length);
+              return inc.length + planCount;
+            })
+          )
+        ).catch(() => {});
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'plan_shares',
+        filter: `to_user_id=eq.${supabaseUserId}`,
+      }, () => {
+        setSocialBadge(b => b + 1);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [supabaseUserId]);
+
   // Global Escape key handler — closes the topmost open overlay
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

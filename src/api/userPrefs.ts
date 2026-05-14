@@ -80,7 +80,7 @@ async function _fetchUserPrefs(): Promise<UserPrefs | null> {
 }
 
 export function getUserPrefs(): Promise<UserPrefs | null> {
-  return cachedFetch(CACHE_KEYS.userPrefs, _fetchUserPrefs, 30 * 60 * 1000);
+  return cachedFetch(CACHE_KEYS.userPrefs, _fetchUserPrefs, 24 * 60 * 60 * 1000);
 }
 
 export async function upsertUserPrefs(partial: {

@@ -1,4 +1,8 @@
 import { supabase } from '../supabaseClient';
+import { cachedFetch, invalidateCache } from '../cacheUtils';
+
+const FRIENDS_CACHE_KEY = 'cache:friends';
+const FRIENDS_TTL = 5 * 60 * 1000;
 
 export type Profile = {
   user_id: string;
@@ -115,16 +119,18 @@ async function enrichWithProfiles(
 }
 
 export async function getFriends(currentUserId: string): Promise<FriendWithProfile[]> {
-  const { data, error } = await supabase
-    .from('friendships')
-    .select('id,requester_id,addressee_id,status,created_at')
-    .eq('status', 'accepted')
-    .or(`requester_id.eq.${currentUserId},addressee_id.eq.${currentUserId}`);
-  if (error) throw error;
-  return enrichWithProfiles(
-    (data ?? []) as Friendship[],
-    f => f.requester_id === currentUserId ? f.addressee_id : f.requester_id,
-  );
+  return cachedFetch(FRIENDS_CACHE_KEY, async () => {
+    const { data, error } = await supabase
+      .from('friendships')
+      .select('id,requester_id,addressee_id,status,created_at')
+      .eq('status', 'accepted')
+      .or(`requester_id.eq.${currentUserId},addressee_id.eq.${currentUserId}`);
+    if (error) throw error;
+    return enrichWithProfiles(
+      (data ?? []) as Friendship[],
+      f => f.requester_id === currentUserId ? f.addressee_id : f.requester_id,
+    );
+  }, FRIENDS_TTL);
 }
 
 export async function getIncomingRequests(currentUserId: string): Promise<FriendWithProfile[]> {
@@ -152,24 +158,29 @@ export async function sendFriendRequest(currentUserId: string, targetUserId: str
     .from('friendships')
     .insert([{ requester_id: currentUserId, addressee_id: targetUserId }]);
   if (error) throw error;
+  invalidateCache(FRIENDS_CACHE_KEY);
 }
 
 export async function acceptFriendRequest(friendshipId: string): Promise<void> {
   const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
   if (error) throw error;
+  invalidateCache(FRIENDS_CACHE_KEY);
 }
 
 export async function declineFriendRequest(friendshipId: string): Promise<void> {
   const { error } = await supabase.from('friendships').update({ status: 'declined' }).eq('id', friendshipId);
   if (error) throw error;
+  invalidateCache(FRIENDS_CACHE_KEY);
 }
 
 export async function cancelFriendRequest(friendshipId: string): Promise<void> {
   const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
   if (error) throw error;
+  invalidateCache(FRIENDS_CACHE_KEY);
 }
 
 export async function removeFriend(friendshipId: string): Promise<void> {
   const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
   if (error) throw error;
+  invalidateCache(FRIENDS_CACHE_KEY);
 }

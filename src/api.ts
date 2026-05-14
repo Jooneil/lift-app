@@ -88,7 +88,7 @@ const _fetchCustomExercises = async (): Promise<CustomExerciseRow[]> => {
 
 export const exerciseApi = {
   async list(): Promise<ExerciseRow[]> {
-    return cachedFetch(CACHE_KEYS.exercises, _fetchExercises, 12 * 60 * 60 * 1000);
+    return cachedFetch(CACHE_KEYS.exercises, _fetchExercises, 7 * 24 * 60 * 60 * 1000);
   },
   async findByName(name: string): Promise<ExerciseRow | null> {
     const clean = name.trim();
@@ -128,7 +128,7 @@ export const exerciseApi = {
     return (data as ExerciseRow | null) ?? null;
   },
   async listCustom(): Promise<CustomExerciseRow[]> {
-    return cachedFetch(CACHE_KEYS.customExercises, _fetchCustomExercises, 12 * 60 * 60 * 1000);
+    return cachedFetch(CACHE_KEYS.customExercises, _fetchCustomExercises, 7 * 24 * 60 * 60 * 1000);
   },
   async createCustom(input: {
     name: string;
@@ -222,7 +222,7 @@ const _fetchCatalog = async (): Promise<ExerciseCatalogRow[]> => {
 
 export const exerciseCatalogApi = {
   async list(): Promise<ExerciseCatalogRow[]> {
-    return cachedFetch(CACHE_KEYS.catalog, _fetchCatalog, 24 * 60 * 60 * 1000);
+    return cachedFetch(CACHE_KEYS.catalog, _fetchCatalog, 30 * 24 * 60 * 60 * 1000);
   },
 };
 
@@ -233,7 +233,7 @@ const _fetchPlans = async (): Promise<ServerPlanRow[]> => {
 
 export const planApi = {
   async list(): Promise<ServerPlanRow[]> {
-    return cachedFetch(CACHE_KEYS.plans, _fetchPlans, 60 * 60 * 1000);
+    return cachedFetch(CACHE_KEYS.plans, _fetchPlans, 24 * 60 * 60 * 1000);
   },
   async create(name: string, data: ServerPlanData): Promise<ServerPlanRow> {
     const { data: row, error } = await supabase.from('plans').insert([{ name, data, archived: 0 }]).select('id,name,data,archived,predecessor_plan_id').single();
@@ -332,7 +332,7 @@ export const sessionApi = {
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as SessionRow[];
-    }, 5 * 60 * 1000);
+    }, 30 * 60 * 1000);
   },
 };
 
