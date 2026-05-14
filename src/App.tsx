@@ -2603,6 +2603,18 @@ function WorkoutPage({
   const historyCacheRef = useRef<SessionRow[] | null>(null);
   const historicalGhostRef = useRef<Map<string, Map<number, { weight: number; reps: number }>> | null>(null);
   const [openExerciseMenu, setOpenExerciseMenu] = useState<string | null>(null);
+  useEffect(() => {
+    if (!openExerciseMenu) return;
+    const close = (e: Event) => {
+      if (!(e.target as Element).closest('.dropdown-menu')) setOpenExerciseMenu(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [openExerciseMenu]);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editDraftSets, setEditDraftSets] = useState<SessionSet[]>([]);
   const [myoScopeEntry, setMyoScopeEntry] = useState<{ entryId: string; exerciseId?: string; exerciseName: string; currentValue: boolean } | null>(null);
@@ -4431,13 +4443,6 @@ function WorkoutPage({
           </div>
         )}
       </Modal>
-
-      {openExerciseMenu && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 19 }}
-          onClick={() => setOpenExerciseMenu(null)}
-        />
-      )}
 
       {activeKeypad && (
         <WorkoutKeypad
