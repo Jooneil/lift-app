@@ -398,9 +398,14 @@ export default function SocialSheet({
             <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
               <ProfileAvatar profile={f.profile} />
               <div style={{ flex: 1, minWidth: 0 }}><Username profile={f.profile} /></div>
-              <ActionBtn onClick={() => onViewProfile(f.profile)} variant="ghost">
-                View Profile
-              </ActionBtn>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <ActionBtn onClick={() => setSendTarget(f)} variant="primary">
+                  Share Plan
+                </ActionBtn>
+                <ActionBtn onClick={() => onViewProfile(f.profile)} variant="ghost">
+                  View Profile
+                </ActionBtn>
+              </div>
             </div>
           ))
         )}
