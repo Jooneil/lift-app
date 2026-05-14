@@ -1844,115 +1844,205 @@ function AuthedApp({
         );
       })()}
 
-      <Modal open={showArchiveList} onClose={closeArchive} title="Archived Plans" maxWidth={950} maxHeight="80vh" zIndex={20}>
-            {archivedError && <div className="text-error px-3 py-2 bg-error-muted rounded-sm">{archivedError}</div>}
-            {archivedLoading ? (
-              <div className="text-muted p-6 text-center">Loading archived plans...</div>
-            ) : archivedPlans.length === 0 ? (
-              <div className="text-muted p-6 text-center">No archived plans yet.</div>
-            ) : (
-              <div className="flex gap-4 flex-wrap">
-                <div className="flex-[0_0_280px] flex flex-col gap-3">
-                  {archivedPlans.map((plan) => (
-                    <div
-                      key={plan.id}
-                      style={{
-                        background: viewArchivedPlan?.id === plan.id ? 'var(--accent-muted)' : 'var(--bg-card)',
-                        border: `1px solid ${viewArchivedPlan?.id === plan.id ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
-                      }}
-                      className="rounded-md p-3 flex justify-between items-center gap-3 transition-all duration-150"
-                    >
-                      <Button onClick={() => openArchivedPlan(plan)} className="flex-1 text-left">
-                        {plan.name}
-                      </Button>
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleDeleteArchivedPlan(plan)} size="sm">Delete</Button>
-                        <Button onClick={() => exportPlanCSV(plan, buildCatalogByName(searchCatalogExercises))} size="sm">Export</Button>
+      {/* Archive Sheet */}
+      {showArchiveList && (() => {
+        const isDetail = !!viewArchivedPlan;
+        return (
+          <>
+            <style>{`
+              .archive-sheet {
+                border-radius: 20px 20px 0 0;
+                width: 100%;
+                max-width: 100%;
+              }
+              @media (min-width: 600px) {
+                .archive-sheet {
+                  border-radius: 16px;
+                  max-width: 460px;
+                  width: 460px;
+                  height: 720px !important;
+                  max-height: 720px !important;
+                  margin: auto;
+                }
+                .archive-overlay {
+                  align-items: center !important;
+                }
+              }
+            `}</style>
+            <div
+              className="archive-overlay"
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}
+              onClick={closeArchive}
+            >
+              <div
+                className="archive-sheet"
+                style={{ background: 'var(--surface-elevated)', height: '92vh', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+                  {isDetail ? (
+                    <>
+                      <button
+                        onClick={() => { setViewArchivedPlan(null); setViewArchivedSessions({}); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontSize: 14, fontWeight: 600, padding: '4px 0', flexShrink: 0 }}
+                      >
+                        ← Back
+                      </button>
+                      <div style={{ flex: 1, fontWeight: 700, fontSize: 16, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {viewArchivedPlan!.name}
                       </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex-1 min-w-[320px] bg-card border border-subtle rounded-md p-4 max-h-[60vh] overflow-y-auto">
-                  {!viewArchivedPlan ? (
-                    <div className="text-muted p-6 text-center">Select an archived plan to view details.</div>
-                  ) : viewArchivedLoading ? (
-                    <div className="text-muted p-6 text-center">Loading sessions...</div>
+                      <button
+                        onClick={() => exportPlanCSV(viewArchivedPlan!, buildCatalogByName(searchCatalogExercises))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontSize: 14, fontWeight: 600, padding: '4px 0', flexShrink: 0 }}
+                      >
+                        Export
+                      </button>
+                    </>
                   ) : (
-                    <div>
-                      <h3 className="mt-0">{viewArchivedPlan.name}</h3>
-                      {viewArchivedPlan.weeks.map((week) => {
-                        const sessionWeek = viewArchivedSessions[week.id] || {};
-                        return (
-                          <div key={week.id} className="mb-4">
-                            <h4 className="mb-2">{week.name}</h4>
-                            {week.days.map((day) => {
-                              const session = sessionWeek[day.id] || null;
-                              return (
-                                <div key={day.id} className="mb-3">
-                                  <h5 className="my-1.5">{day.name}</h5>
-                                  {day.items.length === 0 ? (
-                                    <div className="text-muted">No exercises defined for this day.</div>
-                                  ) : (
-                                    <div className="flex flex-col gap-2">
-                                      {day.items.map((item) => {
-                                        const entry = session?.entries?.find((entry) => {
-                                          if (item.exerciseId && entry.exerciseId) return item.exerciseId === entry.exerciseId;
-                                          const entryName = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
-                                          const itemName = normalizeExerciseName(item.exerciseName || '').toLowerCase();
-                                          if (item.exerciseId && !entry.exerciseId) return entryName === itemName;
-                                          return entryName === itemName;
-                                        }) || null;
-                                        const sets = entry?.sets ?? [];
-                                        const rowCount = Math.max(item.targetSets, sets.length);
-                                        return (
-                                          <div key={item.id} className="bg-elevated border border-subtle rounded-md p-3">
-                                            <div className="font-semibold text-[15px]">{item.exerciseName}</div>
-                                            <div className="text-[13px] text-muted mb-2">
-                                              Target: {item.targetSets} set{item.targetSets === 1 ? '' : 's'}
-                                              {item.targetReps ? ` - ${item.targetReps}` : ''}
-                                            </div>
-                                            {rowCount === 0 ? (
-                                              <div className="text-muted text-[13px]">No recorded sets.</div>
-                                            ) : (
-                                              <table className="w-full border-collapse text-[13px]">
-                                                <thead>
-                                                  <tr className="text-left">
-                                                    <th className="py-1.5 border-b border-b-subtle text-muted font-medium text-[11px] uppercase">Set</th>
-                                                    <th className="py-1.5 border-b border-b-subtle text-muted font-medium text-[11px] uppercase">Weight</th>
-                                                    <th className="py-1.5 border-b border-b-subtle text-muted font-medium text-[11px] uppercase">Reps</th>
-                                                  </tr>
-                                                </thead>
-                                                <tbody>
-                                                  {Array.from({ length: rowCount }).map((_, idx) => {
-                                                    const recorded = sets[idx];
-                                                    return (
-                                                      <tr key={idx} className="border-b border-b-subtle">
-                                                        <td className="py-2 text-secondary">{idx + 1}</td>
-                                                        <td className="py-2" style={{ fontWeight: recorded?.weight != null ? 600 : 400 }}>{recorded?.weight ?? '-'}</td>
-                                                        <td className="py-2" style={{ fontWeight: recorded?.reps != null ? 600 : 400 }}>{recorded?.reps ?? '-'}</td>
-                                                      </tr>
-                                                    );
-                                                  })}
-                                                </tbody>
-                                              </table>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <>
+                      <div style={{ flex: 1, fontWeight: 700, fontSize: 17 }}>Archived Plans</div>
+                      <button
+                        onClick={closeArchive}
+                        style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: 16, flexShrink: 0 }}
+                      >
+                        ✕
+                      </button>
+                    </>
                   )}
                 </div>
+
+                {/* Body */}
+                {isDetail ? (
+                  <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '12px 16px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+                    {viewArchivedLoading ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 14 }}>Loading sessions…</div>
+                    ) : (
+                      viewArchivedPlan!.weeks.map((week, wi) => {
+                        const sessionWeek = viewArchivedSessions[week.id] || {};
+                        return (
+                          <div key={week.id} style={{ marginBottom: wi < viewArchivedPlan!.weeks.length - 1 ? 20 : 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                              {week.name}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {week.days.map((day) => {
+                                const daySession = sessionWeek[day.id] || null;
+                                const hasSession = !!(daySession?.entries?.length);
+                                return (
+                                  <div key={day.id} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
+                                    <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: day.items.length > 0 ? '1px solid var(--border-subtle)' : 'none' }}>
+                                      <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{day.name}</div>
+                                      {hasSession && (
+                                        <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 600, background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 6, padding: '2px 8px' }}>
+                                          Logged
+                                        </div>
+                                      )}
+                                    </div>
+                                    {day.items.length > 0 && (
+                                      <div style={{ padding: '8px 14px 12px' }}>
+                                        {day.items.map((item, ei) => {
+                                          const entry = daySession?.entries?.find((e) => {
+                                            if (item.exerciseId && e.exerciseId) return item.exerciseId === e.exerciseId;
+                                            const en = normalizeExerciseName(e.exerciseName || '').toLowerCase();
+                                            const im = normalizeExerciseName(item.exerciseName || '').toLowerCase();
+                                            return en === im;
+                                          }) || null;
+                                          const sets = entry?.sets ?? [];
+                                          const rowCount = Math.max(item.targetSets, sets.length);
+                                          return (
+                                            <div key={item.id} style={{ marginTop: ei > 0 ? 12 : 4 }}>
+                                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+                                                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{item.exerciseName}</div>
+                                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                                  {item.targetSets}×{item.targetReps || '—'}
+                                                </div>
+                                              </div>
+                                              {rowCount === 0 ? (
+                                                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No sets recorded</div>
+                                              ) : (
+                                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                  {Array.from({ length: rowCount }).map((_, idx) => {
+                                                    const s = sets[idx];
+                                                    const logged = s?.weight != null || s?.reps != null;
+                                                    return (
+                                                      <div key={idx} style={{ background: logged ? 'var(--surface-elevated)' : 'var(--surface-base)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: logged ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: logged ? 600 : 400, minWidth: 52, textAlign: 'center' }}>
+                                                        {logged ? `${s?.weight ?? '—'}×${s?.reps ?? '—'}` : `Set ${idx + 1}`}
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '12px 16px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+                    {archivedError && (
+                      <div style={{ background: 'var(--error-muted)', border: '1px solid var(--error)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--error)', marginBottom: 12 }}>
+                        {archivedError}
+                      </div>
+                    )}
+                    {archivedLoading ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 14 }}>Loading…</div>
+                    ) : archivedPlans.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '48px 0', fontSize: 14 }}>No archived plans yet.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {archivedPlans.map((plan) => {
+                          const weekCount = plan.weeks.length;
+                          const dayCount = plan.weeks.reduce((acc, w) => acc + w.days.length, 0);
+                          return (
+                            <div
+                              key={plan.id}
+                              style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, display: 'flex', alignItems: 'center', overflow: 'hidden' }}
+                            >
+                              <button
+                                onClick={() => openArchivedPlan(plan)}
+                                style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '13px 14px', textAlign: 'left' }}
+                              >
+                                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{plan.name}</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
+                                  {weekCount} week{weekCount !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
+                                </div>
+                              </button>
+                              <div style={{ display: 'flex', gap: 6, padding: '0 12px', flexShrink: 0 }}>
+                                <button
+                                  onClick={() => exportPlanCSV(plan, buildCatalogByName(searchCatalogExercises))}
+                                  style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}
+                                >
+                                  Export
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteArchivedPlan(plan)}
+                                  style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: 'var(--error, #f87171)', cursor: 'pointer' }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-      </Modal>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Streak Settings Modal */}
       <Modal open={showStreakSettings} onClose={() => setShowStreakSettings(false)} title="Streak Settings" maxWidth={420}>
