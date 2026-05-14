@@ -2595,8 +2595,11 @@ function WorkoutPage({
   const [historyEntry, setHistoryEntry] = useState<{ exerciseId?: string; exerciseName: string } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyItems, setHistoryItems] = useState<Array<{ date: string; weight: number; reps: number }>>([]);
+  const [historyLastSession, setHistoryLastSession] = useState<{ date: string; sets: Array<{ weight: number; reps: number }> } | null>(null);
+  const [historyFirstSession, setHistoryFirstSession] = useState<{ date: string; sets: Array<{ weight: number; reps: number }> } | null>(null);
   const [historyPr, setHistoryPr] = useState<{ date: string; weight: number; reps: number } | null>(null);
+  const [historyProgression, setHistoryProgression] = useState<Array<{ date: string; weight: number; reps: number }>>([]);
+  const [historyProgressionExpanded, setHistoryProgressionExpanded] = useState(false);
   const historyCacheRef = useRef<SessionRow[] | null>(null);
   const historicalGhostRef = useRef<Map<string, Map<number, { weight: number; reps: number }>> | null>(null);
   const [openExerciseMenu, setOpenExerciseMenu] = useState<string | null>(null);
@@ -3216,8 +3219,10 @@ function WorkoutPage({
   const loadHistoryFor = async (entry: { exerciseId?: string; exerciseName: string }) => {
     if (!plan.serverId) {
       setHistoryError('Save the plan to load history across sessions.');
-      setHistoryItems([]);
+      setHistoryLastSession(null);
+      setHistoryFirstSession(null);
       setHistoryPr(null);
+      setHistoryProgression([]);
       return;
     }
     setHistoryLoading(true);
@@ -3230,12 +3235,14 @@ function WorkoutPage({
       }
       const targetName = normalizeExerciseName(entry.exerciseName).toLowerCase();
 
-      // Collect all valid sets for this exercise across all sessions
-      const allSets: Array<{ date: string; weight: number; reps: number }> = [];
+      // Group all sets by session date, preserving set order
+      const byDate = new Map<string, { isoDate: string; sets: Array<{ weight: number; reps: number }> }>();
       for (const row of rows) {
         const data = (row as SessionRow).data;
         if (!data || !Array.isArray(data.entries)) continue;
         const sessionDate = data.date || row.updated_at || '';
+        const dateKey = sessionDate ? new Date(sessionDate).toLocaleDateString() : '';
+        if (!dateKey) continue;
         for (const e of data.entries) {
           const entryName = normalizeExerciseName(e.exerciseName || '').toLowerCase();
           const match =
@@ -3243,47 +3250,54 @@ function WorkoutPage({
             (entry.exerciseId && !e.exerciseId && entryName === targetName) ||
             (!entry.exerciseId && entryName === targetName);
           if (!match) continue;
-          for (const set of e.sets ?? []) {
-            const weight = typeof set.weight === 'number' ? set.weight : null;
-            const reps = typeof set.reps === 'number' ? set.reps : null;
-            if (weight == null || reps == null) continue;
-            if (Number.isNaN(weight) || Number.isNaN(reps)) continue;
-            allSets.push({ date: sessionDate, weight, reps });
+          const validSets = (e.sets ?? [])
+            .filter(s => typeof s.weight === 'number' && typeof s.reps === 'number' && !Number.isNaN(s.weight) && !Number.isNaN(s.reps) && (s.weight ?? 0) > 0)
+            .map(s => ({ weight: s.weight as number, reps: s.reps as number }));
+          if (!validSets.length) continue;
+          if (!byDate.has(dateKey)) byDate.set(dateKey, { isoDate: sessionDate, sets: [] });
+          byDate.get(dateKey)!.sets.push(...validSets);
+        }
+      }
+
+      // Sort oldest → newest
+      const sessions = Array.from(byDate.values()).sort(
+        (a, b) => (Date.parse(a.isoDate) || 0) - (Date.parse(b.isoDate) || 0)
+      );
+
+      if (!sessions.length) {
+        setHistoryLastSession(null);
+        setHistoryFirstSession(null);
+        setHistoryPr(null);
+        setHistoryProgression([]);
+        return;
+      }
+
+      const last = sessions[sessions.length - 1];
+      setHistoryLastSession({ date: last.isoDate, sets: last.sets });
+      setHistoryFirstSession(sessions.length > 1 ? { date: sessions[0].isoDate, sets: sessions[0].sets } : null);
+
+      // PR = heaviest single set across all history
+      let pr: { date: string; weight: number; reps: number } | null = null;
+      for (const sesh of sessions) {
+        for (const s of sesh.sets) {
+          if (!pr || s.weight > pr.weight || (s.weight === pr.weight && s.reps > pr.reps)) {
+            pr = { date: sesh.isoDate, weight: s.weight, reps: s.reps };
           }
         }
       }
-
-      // Group by date (date portion only), keep only the best set per session
-      const bestByDate = new Map<string, { date: string; weight: number; reps: number }>();
-      for (const s of allSets) {
-        const dateKey = s.date ? new Date(s.date).toLocaleDateString() : '';
-        if (!dateKey) continue;
-        const cur = bestByDate.get(dateKey);
-        if (!cur || s.weight > cur.weight || (s.weight === cur.weight && s.reps > cur.reps)) {
-          bestByDate.set(dateKey, s);
-        }
-      }
-
-      // Sort oldest first (ascending) for progression view
-      const grouped = Array.from(bestByDate.values()).sort((a, b) => {
-        return (Date.parse(a.date || '') || 0) - (Date.parse(b.date || '') || 0);
-      });
-
-      // PR = highest weight, ties broken by most reps
-      let pr: { date: string; weight: number; reps: number } | null = null;
-      for (const item of grouped) {
-        if (!pr || item.weight > pr.weight || (item.weight === pr.weight && item.reps > pr.reps)) {
-          pr = item;
-        }
-      }
-
       setHistoryPr(pr);
-      // History list excludes the PR entry so it isn't shown twice
-      setHistoryItems(pr ? grouped.filter((item) => item !== pr) : grouped);
+
+      // Progression: best set per session date (oldest → newest)
+      setHistoryProgression(sessions.map(sesh => {
+        const best = sesh.sets.reduce((b, s) => (s.weight > b.weight || (s.weight === b.weight && s.reps > b.reps) ? s : b));
+        return { date: sesh.isoDate, weight: best.weight, reps: best.reps };
+      }));
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : String(err));
-      setHistoryItems([]);
+      setHistoryLastSession(null);
+      setHistoryFirstSession(null);
       setHistoryPr(null);
+      setHistoryProgression([]);
     } finally {
       setHistoryLoading(false);
     }
@@ -4322,45 +4336,106 @@ function WorkoutPage({
         </div>
       </Modal>
 
-      <Modal open={historyOpen} onClose={() => { setHistoryOpen(false); setHistoryError(null); }} title={`History${historyEntry ? ` - ${historyEntry.exerciseName}` : ''}`} maxWidth={520} maxHeight="80vh">
-            {historyLoading ? (
-              <div className="text-muted p-6 text-center">Loading history...</div>
-            ) : historyError ? (
-              <div className="text-error px-3 py-2.5 bg-error-muted rounded-sm">{historyError}</div>
-            ) : !historyPr && historyItems.length === 0 ? (
-              <div className="text-muted p-6 text-center">No recorded sets yet.</div>
-            ) : (
-              <>
-                {historyPr && (
-                  <div className="border border-success rounded-md p-4 bg-success-muted shadow-[0_0_20px_rgba(74,222,128,0.1)]">
-                    <div className="font-semibold text-success text-[13px] mb-2 uppercase tracking-[0.05em]">Personal Best</div>
-                    <div className="text-[28px] font-bold tracking-[-0.02em]">
-                      {historyPr.weight} <span className="text-muted text-[15px] font-normal">×</span> {historyPr.reps}
-                    </div>
-                    <div className="text-secondary text-[13px] mt-1.5">{formatHistoryDate(historyPr.date)}</div>
-                  </div>
-                )}
+      <Modal
+        open={historyOpen}
+        onClose={() => { setHistoryOpen(false); setHistoryError(null); setHistoryProgressionExpanded(false); }}
+        title={historyEntry?.exerciseName ?? 'History'}
+        maxWidth={460}
+        maxHeight="85vh"
+      >
+        {historyLoading ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 0', fontSize: 14 }}>Loading history…</div>
+        ) : historyError ? (
+          <div style={{ color: 'var(--error, #f87171)', background: 'var(--error-muted)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>{historyError}</div>
+        ) : !historyLastSession ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 0', fontSize: 14 }}>No recorded sets yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-                {historyItems.length > 0 && (
-                  <div className="flex flex-col">
-                    <div className="font-semibold text-[13px] text-muted mb-3 uppercase tracking-[0.05em]">Progression</div>
-                    {historyItems.map((item, idx) => (
-                      <div key={`${item.date}-${item.weight}-${item.reps}-${idx}`} className="flex justify-between items-center gap-2 py-3" style={{
-                        borderBottom: idx < historyItems.length - 1 ? '1px solid var(--border-subtle)' : 'none'
-                      }}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full bg-strong" />
-                          <span className="font-semibold text-[15px]">{item.weight}</span>
-                          <span className="text-muted">×</span>
-                          <span className="font-semibold text-[15px]">{item.reps}</span>
+            {/* Last Workout */}
+            <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>Last Workout</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{formatHistoryDate(historyLastSession.date)}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {historyLastSession.sets.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--surface-elevated)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+                    <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.weight}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>lbs</span>
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)', margin: '0 2px' }}>×</span>
+                    <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.reps}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>reps</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Personal Best */}
+            {historyPr && (
+              <div style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.28)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Personal Best</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontSize: 30, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{historyPr.weight}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>lbs</span>
+                  <span style={{ fontSize: 20, color: 'var(--text-muted)', margin: '0 4px' }}>×</span>
+                  <span style={{ fontSize: 30, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{historyPr.reps}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>reps</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{formatHistoryDate(historyPr.date)}</div>
+              </div>
+            )}
+
+            {/* First Ever */}
+            {historyFirstSession && (
+              <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>First Ever</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{formatHistoryDate(historyFirstSession.date)}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {historyFirstSession.sets.map((s, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--surface-elevated)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+                      <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.weight}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>lbs</span>
+                      <span style={{ fontSize: 14, color: 'var(--text-muted)', margin: '0 2px' }}>×</span>
+                      <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{s.reps}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>reps</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Progression — collapsible */}
+            {historyProgression.length > 1 && (
+              <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
+                <button
+                  onClick={() => setHistoryProgressionExpanded(v => !v)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Full Progression ({historyProgression.length} sessions)
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', transform: historyProgressionExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 180ms' }}>▼</div>
+                </button>
+                {historyProgressionExpanded && (
+                  <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    {historyProgression.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 16px', borderBottom: idx < historyProgression.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--border-strong)', flexShrink: 0 }} />
+                          <span style={{ fontWeight: 600, fontSize: 14 }}>{item.weight}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>×</span>
+                          <span style={{ fontWeight: 600, fontSize: 14 }}>{item.reps}</span>
                         </div>
-                        <div className="text-muted text-[13px]">{formatHistoryDate(item.date)}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatHistoryDate(item.date)}</div>
                       </div>
                     ))}
                   </div>
                 )}
-              </>
+              </div>
             )}
+          </div>
+        )}
       </Modal>
 
       {activeKeypad && (
