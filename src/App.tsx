@@ -3235,14 +3235,14 @@ function WorkoutPage({
       }
       const targetName = normalizeExerciseName(entry.exerciseName).toLowerCase();
 
-      // Group all sets by session date, preserving set order
-      const byDate = new Map<string, { isoDate: string; sets: Array<{ weight: number; reps: number }> }>();
+      // Collect sets per session row (no date merging — each row is one workout)
+      const sessionList: Array<{ isoDate: string; sets: Array<{ weight: number; reps: number }> }> = [];
       for (const row of rows) {
         const data = (row as SessionRow).data;
         if (!data || !Array.isArray(data.entries)) continue;
         const sessionDate = data.date || row.updated_at || '';
-        const dateKey = sessionDate ? new Date(sessionDate).toLocaleDateString() : '';
-        if (!dateKey) continue;
+        if (!sessionDate) continue;
+        const setsForRow: Array<{ weight: number; reps: number }> = [];
         for (const e of data.entries) {
           const entryName = normalizeExerciseName(e.exerciseName || '').toLowerCase();
           const match =
@@ -3253,14 +3253,13 @@ function WorkoutPage({
           const validSets = (e.sets ?? [])
             .filter(s => typeof s.weight === 'number' && typeof s.reps === 'number' && !Number.isNaN(s.weight) && !Number.isNaN(s.reps) && (s.weight ?? 0) > 0)
             .map(s => ({ weight: s.weight as number, reps: s.reps as number }));
-          if (!validSets.length) continue;
-          if (!byDate.has(dateKey)) byDate.set(dateKey, { isoDate: sessionDate, sets: [] });
-          byDate.get(dateKey)!.sets.push(...validSets);
+          setsForRow.push(...validSets);
         }
+        if (setsForRow.length) sessionList.push({ isoDate: sessionDate, sets: setsForRow });
       }
 
       // Sort oldest → newest
-      const sessions = Array.from(byDate.values()).sort(
+      const sessions = sessionList.sort(
         (a, b) => (Date.parse(a.isoDate) || 0) - (Date.parse(b.isoDate) || 0)
       );
 
