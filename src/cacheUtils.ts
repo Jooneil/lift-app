@@ -23,6 +23,11 @@ export function invalidateCache(...keys: string[]) {
   for (const k of keys) localStorage.removeItem(k);
 }
 
+export function clearAllCache() {
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('cache:'));
+  for (const k of keys) localStorage.removeItem(k);
+}
+
 export const CACHE_KEYS = {
   plans: 'cache:plans',
   exercises: 'cache:exercises',

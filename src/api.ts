@@ -1,6 +1,6 @@
 // api.ts – Supabase-backed API used by the app
 import { supabase } from './supabaseClient'
-import { cachedFetch, invalidateCache, CACHE_KEYS } from './cacheUtils'
+import { cachedFetch, invalidateCache, clearAllCache, CACHE_KEYS } from './cacheUtils'
 
 export { CACHE_KEYS } from './cacheUtils'
 
@@ -54,7 +54,7 @@ export const api = {
     const email = data?.user?.email || null;
     return email ? { id: 0, username: email } : null;
   },
-  async logout(): Promise<{ ok: true }> { await supabase.auth.signOut(); return { ok: true }; },
+  async logout(): Promise<{ ok: true }> { clearAllCache(); await supabase.auth.signOut(); return { ok: true }; },
 };
 
 const isMissingTableError = (error: { code?: string; message?: string } | null | undefined) => {
