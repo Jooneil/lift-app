@@ -4432,6 +4432,13 @@ function WorkoutPage({
         )}
       </Modal>
 
+      {openExerciseMenu && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 19 }}
+          onClick={() => setOpenExerciseMenu(null)}
+        />
+      )}
+
       {activeKeypad && (
         <WorkoutKeypad
           field={keypadField}
