@@ -600,7 +600,10 @@ function AuthedApp({
   useEffect(() => {
     (async () => {
       try {
-        const rows = await planApi.list();
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Load timed out')), 12000)
+        );
+        const rows = await Promise.race([planApi.list(), timeout]);
         const loaded: Plan[] = rows.map((row) => mapServerPlan(row));
         setPlansLoading(false);
 

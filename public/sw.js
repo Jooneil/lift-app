@@ -41,13 +41,11 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `lift-app-${CACHE_VERSION}`;
 
-// Pre-cache these on install
+// Only pre-cache static assets — NOT index.html (must always be fresh)
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
   '/logo.png',
   '/manifest.webmanifest',
 ];
@@ -82,26 +80,46 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/auth/') ||
     url.hostname.includes('supabase')
   ) {
-    return; // default network behavior
+    return;
   }
 
-  // Only cache same-origin GET requests
+  // Only handle same-origin GET requests
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
     return;
   }
 
-  // Cache-first with background update for static assets
+  // Network-first for HTML — must always be fresh so new deploys load correctly
+  if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for hashed Vite assets — safe forever since filenames change on rebuild
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return fetch(event.request).then((response) => {
+            if (response.ok) cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+      )
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for everything else (logo, manifest, etc.)
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
       cache.match(event.request).then((cached) => {
         const networkFetch = fetch(event.request).then((response) => {
-          if (response.ok) {
-            cache.put(event.request, response.clone());
-          }
+          if (response.ok) cache.put(event.request, response.clone());
           return response;
         });
-
-        // Return cached immediately, update in background
         return cached || networkFetch;
       })
     )
