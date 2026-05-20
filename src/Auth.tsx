@@ -61,22 +61,33 @@ export default function Auth({
       }
       if (mode === 'register') {
         if (!username.trim()) throw new Error('Choose a username.');
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data: signUpData, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+        if (!signUpData.session) {
+          setMessage('Account created! Please check your email to verify your account, then sign in.');
+          return;
+        }
+        // Email verification disabled — session returned immediately
+        const name = username.trim();
+        if (signUpData.user && name) {
+          await Promise.all([
+            ensureProfile(signUpData.user.id, name, 'happy').catch(() => {}),
+            upsertUserPrefs({ display_name: name }).catch(() => {}),
+          ]);
+        }
+        onAuthed({ id: 0, username: signUpData.user?.email || email });
+        return;
       }
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      const userEmail = data.user?.email || email;
-      if (mode === 'register' && data.user && username.trim()) {
-        const name = username.trim();
-        await Promise.all([
-          ensureProfile(data.user.id, name, 'happy').catch(() => {}),
-          upsertUserPrefs({ display_name: name }).catch(() => {}),
-        ]);
-      }
-      onAuthed({ id: 0, username: userEmail });
+      onAuthed({ id: 0, username: data.user?.email || email });
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Error');
+      const msg = e instanceof Error ? e.message : 'Error';
+      setErr(
+        /not confirmed|not verified|email.*confirm/i.test(msg)
+          ? 'Please verify your account through your email before signing in.'
+          : msg
+      );
     } finally {
       setBusy(false);
     }
