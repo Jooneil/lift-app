@@ -18,7 +18,6 @@ type Props = {
   currentUserId: string;
   userCode: string;
   plans: Plan[];
-  exerciseInstructions: Record<string, string>;
   onAcceptPlan: (planName: string, planData: ServerPlanData) => Promise<void>;
   onBadgeUpdate: (count: number) => void;
   onViewProfile: (profile: ViewingProfile) => void;
@@ -81,7 +80,7 @@ function ActionBtn({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SocialSheet({
-  open, onClose, currentUserId, userCode, plans, exerciseInstructions, onAcceptPlan, onBadgeUpdate, onViewProfile,
+  open, onClose, currentUserId, userCode, plans, onAcceptPlan, onBadgeUpdate, onViewProfile,
 }: Props) {
   const [tab, setTab] = useState<Tab>('friends');
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
@@ -249,8 +248,10 @@ export default function SocialSheet({
           }
         }
       }
+      const prefs = await getUserPrefs().catch(() => null);
+      const allInstructions: Record<string, string> = prefs?.prefs?.exercise_instructions ?? {};
       const sharedInstructions: Record<string, string> = {};
-      for (const [key, val] of Object.entries(exerciseInstructions)) {
+      for (const [key, val] of Object.entries(allInstructions)) {
         if (planExerciseKeys.has(normalizeExerciseName(key).toLowerCase())) {
           sharedInstructions[key] = val;
         }
@@ -267,11 +268,11 @@ export default function SocialSheet({
     finally { setSendingPlan(false); }
   };
 
-  const applyInstructions = async (share: PlanShare, incoming: Record<string, string>) => {
+  const applyInstructions = async (toMerge: Record<string, string>) => {
     try {
       const prefs = await getUserPrefs();
       const existing = prefs?.prefs?.exercise_instructions ?? {};
-      const merged = { ...existing, ...incoming };
+      const merged = { ...existing, ...toMerge };
       await upsertUserPrefs({ exercise_instructions: merged });
     } catch { /* ignore — instructions are non-critical */ }
   };
@@ -280,23 +281,23 @@ export default function SocialSheet({
     const id = `accept-plan-${share.id}`;
     setPendingActions(p => new Set([...p, id]));
     try {
-      const incoming = share.plan_snapshot?.sharedInstructions ?? {};
-      const hasInstructions = Object.keys(incoming).length > 0;
+      const incomingInstructions = share.plan_snapshot?.sharedInstructions ?? {};
+      const hasInstructions = Object.keys(incomingInstructions).length > 0;
 
       if (hasInstructions) {
         // Check for conflicts with recipient's existing instructions
         const prefs = await getUserPrefs();
         const existing = prefs?.prefs?.exercise_instructions ?? {};
-        const conflicts = Object.keys(incoming).filter(k => existing[k] && existing[k] !== incoming[k]);
+        const conflicts = Object.keys(incomingInstructions).filter(k => existing[k] && existing[k] !== incomingInstructions[k]);
 
         if (conflicts.length > 0) {
           // Pause and ask — store pending share for after user answers
-          setInstructionPrompt({ share, toAdd: incoming, conflicts });
+          setInstructionPrompt({ share, toAdd: incomingInstructions, conflicts });
           setPendingActions(p => { const n = new Set(p); n.delete(id); return n; });
           return;
         }
         // No conflicts — silently merge
-        await applyInstructions(share, incoming);
+        await applyInstructions(incomingInstructions);
       }
 
       await planSharesApi.acceptPlan(share.id);
@@ -686,7 +687,7 @@ export default function SocialSheet({
                   const prefs = await getUserPrefs().catch(() => null);
                   const existing = prefs?.prefs?.exercise_instructions ?? {};
                   const safeOnly = Object.fromEntries(Object.entries(toAdd).filter(([k]) => !existing[k]));
-                  if (Object.keys(safeOnly).length) await applyInstructions(share, safeOnly).catch(() => {});
+                  if (Object.keys(safeOnly).length) await applyInstructions(safeOnly).catch(() => {});
                   await planSharesApi.acceptPlan(share.id);
                   await onAcceptPlan(share.plan_name, share.plan_snapshot);
                   setReceivedPlans(p => p.filter(s => s.id !== share.id));
@@ -699,7 +700,7 @@ export default function SocialSheet({
                 onClick={async () => {
                   const { share, toAdd } = instructionPrompt;
                   setInstructionPrompt(null);
-                  await applyInstructions(share, toAdd).catch(() => {});
+                  await applyInstructions(toAdd).catch(() => {});
                   await planSharesApi.acceptPlan(share.id);
                   await onAcceptPlan(share.plan_name, share.plan_snapshot);
                   setReceivedPlans(p => p.filter(s => s.id !== share.id));

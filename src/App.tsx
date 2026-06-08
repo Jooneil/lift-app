@@ -2500,7 +2500,6 @@ function AuthedApp({
       currentUserId={supabaseUserId}
       userCode={userCode}
       plans={plans}
-      exerciseInstructions={exerciseInstructionsRef.current}
       onAcceptPlan={async (planName, planData) => {
         const created = await planApi.create(planName, planData);
         if (created?.id) {
