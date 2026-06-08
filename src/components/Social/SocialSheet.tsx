@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Mascot } from '../mascot/Mascot';
 import * as friendsApi from '../../api/friends';
 import * as planSharesApi from '../../api/planShares';
+import { getUserPrefs, upsertUserPrefs } from '../../api/userPrefs';
+import { normalizeExerciseName } from '../../lib/utils';
 import type { FriendWithProfile, Profile } from '../../api/friends';
 import type { ViewingProfile } from '../Profile/ProfileModal';
 import type { PlanShare } from '../../api/planShares';
@@ -16,6 +18,7 @@ type Props = {
   currentUserId: string;
   userCode: string;
   plans: Plan[];
+  exerciseInstructions: Record<string, string>;
   onAcceptPlan: (planName: string, planData: ServerPlanData) => Promise<void>;
   onBadgeUpdate: (count: number) => void;
   onViewProfile: (profile: ViewingProfile) => void;
@@ -78,7 +81,7 @@ function ActionBtn({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SocialSheet({
-  open, onClose, currentUserId, userCode, plans, onAcceptPlan, onBadgeUpdate, onViewProfile,
+  open, onClose, currentUserId, userCode, plans, exerciseInstructions, onAcceptPlan, onBadgeUpdate, onViewProfile,
 }: Props) {
   const [tab, setTab] = useState<Tab>('friends');
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
@@ -99,6 +102,11 @@ export default function SocialSheet({
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
 
   const [codeCopied, setCodeCopied] = useState(false);
+  const [instructionPrompt, setInstructionPrompt] = useState<{
+    share: PlanShare;
+    toAdd: Record<string, string>;
+    conflicts: string[];
+  } | null>(null);
 
   const sheetRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
@@ -232,11 +240,26 @@ export default function SocialSheet({
     if (!sendTarget) return;
     setSendingPlan(true);
     try {
+      // Collect sender's instructions for exercises in this plan (never notes)
+      const planExerciseKeys = new Set<string>();
+      for (const week of plan.weeks ?? []) {
+        for (const day of week.days ?? []) {
+          for (const item of day.items ?? []) {
+            if (item.exerciseName) planExerciseKeys.add(normalizeExerciseName(item.exerciseName).toLowerCase());
+          }
+        }
+      }
+      const sharedInstructions: Record<string, string> = {};
+      for (const [key, val] of Object.entries(exerciseInstructions)) {
+        if (planExerciseKeys.has(normalizeExerciseName(key).toLowerCase())) {
+          sharedInstructions[key] = val;
+        }
+      }
       await planSharesApi.sendPlan(
         currentUserId,
         sendTarget.profile.user_id,
         plan.name,
-        { weeks: plan.weeks, ghostMode: plan.ghostMode } as unknown as ServerPlanData,
+        { weeks: plan.weeks, ghostMode: plan.ghostMode, ...(Object.keys(sharedInstructions).length ? { sharedInstructions } : {}) } as unknown as ServerPlanData,
       );
       setJustSent(true);
       setTimeout(() => { setJustSent(false); setSendTarget(null); }, 1800);
@@ -244,10 +267,38 @@ export default function SocialSheet({
     finally { setSendingPlan(false); }
   };
 
+  const applyInstructions = async (share: PlanShare, incoming: Record<string, string>) => {
+    try {
+      const prefs = await getUserPrefs();
+      const existing = prefs?.prefs?.exercise_instructions ?? {};
+      const merged = { ...existing, ...incoming };
+      await upsertUserPrefs({ exercise_instructions: merged });
+    } catch { /* ignore — instructions are non-critical */ }
+  };
+
   const handleAcceptPlan = async (share: PlanShare) => {
     const id = `accept-plan-${share.id}`;
     setPendingActions(p => new Set([...p, id]));
     try {
+      const incoming = share.plan_snapshot?.sharedInstructions ?? {};
+      const hasInstructions = Object.keys(incoming).length > 0;
+
+      if (hasInstructions) {
+        // Check for conflicts with recipient's existing instructions
+        const prefs = await getUserPrefs();
+        const existing = prefs?.prefs?.exercise_instructions ?? {};
+        const conflicts = Object.keys(incoming).filter(k => existing[k] && existing[k] !== incoming[k]);
+
+        if (conflicts.length > 0) {
+          // Pause and ask — store pending share for after user answers
+          setInstructionPrompt({ share, toAdd: incoming, conflicts });
+          setPendingActions(p => { const n = new Set(p); n.delete(id); return n; });
+          return;
+        }
+        // No conflicts — silently merge
+        await applyInstructions(share, incoming);
+      }
+
       await planSharesApi.acceptPlan(share.id);
       await onAcceptPlan(share.plan_name, share.plan_snapshot);
       const next = receivedPlans.filter(s => s.id !== share.id);
@@ -614,6 +665,53 @@ export default function SocialSheet({
           }
         </div>
       </div>
+
+      {/* Instruction conflict prompt */}
+      {instructionPrompt && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 460, background: 'var(--surface-elevated)', borderRadius: '20px 20px 0 0', padding: '24px 20px', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Override exercise instructions?</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+              This plan includes instructions for {Object.keys(instructionPrompt.toAdd).length} exercise{Object.keys(instructionPrompt.toAdd).length !== 1 ? 's' : ''}.
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              {instructionPrompt.conflicts.length} already {instructionPrompt.conflicts.length === 1 ? 'has' : 'have'} instructions: <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{instructionPrompt.conflicts.join(', ')}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={async () => {
+                  const { share, toAdd } = instructionPrompt;
+                  setInstructionPrompt(null);
+                  // Only add non-conflicting ones
+                  const prefs = await getUserPrefs().catch(() => null);
+                  const existing = prefs?.prefs?.exercise_instructions ?? {};
+                  const safeOnly = Object.fromEntries(Object.entries(toAdd).filter(([k]) => !existing[k]));
+                  if (Object.keys(safeOnly).length) await applyInstructions(share, safeOnly).catch(() => {});
+                  await planSharesApi.acceptPlan(share.id);
+                  await onAcceptPlan(share.plan_name, share.plan_snapshot);
+                  setReceivedPlans(p => p.filter(s => s.id !== share.id));
+                }}
+                style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid var(--border-strong)', background: 'var(--surface-raised)', color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Keep mine
+              </button>
+              <button
+                onClick={async () => {
+                  const { share, toAdd } = instructionPrompt;
+                  setInstructionPrompt(null);
+                  await applyInstructions(share, toAdd).catch(() => {});
+                  await planSharesApi.acceptPlan(share.id);
+                  await onAcceptPlan(share.plan_name, share.plan_snapshot);
+                  setReceivedPlans(p => p.filter(s => s.id !== share.id));
+                }}
+                style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: 'none', background: '#60a5fa', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Override all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @media (min-width: 768px) {

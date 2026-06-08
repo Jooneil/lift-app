@@ -7,7 +7,7 @@ export { CACHE_KEYS } from './cacheUtils'
 export type ServerPlanItem = { id?: string; exerciseId?: string; exerciseName?: string; targetSets?: number; targetReps?: string; myoReps?: boolean };
 export type ServerPlanDay = { id?: string; name?: string; items?: ServerPlanItem[] };
 export type ServerPlanWeek = { id?: string; name?: string; days?: ServerPlanDay[] };
-export type ServerPlanData = { weeks?: ServerPlanWeek[]; days?: ServerPlanDay[]; ghostMode?: 'default' | 'full-body' };
+export type ServerPlanData = { weeks?: ServerPlanWeek[]; days?: ServerPlanDay[]; ghostMode?: 'default' | 'full-body'; sharedInstructions?: Record<string, string> };
 export type ServerPlanRow = { id: string; name?: string; data?: ServerPlanData; archived?: 0 | 1 | boolean; predecessor_plan_id?: string | null };
 export type SessionSetPayload = { id: string; setIndex: number; weight: number | null; reps: number | null };
 export type SessionEntryPayload = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSetPayload[] };
