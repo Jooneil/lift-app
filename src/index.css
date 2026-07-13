@@ -471,6 +471,15 @@ input[type="checkbox"] {
   box-shadow: 0 0 8px rgba(129, 140, 248, 0.4);
 }
 
+/* Builder rows reorder via press-and-hold — never let the browser start
+   text selection or the iOS copy callout on them */
+.builder-exercise-row,
+.builder-exercise-row * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
 /* Items above/below the dragged item slide apart smoothly */
 .drag-item.shift-down {
   transform: translateY(var(--drag-item-height, 52px));

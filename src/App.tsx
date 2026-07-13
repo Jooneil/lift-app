@@ -5519,6 +5519,32 @@ function BuilderPage({
   const dragTimerRef = useRef<number | null>(null);
   const dragOffsetYRef = useRef<number>(0);
   const draggedElRef = useRef<HTMLElement | null>(null);
+  const dragPointerIdRef = useRef<number | null>(null);
+  const dragFromGripRef = useRef(false);
+  const dragJustEndedRef = useRef(false);
+  const preventTouchMoveRef = useRef((e: TouchEvent) => { e.preventDefault(); });
+
+  // Lift the row: visual pop, haptic tick, pointer capture, and scroll lock.
+  // iOS evaluates touch-action at gesture start, so a mid-gesture style change
+  // can't stop scrolling — the non-passive touchmove listener does.
+  const activateDrag = () => {
+    setDragActive(true);
+    const el = draggedElRef.current;
+    if (el) {
+      el.style.transform = 'translateY(0px) scale(1.03)';
+      if (dragPointerIdRef.current != null) { try { el.setPointerCapture(dragPointerIdRef.current); } catch { /* ignore */ } }
+    }
+    try { navigator.vibrate?.(10); } catch { /* unsupported */ }
+    document.addEventListener('touchmove', preventTouchMoveRef.current, { passive: false });
+  };
+
+  const resetDragState = () => {
+    if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
+    document.removeEventListener('touchmove', preventTouchMoveRef.current);
+    if (draggedElRef.current) draggedElRef.current.style.transform = '';
+    setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); setDragActive(false);
+    dragOffsetYRef.current = 0; draggedElRef.current = null; dragPointerIdRef.current = null; dragFromGripRef.current = false;
+  };
 
   // While dragging, disable text selection globally to avoid blue highlight
   useEffect(() => {
@@ -6179,11 +6205,28 @@ function BuilderPage({
             ) : (
               <div
                 style={{ display: 'flex', flexDirection: 'column', gap: 6, touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto' } as React.CSSProperties}
+                onClickCapture={(e) => {
+                  // A completed drag still synthesizes a click on whatever is under
+                  // the finger — swallow it so dropping a row doesn't open menus.
+                  if (dragJustEndedRef.current) {
+                    dragJustEndedRef.current = false;
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
                 onPointerMove={(e) => {
                   if (!draggingExerciseId || dragWeekId !== activeWeekId || dragDayId !== activeDayId) return;
                   const dy = Math.abs(e.clientY - dragStartYRef.current);
-                  if (!dragActive && dy > 8) setDragActive(true);
-                  if (!dragActive) return;
+                  if (!dragActive) {
+                    if (dragFromGripRef.current) {
+                      // Grip drags start on movement, no hold needed
+                      if (dy > 8) activateDrag(); else return;
+                    } else {
+                      // Moved before the long-press completed — that's a scroll
+                      if (dy > 10) resetDragState();
+                      return;
+                    }
+                  }
                   e.preventDefault();
                   dragOffsetYRef.current = e.clientY - dragStartYRef.current;
                   if (draggedElRef.current) draggedElRef.current.style.transform = `translateY(${dragOffsetYRef.current}px) scale(1.02)`;
@@ -6206,19 +6249,14 @@ function BuilderPage({
                 }}
                 onPointerUp={() => {
                   if (!draggingExerciseId || dragWeekId !== activeWeekId || dragDayId !== activeDayId) return;
-                  if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
-                  if (!dragActive) { setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); return; }
-                  if (draggedElRef.current) draggedElRef.current.style.transform = '';
+                  if (!dragActive) { resetDragState(); return; }
                   const insert = dragInsertIndex == null ? activeDay.items.length : dragInsertIndex;
                   handleReorderExerciseAtIndex(activeWeekId, activeDayId, draggingExerciseId, insert);
-                  setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); setDragActive(false);
-                  dragOffsetYRef.current = 0; draggedElRef.current = null;
+                  dragJustEndedRef.current = true;
+                  resetDragState();
                 }}
                 onPointerCancel={() => {
-                  if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
-                  if (draggedElRef.current) draggedElRef.current.style.transform = '';
-                  setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); setDragActive(false);
-                  dragOffsetYRef.current = 0; draggedElRef.current = null;
+                  resetDragState();
                 }}
               >
                 {activeDay.items.map((item, idx) => {
@@ -6238,22 +6276,28 @@ function BuilderPage({
                       {showPlaceholder && <div className="drag-placeholder" />}
                       <div
                         data-exercise-id={item.id}
+                        className="builder-exercise-row"
                         ref={isDragging ? (el) => { draggedElRef.current = el; } : undefined}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 4px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', borderRadius: 12, touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto', userSelect: (draggingExerciseId && dragActive) ? 'none' : 'auto', opacity: isDragging ? 0.7 : 1 } as React.CSSProperties}
+                        onPointerDown={(e) => {
+                          dragJustEndedRef.current = false;
+                          const exerciseRow = e.currentTarget as HTMLElement;
+                          const fromGrip = !!(e.target as HTMLElement).closest?.('[data-drag-grip]');
+                          if (fromGrip) e.preventDefault();
+                          draggedElRef.current = exerciseRow;
+                          dragPointerIdRef.current = e.pointerId;
+                          dragFromGripRef.current = fromGrip;
+                          setDraggingExerciseId(item.id); setDragWeekId(activeWeekId); setDragDayId(activeDayId);
+                          setDragActive(false); dragStartYRef.current = e.clientY; dragOffsetYRef.current = 0; setDragInsertIndex(idx);
+                          if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
+                          // Grip: near-instant. Anywhere else on the row: press-and-hold to lift.
+                          dragTimerRef.current = window.setTimeout(activateDrag, fromGrip ? 150 : 400);
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 4px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', borderRadius: 12, position: 'relative', zIndex: isDragging ? 10 : 'auto', boxShadow: isDragging ? '0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(138, 143, 255, 0.25)' : 'none', touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto', opacity: isDragging ? 0.95 : 1 } as React.CSSProperties}
                       >
                         {/* Grip col */}
                         <div
-                          onPointerDown={(e) => {
-                            e.preventDefault();
-                            const exerciseRow = (e.currentTarget as HTMLElement).closest('[data-exercise-id]') as HTMLElement | null;
-                            draggedElRef.current = exerciseRow;
-                            setDraggingExerciseId(item.id); setDragWeekId(activeWeekId); setDragDayId(activeDayId);
-                            setDragActive(false); dragStartYRef.current = e.clientY; dragOffsetYRef.current = 0; setDragInsertIndex(idx);
-                            if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
-                            dragTimerRef.current = window.setTimeout(() => setDragActive(true), 150);
-                            try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-                          }}
-                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 22, flexShrink: 0, cursor: 'grab', paddingLeft: 4 }}
+                          data-drag-grip
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 22, flexShrink: 0, cursor: 'grab', paddingLeft: 4, touchAction: 'none' }}
                         >
                           <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>{idx + 1}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1 }}>≡</div>
