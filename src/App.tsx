@@ -4627,14 +4627,19 @@ function WorkoutPage({
             setKeypadRepsDraft(v); keypadRepsDraftRef.current = v;
             const kp = activeKeypadRef.current;
             if (v !== '' && keypadWeightDraftRef.current === '' && kp?.ghostWeight != null) {
-              // Typing reps confirms the ghosted weight immediately
+              // Typing reps confirms the ghosted weight immediately. Committing it
+              // to the session (not just the draft) lets updateSet's forward
+              // propagation fill the remaining sets of the exercise right away.
               const w = String(kp.ghostWeight);
               setKeypadWeightDraft(w); keypadWeightDraftRef.current = w;
               keypadWeightAutoFilledRef.current = true;
+              updateSet(kp.entryId, kp.setId, { weight: kp.ghostWeight });
             } else if (v === '' && keypadWeightAutoFilledRef.current) {
-              // Reps cleared — the auto-confirmed weight goes back to a ghost
+              // Reps cleared — revert the auto-confirmed weight to a ghost; the
+              // propagation clears the later sets it auto-filled too.
               setKeypadWeightDraft(''); keypadWeightDraftRef.current = '';
               keypadWeightAutoFilledRef.current = false;
+              if (kp) updateSet(kp.entryId, kp.setId, { weight: null });
             }
           }}
           onFieldSwitch={setKeypadField}
