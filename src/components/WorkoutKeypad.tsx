@@ -14,6 +14,7 @@ type Props = {
   onFieldSwitch: (field: ActiveField) => void;
   onDone: () => void;
   onPromote: () => void;
+  className?: string;
 };
 
 const DIGIT_ROWS = [
@@ -54,6 +55,7 @@ export default function WorkoutKeypad({
   onFieldSwitch,
   onDone,
   onPromote,
+  className,
 }: Props) {
   const isWeight = field === 'weight';
   const currentDraft = isWeight ? weightDraft : repsDraft;
@@ -110,6 +112,7 @@ export default function WorkoutKeypad({
 
   return (
     <div
+      className={className}
       onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
       style={{

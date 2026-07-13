@@ -89,6 +89,18 @@
   --transition-fast: 0.12s cubic-bezier(0.22, 1, 0.36, 1);
   --transition-base: 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* ── New workout view design tokens ──────────────────────── */
+  --wk-bg:         #0a0a0b;
+  --wk-surface:    #121214;
+  --wk-surface-2:  #1a1a1d;
+  --wk-line:       rgba(255,255,255,0.07);
+  --wk-line-strong:rgba(255,255,255,0.16);
+  --wk-text:       #f2f2f0;
+  --wk-text-2:     #98989f;
+  --wk-text-3:     #5e5e66;
+  --wk-accent:     oklch(0.86 0.07 166);
+  --wk-accent-dim: oklch(0.86 0.07 166 / 0.13);
+
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -530,4 +542,69 @@ input[type="checkbox"] {
   input, select, textarea {
     min-height: 44px;
   }
+}
+
+/* ── Keypad slide-in / slide-out ──────────────────────────── */
+@keyframes keypadSlideIn {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes keypadSlideOut {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+.keypad-entering { animation: keypadSlideIn  0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.keypad-exiting  { animation: keypadSlideOut 0.22s cubic-bezier(0.4, 0, 1, 1)     both; }
+
+/* ── New workout view helpers ─────────────────────────────── */
+@keyframes wkSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wk-micro {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--wk-text-3);
+}
+
+.wk-mono {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.wk-pill {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--wk-text-2);
+  border: 1px solid var(--wk-line-strong);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  min-height: 0;
+}
+
+.wk-pill.active,
+.wk-pill:active {
+  background: var(--wk-surface-2);
+  color: var(--wk-text);
+}
+
+.wk-tap {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.wk-row {
+  transition: opacity 0.2s;
 }

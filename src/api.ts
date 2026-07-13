@@ -316,10 +316,10 @@ export const sessionApi = {
     const { data } = await supabase.from('completions').select('week_id,day_id,completed_at').eq('plan_id', planServerId).order('completed_at', { ascending: false }).limit(1).maybeSingle(); return (data as { week_id: string; day_id: string } | null) ?? null;
   },
   async last(planServerId: number | string, planWeekId: string, planDayId: string): Promise<SessionPayload | null> {
-    const { data } = await supabase.from('sessions').select('data').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); return (data as { data?: SessionPayload } | null)?.data ?? null;
+    const { data, error } = await supabase.from('sessions').select('data').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); if (error) throw error; return (data as { data?: SessionPayload } | null)?.data ?? null;
   },
   async status(planServerId: number | string, planWeekId: string, planDayId: string): Promise<{ completed: boolean }> {
-    const { data } = await supabase.from('completions').select('plan_id').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); return { completed: !!data };
+    const { data, error } = await supabase.from('completions').select('plan_id').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); if (error) throw error; return { completed: !!data };
   },
   async completedList(planServerId: number | string): Promise<Array<{ week_id: string; day_id: string }>> {
     const { data } = await supabase.from('completions').select('week_id,day_id').eq('plan_id', planServerId).order('completed_at', { ascending: true }); return (data ?? []) as Array<{ week_id: string; day_id: string }>;

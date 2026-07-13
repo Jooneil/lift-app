@@ -33,6 +33,7 @@ import { STEPS } from './components/Tutorial/steps';
 import ProfileModal, { type ViewingProfile } from './components/Profile/ProfileModal';
 import SocialSheet from './components/Social/SocialSheet';
 import PlanCompleteModal, { type PlanCompleteData } from './components/PlanComplete/PlanCompleteModal';
+import WorkoutNewView from './components/WorkoutNew/WorkoutNewView';
 import { ensureProfile } from './api/friends';
 import { Mascot, MASCOT_EXPRESSIONS, type MascotExpression } from './components/mascot/Mascot';
 
@@ -182,6 +183,7 @@ function AuthedApp({
   const [mascotExpression, setMascotExpression] = useState<MascotExpression>('happy');
   const [showSocial, setShowSocial] = useState(false);
   const [socialBadge, setSocialBadge] = useState(0);
+  const [newViewEnabled, setNewViewEnabled] = useState(() => localStorage.getItem('wk:newView') === 'true');
   const [viewingFriendProfile, setViewingFriendProfile] = useState<ViewingProfile | null>(null);
   const [supabaseUserId, setSupabaseUserId] = useState('');
   const [userCode, setUserCode] = useState('');
@@ -1441,6 +1443,24 @@ function AuthedApp({
               </span>
             </div>
           )}
+          {mode === 'workout' && (
+            <button
+              onClick={() => {
+                const next = !newViewEnabled;
+                setNewViewEnabled(next);
+                localStorage.setItem('wk:newView', String(next));
+              }}
+              style={{
+                background: 'none', border: 'none', padding: '4px 8px',
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                color: newViewEnabled ? 'var(--accent-blue)' : 'var(--text-muted)',
+                borderRadius: 6, whiteSpace: 'nowrap',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {newViewEnabled ? 'Return to old view' : 'Try new view'}
+            </button>
+          )}
           <button
             onClick={() => setShowProfile(true)}
             title="Profile"
@@ -1701,6 +1721,7 @@ function AuthedApp({
                     planApi.update(updatedPlan.serverId, updatedPlan.name, payload).catch(() => void 0);
                   }
                 }}
+                newViewEnabled={newViewEnabled}
               />
             </>
           )}
@@ -2553,6 +2574,7 @@ function WorkoutPage({
   streakEnabled,
   workoutPrefs,
   onUpdatePlan,
+  newViewEnabled,
 }: {
   plan: Plan;
   day: PlanDay;
@@ -2581,6 +2603,7 @@ function WorkoutPage({
   streakEnabled: boolean;
   workoutPrefs: Required<WorkoutPrefs>;
   onUpdatePlan: (plan: Plan) => void;
+  newViewEnabled: boolean;
 }) {
   const [replaceSheetOpen, setReplaceSheetOpen] = useState(false);
   const [replaceTargetEntry, setReplaceTargetEntry] = useState<{ exerciseId?: string; exerciseName: string } | null>(null);
@@ -2604,7 +2627,10 @@ function WorkoutPage({
   const [historyProgression, setHistoryProgression] = useState<Array<{ date: string; weight: number; reps: number }>>([]);
   const [historyProgressionExpanded, setHistoryProgressionExpanded] = useState(false);
   const historyCacheRef = useRef<SessionRow[] | null>(null);
-  const historicalGhostRef = useRef<Map<string, Map<number, { weight: number; reps: number }>> | null>(null);
+  const [historicalGhost, setHistoricalGhost] = useState<Map<string, Map<number, { weight: number; reps: number }>> | null>(null);
+  // Ghost values seeded from an archived plan (Effect below), keyed to the week/day
+  // they apply to so the ghost-walk effect can preserve them across re-runs
+  const ghostSeedRef = useRef<{ weekId: string; dayId: string; map: Record<string, { weight: number | null; reps: number | null }[]> } | null>(null);
   const [openExerciseMenu, setOpenExerciseMenu] = useState<string | null>(null);
   useEffect(() => {
     if (!openExerciseMenu) return;
@@ -2647,6 +2673,25 @@ function WorkoutPage({
   const keypadWeightDraftRef = useRef('');
   const keypadRepsDraftRef = useRef('');
   const keypadBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Animation state for smooth keypad open/close
+  const [keypadMounted, setKeypadMounted] = useState(false);
+  const [keypadAnimClass, setKeypadAnimClass] = useState('keypad-entering');
+  const keypadExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keypadLastInfoRef = useRef<KeypadInfo | null>(null);
+
+  useEffect(() => {
+    if (activeKeypad) {
+      if (keypadExitTimerRef.current) clearTimeout(keypadExitTimerRef.current);
+      keypadLastInfoRef.current = activeKeypad;
+      setKeypadMounted(true);
+      setKeypadAnimClass('keypad-entering');
+    } else {
+      setKeypadAnimClass('keypad-exiting');
+      keypadExitTimerRef.current = setTimeout(() => setKeypadMounted(false), 220);
+    }
+    return () => {};
+  }, [activeKeypad]);
 
   const commitKeypadDraft = () => {
     const kp = activeKeypadRef.current;
@@ -2869,7 +2914,7 @@ function WorkoutPage({
 
   useEffect(() => {
     historyCacheRef.current = null;
-    historicalGhostRef.current = null;
+    setHistoricalGhost(null);
   }, [plan.serverId, plan.ghostMode]);
 
   // Load global exercise notes from user prefs
@@ -2947,7 +2992,8 @@ function WorkoutPage({
                 const nameKey = `name:${normalizeExerciseName(entry.exerciseName || '').toLowerCase()}`;
                 if (nameKey && !ghostMap[nameKey]) ghostMap[nameKey] = ghostMap[key];
               }
-              setGhost(ghostMap);
+              ghostSeedRef.current = { weekId: currentWeek.id, dayId: day.id, map: ghostMap };
+              setGhost(prev => ({ ...prev, ...ghostMap }));
               setSession(startSessionFromDay(plan, currentWeek.id, day.id));
               setCompleted(false);
               return;
@@ -2999,6 +3045,7 @@ function WorkoutPage({
     }
 
     let cancelled = false;
+    let anyReadFailed = false;
 
     const readSessionForDay = async (weekId: string, dayId: string) => {
       let payload: SessionPayload | null = null;
@@ -3006,7 +3053,7 @@ function WorkoutPage({
         try {
           payload = await sessionApi.last(serverId, weekId, dayId);
         } catch {
-          /* ignore and try local */
+          anyReadFailed = true; /* transient failure — try local */
         }
       }
       if (!payload) {
@@ -3043,13 +3090,17 @@ function WorkoutPage({
     };
 
     (async () => {
-      // Instant restore from localStorage cache so ghost appears before API calls complete
+      // Instant restore from localStorage cache so ghost appears before API calls complete.
+      // Merge over any ghost seeded for this same week/day so re-runs don't wipe it.
       const cacheKey = `ghost:${plan.serverId ?? plan.id}:${currentWeekId}:${day.id}`;
+      const seed = ghostSeedRef.current;
+      const seedMap = seed && seed.weekId === currentWeekId && seed.dayId === day.id ? seed.map : null;
+      let cachedMap: Record<string, { weight: number | null; reps: number | null }[]> | null = null;
       try {
         const cached = localStorage.getItem(cacheKey);
-        if (cached) setGhost(JSON.parse(cached));
-        else setGhost({});
-      } catch { setGhost({}); }
+        if (cached) cachedMap = JSON.parse(cached);
+      } catch { /* corrupt cache — ignore */ }
+      setGhost({ ...(seedMap ?? {}), ...(cachedMap ?? {}) });
 
       try {
         const ordered: Array<{ weekId: string; dayId: string; dayIndex: number; dayName: string }> = [];
@@ -3106,12 +3157,19 @@ function WorkoutPage({
         }
 
         if (!cancelled) {
-          if (Object.keys(ghostMap).length > 0) {
-            setGhost(ghostMap);
+          if (anyReadFailed) {
+            // Some server reads failed — results are incomplete. Merge what we did
+            // find over the cache/seed values and leave the cache untouched so the
+            // next load still gets an instant restore.
+            if (Object.keys(ghostMap).length > 0) {
+              setGhost({ ...(seedMap ?? {}), ...(cachedMap ?? {}), ...ghostMap });
+            }
+          } else if (Object.keys(ghostMap).length > 0) {
+            setGhost({ ...(seedMap ?? {}), ...ghostMap });
             try { localStorage.setItem(cacheKey, JSON.stringify(ghostMap)); } catch {}
           } else {
             // Genuine no-data — invalidate stale cache but keep ghost as-is
-            // (may have been set by ghostSeed via Effect 1)
+            // (may hold values seeded from an archived plan)
             try { localStorage.removeItem(cacheKey); } catch {}
           }
           void loadHistoricalGhost(targets);
@@ -3191,7 +3249,7 @@ function WorkoutPage({
     }
 
     // Tier 2: Historical ghost (from past sessions)
-    const histData = historicalGhostRef.current;
+    const histData = historicalGhost;
     if (histData) {
       for (const key of keys) {
         const setMap = histData.get(key);
@@ -3393,7 +3451,7 @@ function WorkoutPage({
       }
     }
 
-    historicalGhostRef.current = result;
+    setHistoricalGhost(result);
   };
 
   const openHistory = (entry: { exerciseId?: string; exerciseName: string }) => {
@@ -3605,7 +3663,37 @@ function WorkoutPage({
     });
   };
 
-  
+  const openKeypadFor = (entryId: string, setId: string, field: 'weight' | 'reps', ghostWeight: number | null, ghostReps: number | null) => {
+    if (keypadBlurTimerRef.current) { clearTimeout(keypadBlurTimerRef.current); keypadBlurTimerRef.current = null; }
+    if (activeKeypadRef.current) commitKeypadDraft();
+    const entry = session.entries.find(e => e.id === entryId);
+    const set = entry?.sets.find(s => s.id === setId);
+    const wD = set?.weight != null ? String(set.weight) : '';
+    const rD = set?.reps != null ? String(set.reps) : '';
+    setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
+    setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
+    const kp: KeypadInfo = { entryId, setId, ghostWeight, ghostReps };
+    setActiveKeypad(kp); activeKeypadRef.current = kp;
+    setKeypadField(field);
+  };
+
+  const quickLogSet = (entryId: string, setId: string, ghostWeight: number | null, ghostReps: number | null) => {
+    const entry = session.entries.find(e => e.id === entryId);
+    const set = entry?.sets.find(s => s.id === setId);
+    if (!set) return;
+    if (set.weight != null && set.reps != null) {
+      updateSet(entryId, setId, { weight: null, reps: null });
+      return;
+    }
+    const w = ghostWeight;
+    const r = ghostReps;
+    if (w != null && r != null) {
+      updateSet(entryId, setId, { weight: w, reps: r });
+      if (workoutPrefs.rest_timer_enabled && workoutPrefs.auto_start_rest) startRestTimer(entryId);
+    } else {
+      openKeypadFor(entryId, setId, 'weight', ghostWeight, ghostReps);
+    }
+  };
 
   const addDraftSet = () => {
     setEditDraftSets(prev => [...prev, {
@@ -3684,9 +3772,65 @@ function WorkoutPage({
           <option key={name} value={name} />
         ))}
       </datalist>
+      {newViewEnabled && (
+        <WorkoutNewView
+          plan={plan}
+          day={day}
+          currentWeek={currentWeek}
+          session={session}
+          loggedSets={loggedSets}
+          totalSets={totalSets}
+          elapsedDisplay={elapsedDisplay}
+          catalogByNameMap={catalogByNameMap}
+          getGhost={getGhost}
+          restTimer={restTimer}
+          restEnabled={workoutPrefs.rest_timer_enabled}
+          onDismissRest={dismissRestTimer}
+          openNotes={openNotes}
+          notesDraft={notesDraft}
+          onToggleNotes={(entryId) => {
+            if (!openNotes[entryId]) {
+              const entry = session.entries.find(e => e.id === entryId);
+              if (entry) {
+                const nameKey = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+                setNotesDraft(prev => ({ ...prev, [entryId]: exerciseNotesRef.current[nameKey] ?? '' }));
+              }
+            }
+            setOpenNotes(prev => ({ ...prev, [entryId]: !prev[entryId] }));
+          }}
+          onUpdateNotesDraft={(entryId, text) => setNotesDraft(prev => ({ ...prev, [entryId]: text }))}
+          onSaveNotes={(entryId) => {
+            updateEntryNote(entryId, notesDraft[entryId] ?? '');
+            setOpenNotes(prev => ({ ...prev, [entryId]: false }));
+          }}
+          openInstructions={openInstructions}
+          instructionsDraft={instructionsDraft}
+          onToggleInstructions={(entryId) => {
+            if (!openInstructions[entryId]) {
+              const entry = session.entries.find(e => e.id === entryId);
+              if (entry) {
+                setInstructionsDraft(prev => ({ ...prev, [entryId]: getEntryInstruction(entry) }));
+              }
+            }
+            setOpenInstructions(prev => ({ ...prev, [entryId]: !prev[entryId] }));
+          }}
+          onUpdateInstructionsDraft={(entryId, text) => setInstructionsDraft(prev => ({ ...prev, [entryId]: text }))}
+          onSaveInstructions={(entryId) => {
+            updateEntryInstruction(entryId, instructionsDraft[entryId] ?? '');
+            setOpenInstructions(prev => ({ ...prev, [entryId]: false }));
+          }}
+          onOpenKeypad={openKeypadFor}
+          onQuickLog={quickLogSet}
+          onOpenHistory={openHistory}
+          onEditSets={(entryId, sets) => { setEditingEntryId(entryId); setEditDraftSets(sets.map(s => ({ ...s }))); }}
+          onReplace={(entry, index) => openReplaceSearch(entry, index)}
+          onMyoMatch={openMyoScopeModal}
+        />
+      )}
+
       {/* Sticky progress sentinel — IntersectionObserver fires when this scrolls off-screen */}
-      <div ref={progressSentinelRef} aria-hidden="true" style={{ height: 1, marginTop: -1 }} />
-      {totalSets > 0 && (
+      {!newViewEnabled && <div ref={progressSentinelRef} aria-hidden="true" style={{ height: 1, marginTop: -1 }} />}
+      {!newViewEnabled && totalSets > 0 && (
         <div className={`progress-sticky${progressIsStuck ? ' is-stuck' : ''}`}>
           <div className="flex justify-between items-center mb-1.5">
             <span className="text-[12px] font-medium uppercase tracking-[0.05em] text-muted">
@@ -3743,7 +3887,7 @@ function WorkoutPage({
           </div>
         </div>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {!newViewEnabled && <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       {session.entries.map((entry, entryIndex) => (
         <div key={entry.id} className="list-stagger bg-elevated rounded-md p-4 shadow-card transition-all duration-150 ease-in-out border-l-[3px]" style={{
           '--i': entryIndex,
@@ -4128,7 +4272,7 @@ function WorkoutPage({
           )}
         </div>
       ))}
-      </div>
+      </div>}
 
       <div className="mt-5 pt-4 border-t border-t-subtle flex justify-between items-center flex-wrap gap-3">
         <label style={{
@@ -4447,17 +4591,23 @@ function WorkoutPage({
         )}
       </Modal>
 
-      {activeKeypad && (
+      {keypadMounted && (
         <WorkoutKeypad
+          className={keypadAnimClass}
           field={keypadField}
           weightDraft={keypadWeightDraft}
           repsDraft={keypadRepsDraft}
-          ghostWeight={activeKeypad.ghostWeight}
-          ghostReps={activeKeypad.ghostReps}
+          ghostWeight={(activeKeypad ?? keypadLastInfoRef.current)?.ghostWeight ?? null}
+          ghostReps={(activeKeypad ?? keypadLastInfoRef.current)?.ghostReps ?? null}
           onWeightChange={(v) => { setKeypadWeightDraft(v); keypadWeightDraftRef.current = v; }}
           onRepsChange={(v) => { setKeypadRepsDraft(v); keypadRepsDraftRef.current = v; }}
           onFieldSwitch={setKeypadField}
-          onDone={() => { (document.activeElement as HTMLElement)?.blur(); }}
+          onDone={() => {
+            commitKeypadDraft();
+            setActiveKeypad(null);
+            activeKeypadRef.current = null;
+            (document.activeElement as HTMLElement)?.blur();
+          }}
           onPromote={() => {
             const rawW = parseFloat(keypadWeightDraftRef.current) || 0;
             const newW = String(Math.round((rawW + 5) * 100) / 100);

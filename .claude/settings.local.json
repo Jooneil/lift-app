@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(ls \"C:\\\\Users\\\\josho\\\\Downloads\")",
+      "Read(//c/Users/josho/Downloads/**)",
+      "Bash(Expand-Archive -Path \"Potential new app.zip\" -DestinationPath \"C:\\\\Users\\\\josho\\\\Downloads\\\\potential-new-app-extracted\" -Force)",
+      "Bash(ls -la \"/c/Users/josho/Desktop\" 2>&1 | grep -i lift)"
     ]
   }
 }
