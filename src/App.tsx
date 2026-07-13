@@ -2673,6 +2673,10 @@ function WorkoutPage({
   const keypadWeightDraftRef = useRef('');
   const keypadRepsDraftRef = useRef('');
   const keypadBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True while the weight draft holds a ghost value auto-confirmed by typing reps
+  // (as opposed to a weight the user typed). Lets clearing reps revert the weight
+  // back to a ghost instead of leaving it committed.
+  const keypadWeightAutoFilledRef = useRef(false);
 
   // Animation state for smooth keypad open/close
   const [keypadMounted, setKeypadMounted] = useState(false);
@@ -3685,6 +3689,7 @@ function WorkoutPage({
     const rD = set?.reps != null ? String(set.reps) : '';
     setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
     setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
+    keypadWeightAutoFilledRef.current = set?.weight != null && ghostWeight != null && set.weight === ghostWeight;
     const kp: KeypadInfo = { entryId, setId, ghostWeight, ghostReps };
     setActiveKeypad(kp); activeKeypadRef.current = kp;
     setKeypadField(field);
@@ -4064,6 +4069,7 @@ function WorkoutPage({
                           const rD = set.reps != null ? String(set.reps) : '';
                           setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
                           setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
+                          keypadWeightAutoFilledRef.current = set.weight != null && ghostSet.weight != null && set.weight === ghostSet.weight;
                         }
                         const kp: KeypadInfo = { entryId: entry.id, setId: set.id, ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
                         setActiveKeypad(kp); activeKeypadRef.current = kp;
@@ -4105,6 +4111,7 @@ function WorkoutPage({
                           const rD = set.reps != null ? String(set.reps) : '';
                           setKeypadWeightDraft(wD); keypadWeightDraftRef.current = wD;
                           setKeypadRepsDraft(rD); keypadRepsDraftRef.current = rD;
+                          keypadWeightAutoFilledRef.current = set.weight != null && ghostSet.weight != null && set.weight === ghostSet.weight;
                         }
                         const kp: KeypadInfo = { entryId: entry.id, setId: set.id, ghostWeight: ghostSet.weight, ghostReps: ghostSet.reps };
                         setActiveKeypad(kp); activeKeypadRef.current = kp;
@@ -4612,8 +4619,24 @@ function WorkoutPage({
           repsDraft={keypadRepsDraft}
           ghostWeight={(activeKeypad ?? keypadLastInfoRef.current)?.ghostWeight ?? null}
           ghostReps={(activeKeypad ?? keypadLastInfoRef.current)?.ghostReps ?? null}
-          onWeightChange={(v) => { setKeypadWeightDraft(v); keypadWeightDraftRef.current = v; }}
-          onRepsChange={(v) => { setKeypadRepsDraft(v); keypadRepsDraftRef.current = v; }}
+          onWeightChange={(v) => {
+            setKeypadWeightDraft(v); keypadWeightDraftRef.current = v;
+            keypadWeightAutoFilledRef.current = false;
+          }}
+          onRepsChange={(v) => {
+            setKeypadRepsDraft(v); keypadRepsDraftRef.current = v;
+            const kp = activeKeypadRef.current;
+            if (v !== '' && keypadWeightDraftRef.current === '' && kp?.ghostWeight != null) {
+              // Typing reps confirms the ghosted weight immediately
+              const w = String(kp.ghostWeight);
+              setKeypadWeightDraft(w); keypadWeightDraftRef.current = w;
+              keypadWeightAutoFilledRef.current = true;
+            } else if (v === '' && keypadWeightAutoFilledRef.current) {
+              // Reps cleared — the auto-confirmed weight goes back to a ghost
+              setKeypadWeightDraft(''); keypadWeightDraftRef.current = '';
+              keypadWeightAutoFilledRef.current = false;
+            }
+          }}
           onFieldSwitch={setKeypadField}
           onDone={() => {
             commitKeypadDraft();
@@ -4626,6 +4649,7 @@ function WorkoutPage({
             const newW = String(Math.round((rawW + 5) * 100) / 100);
             setKeypadWeightDraft(newW); keypadWeightDraftRef.current = newW;
             setKeypadRepsDraft('10'); keypadRepsDraftRef.current = '10';
+            keypadWeightAutoFilledRef.current = false;
           }}
         />
       )}
