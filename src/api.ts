@@ -272,7 +272,7 @@ export const sessionApi = {
     // Update first; if no row matched, insert. Avoids 406/400 noise.
     const upd = await supabase
       .from('sessions')
-      .update({ data: session })
+      .update({ data: session, updated_at: new Date().toISOString() })
       .match({ plan_id: planIdForRow, week_id: planWeekId, day_id: planDayId })
       .select('plan_id');
     if (upd.error && (!('code' in upd.error) || (upd.error as any).code !== 'PGRST116')) throw upd.error;
@@ -313,7 +313,7 @@ export const sessionApi = {
     return { ok: true };
   },
   async lastCompleted(planServerId: number | string): Promise<{ week_id: string; day_id: string } | null> {
-    const { data } = await supabase.from('completions').select('week_id,day_id,completed_at').eq('plan_id', planServerId).order('completed_at', { ascending: false }).limit(1).maybeSingle(); return (data as { week_id: string; day_id: string } | null) ?? null;
+    const { data, error } = await supabase.from('completions').select('week_id,day_id,completed_at').eq('plan_id', planServerId).order('completed_at', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return (data as { week_id: string; day_id: string } | null) ?? null;
   },
   async last(planServerId: number | string, planWeekId: string, planDayId: string): Promise<SessionPayload | null> {
     const { data, error } = await supabase.from('sessions').select('data').match({ plan_id: planServerId, week_id: planWeekId, day_id: planDayId }).maybeSingle(); if (error) throw error; return (data as { data?: SessionPayload } | null)?.data ?? null;

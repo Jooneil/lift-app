@@ -3047,15 +3047,26 @@ function WorkoutPage({
     let cancelled = false;
     let anyReadFailed = false;
 
-    const readSessionForDay = async (weekId: string, dayId: string) => {
-      let payload: SessionPayload | null = null;
-      if (serverId) {
-        try {
-          payload = await sessionApi.last(serverId, weekId, dayId);
-        } catch {
-          anyReadFailed = true; /* transient failure — try local */
+    // One request fetches every session for the plan; the backward walk below
+    // is then a pure in-memory lookup instead of a network call per day.
+    const loadServerSessions = async (): Promise<Map<string, SessionPayload> | null> => {
+      if (!serverId) return null;
+      try {
+        const rows = await sessionApi.listForPlan(serverId);
+        const map = new Map<string, SessionPayload>();
+        for (const row of rows) {
+          const data = row.data;
+          if (data && Array.isArray(data.entries)) map.set(`${row.week_id}:${row.day_id}`, data);
         }
+        return map;
+      } catch {
+        anyReadFailed = true; /* transient failure — fall back to local */
+        return null;
       }
+    };
+
+    const readSessionForDay = (serverSessions: Map<string, SessionPayload> | null, weekId: string, dayId: string) => {
+      let payload: SessionPayload | null = serverSessions?.get(`${weekId}:${dayId}`) ?? null;
       if (!payload) {
         const keysToTry: string[] = [];
         if (serverId) keysToTry.push(`session:${serverId}:${weekId}:${dayId}`);
@@ -3129,12 +3140,14 @@ function WorkoutPage({
         const ghostMode = plan.ghostMode ?? 'default';
         const currentDayName = day.name.trim().toLowerCase();
 
+        const serverSessions = await loadServerSessions();
+        if (cancelled) return;
+
         for (let idx = currentIdx - 1; idx >= 0; idx--) {
-          if (cancelled) return;
           if (remaining.size === 0) break;
           const prev = ordered[idx];
           if (ghostMode === 'full-body' && prev.dayName !== currentDayName) continue;
-          const payload = await readSessionForDay(prev.weekId, prev.dayId);
+          const payload = readSessionForDay(serverSessions, prev.weekId, prev.dayId);
           if (!payload || !payload.entries) continue;
 
           for (const entry of payload.entries) {
