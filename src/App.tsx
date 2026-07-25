@@ -1486,7 +1486,10 @@ function AuthedApp({
       </div>
 
       {mode === "builder" && (
-        <div className="page-enter" key="builder-page"><BuilderPage
+        // data-no-ptr: the plan editor opts out of pull-to-refresh entirely, so
+        // dragging a movement down can't trigger a page reload. Refresh stays on
+        // the main workout screen; modals already opt out via Modal's overlay.
+        <div className="page-enter" key="builder-page" data-no-ptr><BuilderPage
           plans={plans}
           setPlans={setPlans}
           selectedPlanId={selectedPlanId}
