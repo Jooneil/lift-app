@@ -43,7 +43,11 @@ export function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
       if (item.exerciseId && !e.exerciseId) return entryName === targetName;
       return entryName === targetName;
     }) || null;
-    const sets: SessionSet[] = Array.from({ length: item.targetSets }, (_, i) => {
+    // A "this workout only" set-count edit pins the count via targetSetsOverride
+    // so the plan target doesn't snap the user's on-the-fly change back. Logged
+    // weights/reps are preserved regardless of where the count comes from.
+    const count = existing?.targetSetsOverride ?? item.targetSets;
+    const sets: SessionSet[] = Array.from({ length: count }, (_, i) => {
       const old = existing?.sets?.[i] || null;
       return {
         id: old?.id || uuid(),
@@ -59,6 +63,7 @@ export function mergeSessionWithDay(planDay: PlanDay, prev: Session): Session {
       sets,
       note: existing?.note ?? null,
       myoRepMatch: item.myoReps || existing?.myoRepMatch || undefined,
+      ...(existing?.targetSetsOverride != null ? { targetSetsOverride: existing.targetSetsOverride } : {}),
     };
   });
   return { ...prev, entries: nextEntries };

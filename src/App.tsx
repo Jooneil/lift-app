@@ -1202,6 +1202,12 @@ function AuthedApp({
     setPlans(prev => prev.map(p =>
       p.id === selectedPlan.id ? { ...p, ghostMode: mode } : p
     ));
+    // Persist immediately with the explicit new value — building the payload
+    // from state here would save the OLD mode (state hasn't re-rendered yet)
+    if (selectedPlan.serverId) {
+      const payload = { weeks: selectedPlan.weeks, ghostMode: mode };
+      planApi.update(selectedPlan.serverId, selectedPlan.name, payload).catch(() => void 0);
+    }
   };
 
   const handleFinishPlan = async () => {
@@ -3097,17 +3103,20 @@ function WorkoutPage({
       entry: { exerciseId?: string; exerciseName?: string | null },
       target: { exerciseId?: string; exerciseName: string }
     ) => {
-      if (target.exerciseId && entry.exerciseId) return String(target.exerciseId) === String(entry.exerciseId);
+      // Id match when both sides agree; name is always an accepted fallback
+      // because ids differ across plans (custom-exercise vs catalog namespaces)
+      if (target.exerciseId && entry.exerciseId && String(target.exerciseId) === String(entry.exerciseId)) return true;
       const entryName = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
       const targetName = normalizeExerciseName(target.exerciseName || '').toLowerCase();
-      if (target.exerciseId && !entry.exerciseId) return entryName === targetName;
-      return entryName === targetName;
+      return !!targetName && entryName === targetName;
     };
 
     (async () => {
       // Instant restore from localStorage cache so ghost appears before API calls complete.
       // Merge over any ghost seeded for this same week/day so re-runs don't wipe it.
-      const cacheKey = `ghost:${plan.serverId ?? plan.id}:${currentWeekId}:${day.id}`;
+      // Keyed per ghost mode so switching modes never restores the other mode's values.
+      const modeKey = plan.ghostMode ?? 'default';
+      const cacheKey = `ghost:${plan.serverId ?? plan.id}:${currentWeekId}:${day.id}:${modeKey}`;
       const seed = ghostSeedRef.current;
       const seedMap = seed && seed.weekId === currentWeekId && seed.dayId === day.id ? seed.map : null;
       let cachedMap: Record<string, { weight: number | null; reps: number | null }[]> | null = null;
@@ -3199,7 +3208,7 @@ function WorkoutPage({
     return () => {
       cancelled = true;
     };
-  }, [plan.serverId, currentWeekId, plan.weeks, day.id, plan.id]);
+  }, [plan.serverId, currentWeekId, plan.weeks, day.id, plan.id, plan.ghostMode]);
 
   // Populate notes from global exercise notes
   useEffect(() => {
@@ -3330,15 +3339,18 @@ function WorkoutPage({
       for (const row of rows) {
         const data = (row as SessionRow).data;
         if (!data || !Array.isArray(data.entries)) continue;
+        if (data.ghostSeed) continue; // synthetic seed rows aren't real workouts
         const sessionDate = data.date || row.updated_at || '';
         if (!sessionDate) continue;
         const setsForRow: Array<{ weight: number; reps: number }> = [];
         for (const e of data.entries) {
           const entryName = normalizeExerciseName(e.exerciseName || '').toLowerCase();
+          // Match by id when both sides agree, but always fall back to the name —
+          // ids come from two namespaces (custom exercises vs catalog), so the same
+          // exercise can carry different ids across plans.
           const match =
             (entry.exerciseId && e.exerciseId && String(e.exerciseId) === String(entry.exerciseId)) ||
-            (entry.exerciseId && !e.exerciseId && entryName === targetName) ||
-            (!entry.exerciseId && entryName === targetName);
+            (!!targetName && entryName === targetName);
           if (!match) continue;
           const validSets = (e.sets ?? [])
             .filter(s => typeof s.weight === 'number' && typeof s.reps === 'number' && !Number.isNaN(s.weight) && !Number.isNaN(s.reps) && (s.weight ?? 0) > 0)
@@ -3436,13 +3448,15 @@ function WorkoutPage({
       for (const row of filteredRows) {
         const data = (row as SessionRow).data;
         if (!data || !Array.isArray(data.entries)) continue;
+        if (data.ghostSeed) continue; // seeds duplicate archived data with today's date
 
         for (const entry of data.entries) {
           const entryName = normalizeExerciseName(entry.exerciseName || '').toLowerCase();
+          // Id match when both sides agree, name fallback otherwise (ids span
+          // two namespaces and differ across plans for the same exercise)
           const match =
             (target.exerciseId && entry.exerciseId && String(entry.exerciseId) === String(target.exerciseId)) ||
-            (target.exerciseId && !entry.exerciseId && entryName === targetName) ||
-            (!target.exerciseId && entryName === targetName);
+            (!!targetName && entryName === targetName);
           if (!match) continue;
 
           const sets = entry.sets ?? [];
@@ -3728,13 +3742,68 @@ function WorkoutPage({
     );
   };
 
-  const saveEditSets = () => {
+  // "This workout only": pin the new set count on the session entry so the
+  // plan→session merge (mergeSessionWithDay) stops snapping it back to the
+  // plan's targetSets — the reason set edits used to silently revert.
+  const saveEditSetsToday = () => {
     if (!editingEntryId) return;
+    const draft = editDraftSets;
+    setSession(s => {
+      if (!s) return s;
+      const nextEntries = s.entries.map(entry =>
+        entry.id !== editingEntryId
+          ? entry
+          : { ...entry, sets: draft, targetSetsOverride: draft.length }
+      );
+      const next: Session = { ...s, entries: nextEntries };
+      saveNow(next);
+      return next;
+    });
+    setEditingEntryId(null);
+    setEditDraftSets([]);
+  };
+
+  // "Rest of plan": change the exercise's targetSets across the plan (same
+  // matching + full-body day scoping as Myo-Rep rest-of-plan), then clear any
+  // per-session override so the plan is the source of truth going forward.
+  const saveEditSetsRestOfPlan = () => {
+    if (!editingEntryId) return;
+    const draft = editDraftSets;
+    const newCount = draft.length;
+    const editedEntry = session?.entries.find(e => e.id === editingEntryId) || null;
+    if (editedEntry) {
+      const targetName = editedEntry.exerciseName.trim().toLowerCase();
+      const targetId = editedEntry.exerciseId;
+      const currentDayName = day.name.trim().toLowerCase();
+      const isFullBody = plan.ghostMode === 'full-body';
+      const updatedPlan = {
+        ...plan,
+        weeks: plan.weeks.map((week) => ({
+          ...week,
+          days: week.days.map((d) => {
+            if (isFullBody && d.name.trim().toLowerCase() !== currentDayName) return d;
+            return {
+              ...d,
+              items: d.items.map((item) => {
+                const itemName = item.exerciseName.trim().toLowerCase();
+                const matches = targetId
+                  ? (item.exerciseId === targetId || itemName === targetName)
+                  : itemName === targetName;
+                return matches ? { ...item, targetSets: newCount } : item;
+              }),
+            };
+          }),
+        })),
+      };
+      onUpdatePlan(updatedPlan);
+    }
     setSession(s => {
       if (!s) return s;
       const nextEntries = s.entries.map(entry => {
         if (entry.id !== editingEntryId) return entry;
-        return { ...entry, sets: editDraftSets };
+        const updated = { ...entry, sets: draft };
+        delete updated.targetSetsOverride;
+        return updated;
       });
       const next: Session = { ...s, entries: nextEntries };
       saveNow(next);
@@ -4026,9 +4095,13 @@ function WorkoutPage({
                 + Add Set
               </Button>
 
-              <div className="flex gap-2 justify-end">
+              <div className="text-muted text-[12px] text-center mt-1 mb-1">Save this set change to…</div>
+              <div className="flex gap-2 mb-1">
+                <Button onClick={saveEditSetsToday} variant="primary" size="sm" block>This workout</Button>
+                <Button onClick={saveEditSetsRestOfPlan} size="sm" block>Rest of plan</Button>
+              </div>
+              <div className="flex justify-center">
                 <Button onClick={cancelEdit} size="sm">Cancel</Button>
-                <Button onClick={saveEditSets} variant="primary">Save</Button>
               </div>
             </>
           ) : (
@@ -5225,13 +5298,80 @@ function BuilderPage({
     return JSON.stringify(selectedPlan) !== JSON.stringify(builderInitialSnapshotRef.current);
   }, [selectedPlan]);
 
-  const handleBack = () => {
-    if (dirty) {
-      setShowDiscardModal(true);
-    } else {
-      builderInitialSnapshotRef.current = null;
-      onBack?.();
+  // --- Autosave: a plan persists the moment it exists and on every edit ---
+  const selectedPlanRef2 = useRef<Plan | null>(null);
+  selectedPlanRef2.current = selectedPlan;
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  const autosaveTimerRef = useRef<number | null>(null);
+  const autosaveInFlightRef = useRef(false);
+  const autosavePendingRef = useRef(false);
+  // Remembers server ids handed out mid-flight so racing saves can't create duplicates
+  const autosaveCreatedIdsRef = useRef<Record<string, NonNullable<Plan['serverId']>>>({});
+
+  const autosavePlan = useCallback(async () => {
+    const plan = selectedPlanRef2.current;
+    if (!plan) return;
+    if (autosaveInFlightRef.current) { autosavePendingRef.current = true; return; }
+    autosaveInFlightRef.current = true;
+    try {
+      const payload = { weeks: plan.weeks, ghostMode: plan.ghostMode };
+      const serverId = plan.serverId ?? autosaveCreatedIdsRef.current[plan.id];
+      let savedPlan = plan;
+      if (serverId) {
+        await planApi.update(serverId, plan.name, payload);
+      } else {
+        const created = await planApi.create(plan.name, payload);
+        if (created?.id) {
+          autosaveCreatedIdsRef.current[plan.id] = created.id;
+          savedPlan = { ...plan, serverId: created.id };
+          setPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, serverId: created.id } : p)));
+        }
+      }
+      builderInitialSnapshotRef.current = JSON.parse(JSON.stringify(savedPlan));
+    } catch {
+      // Transient failure — plan stays dirty; the next edit or flush retries
+    } finally {
+      autosaveInFlightRef.current = false;
+      if (autosavePendingRef.current) { autosavePendingRef.current = false; void autosavePlan(); }
     }
+  }, [setPlans]);
+
+  // Debounced save on every change; also creates brand-new plans immediately
+  useEffect(() => {
+    if (!selectedPlan) return;
+    if (!dirty && selectedPlan.serverId) return;
+    if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
+      void autosavePlan();
+    }, 1200);
+    return () => {
+      if (autosaveTimerRef.current) { window.clearTimeout(autosaveTimerRef.current); autosaveTimerRef.current = null; }
+    };
+  }, [selectedPlan, dirty, autosavePlan]);
+
+  // Flush pending edits the instant the app is backgrounded (phone locked,
+  // app switched) — iOS can kill the page before a debounce timer fires.
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+        void autosavePlan();
+      }
+    };
+    document.addEventListener('visibilitychange', flush);
+    return () => document.removeEventListener('visibilitychange', flush);
+  }, [autosavePlan]);
+
+  const handleBack = () => {
+    // Everything autosaves, so back never discards — just flush any pending edit
+    if (autosaveTimerRef.current) { window.clearTimeout(autosaveTimerRef.current); autosaveTimerRef.current = null; }
+    if (dirtyRef.current || (selectedPlanRef2.current && !selectedPlanRef2.current.serverId)) void autosavePlan();
+    builderInitialSnapshotRef.current = null;
+    onBack?.();
   };
 
   const handleDiscard = () => {
@@ -5523,17 +5663,27 @@ function BuilderPage({
   const dragFromGripRef = useRef(false);
   const dragJustEndedRef = useRef(false);
   const preventTouchMoveRef = useRef((e: TouchEvent) => { e.preventDefault(); });
+  // Live mirrors of the drag state + a handle to the list container. The
+  // move/drop logic runs on document-level listeners (attached for the
+  // duration of one gesture), which must read fresh values from refs rather
+  // than a stale render closure. Driving the gesture from the document — not
+  // from pointer capture on the row, which iOS silently drops when it's
+  // requested from a timer or the node re-renders — is what stops the "purple
+  // placeholder shows but the row never actually moves" failure.
+  const dragContainerRef = useRef<HTMLDivElement | null>(null);
+  const draggingExerciseIdRef = useRef<string | null>(null);
+  const dragActiveRef = useRef<boolean>(false);
+  const dragInsertIndexRef = useRef<number | null>(null);
+  const docDragCleanupRef = useRef<null | (() => void)>(null);
 
-  // Lift the row: visual pop, haptic tick, pointer capture, and scroll lock.
-  // iOS evaluates touch-action at gesture start, so a mid-gesture style change
-  // can't stop scrolling — the non-passive touchmove listener does.
+  // Lift the row: visual pop, haptic tick, and scroll lock. iOS evaluates
+  // touch-action at gesture start, so a mid-gesture style change can't stop
+  // scrolling — the non-passive touchmove listener does.
   const activateDrag = () => {
+    dragActiveRef.current = true;
     setDragActive(true);
     const el = draggedElRef.current;
-    if (el) {
-      el.style.transform = 'translateY(0px) scale(1.03)';
-      if (dragPointerIdRef.current != null) { try { el.setPointerCapture(dragPointerIdRef.current); } catch { /* ignore */ } }
-    }
+    if (el) el.style.transform = 'translateY(0px) scale(1.03)';
     try { navigator.vibrate?.(10); } catch { /* unsupported */ }
     document.addEventListener('touchmove', preventTouchMoveRef.current, { passive: false });
   };
@@ -5541,7 +5691,9 @@ function BuilderPage({
   const resetDragState = () => {
     if (dragTimerRef.current) { window.clearTimeout(dragTimerRef.current); dragTimerRef.current = null; }
     document.removeEventListener('touchmove', preventTouchMoveRef.current);
+    if (docDragCleanupRef.current) { docDragCleanupRef.current(); docDragCleanupRef.current = null; }
     if (draggedElRef.current) draggedElRef.current.style.transform = '';
+    draggingExerciseIdRef.current = null; dragActiveRef.current = false; dragInsertIndexRef.current = null;
     setDraggingExerciseId(null); setDragWeekId(null); setDragDayId(null); setDragInsertIndex(null); setDragActive(false);
     dragOffsetYRef.current = 0; draggedElRef.current = null; dragPointerIdRef.current = null; dragFromGripRef.current = false;
   };
@@ -5625,15 +5777,19 @@ function BuilderPage({
     setError(null);
     try {
       const payload = { weeks: selectedPlan.weeks, ghostMode: selectedPlan.ghostMode };
-      if (selectedPlan.serverId) {
-        await planApi.update(selectedPlan.serverId, selectedPlan.name, payload);
+      const knownServerId = selectedPlan.serverId ?? autosaveCreatedIdsRef.current[selectedPlan.id];
+      if (knownServerId) {
+        await planApi.update(knownServerId, selectedPlan.name, payload);
+        builderInitialSnapshotRef.current = JSON.parse(JSON.stringify(selectedPlan));
         // After update, pass through the same plan reference
         if (onSaved) onSaved(selectedPlan);
       } else {
         const created = await planApi.create(selectedPlan.name, payload);
         if (created?.id) {
+          autosaveCreatedIdsRef.current[selectedPlan.id] = created.id;
           const withServerId: Plan = { ...selectedPlan, serverId: created.id };
           setPlans((prev) => prev.map((p) => (p.id === selectedPlan.id ? { ...p, serverId: created.id } : p)));
+          builderInitialSnapshotRef.current = JSON.parse(JSON.stringify(withServerId));
           if (onSaved) onSaved(withServerId);
         } else {
           if (onSaved) onSaved(selectedPlan);
@@ -6204,6 +6360,7 @@ function BuilderPage({
               </div>
             ) : (
               <div
+                ref={dragContainerRef}
                 style={{ display: 'flex', flexDirection: 'column', gap: 6, touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto' } as React.CSSProperties}
                 onClickCapture={(e) => {
                   // A completed drag still synthesizes a click on whatever is under
@@ -6213,50 +6370,6 @@ function BuilderPage({
                     e.preventDefault();
                     e.stopPropagation();
                   }
-                }}
-                onPointerMove={(e) => {
-                  if (!draggingExerciseId || dragWeekId !== activeWeekId || dragDayId !== activeDayId) return;
-                  const dy = Math.abs(e.clientY - dragStartYRef.current);
-                  if (!dragActive) {
-                    if (dragFromGripRef.current) {
-                      // Grip drags start on movement, no hold needed
-                      if (dy > 8) activateDrag(); else return;
-                    } else {
-                      // Moved before the long-press completed — that's a scroll
-                      if (dy > 10) resetDragState();
-                      return;
-                    }
-                  }
-                  e.preventDefault();
-                  dragOffsetYRef.current = e.clientY - dragStartYRef.current;
-                  if (draggedElRef.current) draggedElRef.current.style.transform = `translateY(${dragOffsetYRef.current}px) scale(1.02)`;
-                  const container = e.currentTarget as HTMLElement;
-                  const allRows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
-                  const seen = new Set<string>();
-                  const rows: HTMLElement[] = [];
-                  for (const row of allRows) {
-                    const id = row.getAttribute('data-exercise-id')!;
-                    if (!seen.has(id) && row.offsetParent !== null) { seen.add(id); rows.push(row); }
-                  }
-                  if (rows.length === 0) return;
-                  const y = e.clientY;
-                  let insert = rows.length;
-                  for (let i = 0; i < rows.length; i++) {
-                    const r = rows[i].getBoundingClientRect();
-                    if (y < r.top + r.height / 2) { insert = i; break; }
-                  }
-                  setDragInsertIndex(insert);
-                }}
-                onPointerUp={() => {
-                  if (!draggingExerciseId || dragWeekId !== activeWeekId || dragDayId !== activeDayId) return;
-                  if (!dragActive) { resetDragState(); return; }
-                  const insert = dragInsertIndex == null ? activeDay.items.length : dragInsertIndex;
-                  handleReorderExerciseAtIndex(activeWeekId, activeDayId, draggingExerciseId, insert);
-                  dragJustEndedRef.current = true;
-                  resetDragState();
-                }}
-                onPointerCancel={() => {
-                  resetDragState();
                 }}
               >
                 {activeDay.items.map((item, idx) => {
@@ -6286,11 +6399,82 @@ function BuilderPage({
                           draggedElRef.current = exerciseRow;
                           dragPointerIdRef.current = e.pointerId;
                           dragFromGripRef.current = fromGrip;
+                          draggingExerciseIdRef.current = item.id;
+                          dragActiveRef.current = false;
+                          dragInsertIndexRef.current = idx;
                           setDraggingExerciseId(item.id); setDragWeekId(activeWeekId); setDragDayId(activeDayId);
                           setDragActive(false); dragStartYRef.current = e.clientY; dragOffsetYRef.current = 0; setDragInsertIndex(idx);
                           if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
                           // Grip: near-instant. Anywhere else on the row: press-and-hold to lift.
                           dragTimerRef.current = window.setTimeout(activateDrag, fromGrip ? 150 : 400);
+
+                          // Everything after the press is driven from the
+                          // document, not React props on the row, so a
+                          // re-render, the finger leaving the row, or an iOS
+                          // pointer-capture quirk can't swallow the move or the
+                          // drop. All dynamic values are read from refs.
+                          const weekId = activeWeekId;
+                          const dayId = activeDayId;
+                          const onMove = (ev: PointerEvent) => {
+                            if (ev.pointerId !== dragPointerIdRef.current) return;
+                            if (!draggingExerciseIdRef.current) return;
+                            const dy = Math.abs(ev.clientY - dragStartYRef.current);
+                            if (!dragActiveRef.current) {
+                              // Grip drags lift on movement; a plain press that
+                              // moves first is a scroll, so bail and let it scroll.
+                              if (dragFromGripRef.current) { if (dy > 8) activateDrag(); else return; }
+                              else { if (dy > 10) resetDragState(); return; }
+                            }
+                            ev.preventDefault();
+                            dragOffsetYRef.current = ev.clientY - dragStartYRef.current;
+                            if (draggedElRef.current) draggedElRef.current.style.transform = `translateY(${dragOffsetYRef.current}px) scale(1.02)`;
+                            const container = dragContainerRef.current;
+                            if (!container) return;
+                            const allRows = Array.from(container.querySelectorAll('[data-exercise-id]')) as HTMLElement[];
+                            const seen = new Set<string>();
+                            const rows: HTMLElement[] = [];
+                            for (const row of allRows) {
+                              const id = row.getAttribute('data-exercise-id')!;
+                              if (!seen.has(id) && row.offsetParent !== null) { seen.add(id); rows.push(row); }
+                            }
+                            if (rows.length === 0) return;
+                            const y = ev.clientY;
+                            let insert = rows.length;
+                            for (let i = 0; i < rows.length; i++) {
+                              // Skip the dragged row itself — it follows the pointer
+                              // via transform, so its rect always sits at `y` and
+                              // would otherwise freeze the insert index in place.
+                              if (rows[i].getAttribute('data-exercise-id') === draggingExerciseIdRef.current) continue;
+                              const r = rows[i].getBoundingClientRect();
+                              if (y < r.top + r.height / 2) { insert = i; break; }
+                            }
+                            dragInsertIndexRef.current = insert;
+                            setDragInsertIndex(insert);
+                          };
+                          const onUp = (ev: PointerEvent) => {
+                            if (ev.pointerId !== dragPointerIdRef.current) return;
+                            const draggedId = draggingExerciseIdRef.current;
+                            if (draggedId && dragActiveRef.current) {
+                              const container = dragContainerRef.current;
+                              const fallback = container ? container.querySelectorAll('[data-exercise-id]').length : 0;
+                              const insert = dragInsertIndexRef.current == null ? fallback : dragInsertIndexRef.current;
+                              handleReorderExerciseAtIndex(weekId, dayId, draggedId, insert);
+                              dragJustEndedRef.current = true;
+                            }
+                            resetDragState();
+                          };
+                          const onCancel = (ev: PointerEvent) => {
+                            if (ev.pointerId !== dragPointerIdRef.current) return;
+                            resetDragState();
+                          };
+                          document.addEventListener('pointermove', onMove, { passive: false });
+                          document.addEventListener('pointerup', onUp);
+                          document.addEventListener('pointercancel', onCancel);
+                          docDragCleanupRef.current = () => {
+                            document.removeEventListener('pointermove', onMove);
+                            document.removeEventListener('pointerup', onUp);
+                            document.removeEventListener('pointercancel', onCancel);
+                          };
                         }}
                         style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 4px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', borderRadius: 12, position: 'relative', zIndex: isDragging ? 10 : 'auto', boxShadow: isDragging ? '0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(138, 143, 255, 0.25)' : 'none', touchAction: (draggingExerciseId && dragActive) ? 'none' : 'auto', opacity: isDragging ? 0.95 : 1 } as React.CSSProperties}
                       >

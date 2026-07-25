@@ -34,7 +34,10 @@ export type Session = {
   completed?: boolean;
   ghostSeed?: boolean;
 };
-export type SessionEntry = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSet[]; note?: string | null; myoRepMatch?: boolean };
+// targetSetsOverride: when the user changes the set count for THIS workout only
+// (not the whole plan), this pins the entry's set count so the plan→session
+// merge doesn't snap it back to the plan's targetSets.
+export type SessionEntry = { id: string; exerciseId?: string; exerciseName: string; sets: SessionSet[]; note?: string | null; myoRepMatch?: boolean; targetSetsOverride?: number };
 export type SessionSet = { id: string; setIndex: number; weight: number | null; reps: number | null };
 
 export type ArchivedSessionMap = Record<string, Record<string, Session | null>>;
