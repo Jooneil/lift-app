@@ -48,3 +48,9 @@ admin.html
 # Windows device-name artifact
 nul
 
+
+# Local dev server databases (old Express login; never commit)
+server/credsdb.txt
+server/*.db
+server/*.sqlite
+server/data/
